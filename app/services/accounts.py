@@ -3,6 +3,7 @@ from sqlmodel import Session, delete, select
 from app.models.exercise import RestPreference
 from app.models.food import Food, FoodLog
 from app.models.measurement import BodyMeasurement
+from app.models.points import PointAward
 from app.models.sleep import SleepEntry
 from app.models.user import Profile, User, WeightEntry
 from app.models.whoop import WhoopConnection
@@ -19,5 +20,6 @@ def delete_user(session: Session, user: User) -> None:
     session.exec(delete(Profile).where(Profile.user_id == user.id))
     session.exec(delete(RestPreference).where(RestPreference.user_id == user.id))
     session.exec(delete(WhoopConnection).where(WhoopConnection.user_id == user.id))
+    session.exec(delete(PointAward).where(PointAward.user_id == user.id))
     session.delete(user)
     session.commit()

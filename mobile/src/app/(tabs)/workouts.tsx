@@ -9,9 +9,9 @@ import { Badge, Button, Card, CardHead, Field, IconButton, LinkButton, ListRow, 
 import { ExerciseSearch, QrScanner, SetForm, SetsList, WorkoutDetail, type PickedExercise } from "@/components/WorkoutParts";
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
-import { WEEKDAYS_SHORT, duration, longDateTime, plural, timeOf, units, weekdayIndex } from "@/lib/format";
+import { WEEKDAYS_SHORT, duration, longDateTime, plural, timeOf, tzOffset, units, weekdayIndex } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
-import type { Routine, Workout } from "@/lib/types";
+import type { Points, Routine, Workout } from "@/lib/types";
 
 type SheetState =
   | { kind: "search" }
@@ -101,7 +101,9 @@ export default function Workouts() {
               style={{ flex: 1 }}
               onPress={async () => {
                 await api(`/workouts/${active.id}`, { method: "PATCH", body: { finish: true, notes } });
-                toast("Workout saved. Nice work!");
+                const points = await api<Points>(`/points?tz_offset=${tzOffset()}`).catch(() => null);
+                const earned = points?.new.reduce((sum, x) => sum + x.points, 0) ?? 0;
+                toast(earned ? `Workout saved. +${earned} wellness points` : "Workout saved. Nice work!");
                 await load();
               }}
             />

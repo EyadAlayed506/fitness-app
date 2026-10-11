@@ -17,6 +17,7 @@ from app.routers import (
     marketing,
     me,
     measurements,
+    points,
     sleep,
     whoop,
     workouts,
@@ -43,7 +44,7 @@ app.add_middleware(
 )
 
 api = APIRouter(prefix="/api")
-for module in (auth, me, exercises, workouts, foods, measurements, sleep, whoop, analytics, marketing):
+for module in (auth, me, exercises, workouts, foods, measurements, sleep, whoop, analytics, points, marketing):
     api.include_router(module.router)
 app.include_router(api)
 

@@ -5,13 +5,14 @@ import { Pressable, View } from "react-native";
 import { MacroBars } from "@/components/MacroBars";
 import { SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
 import { TodayCard } from "@/components/TodayCard";
+import { PointsCard } from "@/components/PointsParts";
 import { Badge, Button, Card, CardHead, Field, LinkButton, Meter, Row, Screen, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth, useProfile } from "@/lib/auth";
 import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, tzOffset, units } from "@/lib/format";
 import { profilePayload } from "@/lib/profile";
 import { useTheme } from "@/lib/theme";
-import type { DietOption, FoodDay, Plan, Recommendations, SleepAnalytics, SleepEntry, WhoopStatus } from "@/lib/types";
+import type { DietOption, FoodDay, Plan, Points, Recommendations, SleepAnalytics, SleepEntry, WhoopStatus } from "@/lib/types";
 
 const BMI_BADGE = { underweight: "info", normal: "good", overweight: "warn", obese: "bad" } as const;
 const SCALE_MIN = 15;
@@ -26,6 +27,7 @@ export default function Home() {
   const [lastSleep, setLastSleep] = useState<SleepEntry | null>(null);
   const [sleepStats, setSleepStats] = useState<SleepAnalytics | null>(null);
   const [today, setToday] = useState<Recommendations | null>(null);
+  const [points, setPoints] = useState<Points | null>(null);
   const [whoopConnected, setWhoopConnected] = useState(false);
   const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
@@ -45,6 +47,8 @@ export default function Home() {
       api<Recommendations>(`/me/recommendations?tz_offset=${tzOffset()}`).catch(() => null),
     ]);
     setToday(recs);
+    // after the sync above, so last night's WHOOP sleep can count
+    setPoints(await api<Points>(`/points?tz_offset=${tzOffset()}`).catch(() => null));
     setDay(food);
     setLastSleep(sleeps[0] ?? null);
     setSleepStats(stats);
@@ -88,6 +92,7 @@ export default function Home() {
       }}
     >
       {today ? <TodayCard data={today} /> : null}
+      {points ? <PointsCard data={points} /> : null}
 
       <Card>
         <CardHead title="Body mass index" right={<Badge label={cap(plan.bmi_category)} tone={BMI_BADGE[plan.bmi_category]} />} />

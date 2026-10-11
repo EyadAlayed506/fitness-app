@@ -63,7 +63,12 @@ def main() -> None:
         if old:
             delete_user(session, old)
 
-        user = User(email=EMAIL, hashed_password=hash_password(PASSWORD))
+        # "signed up" when the history starts, so recent days can earn wellness points
+        user = User(
+            email=EMAIL,
+            hashed_password=hash_password(PASSWORD),
+            created_at=datetime.now(UTC) - timedelta(days=DAYS),
+        )
         session.add(user)
         session.commit()
         session.refresh(user)
@@ -158,7 +163,8 @@ def main() -> None:
             minutes = round((wake - bed).total_seconds() / 60)
             quality = 5 if minutes >= 480 else 4 if minutes >= 435 else 3 if minutes >= 390 else 2
             session.add(SleepEntry(user_id=user.id, date=wake.date(), bedtime=bed, wake_time=wake,
-                                   duration_minutes=minutes, quality=quality))
+                                   duration_minutes=minutes, quality=quality,
+                                   created_at=datetime.combine(wake.date(), time(9), tzinfo=UTC)))
         session.commit()
 
     print(f"Demo account ready. Log in with {EMAIL} / {PASSWORD}")

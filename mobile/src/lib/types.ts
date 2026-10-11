@@ -307,3 +307,34 @@ export interface Recommendations {
   items: Recommendation[];
   disclaimer: string;
 }
+
+export interface PointAward {
+  rule: string;
+  points: number;
+  day: string;
+  reason: string;
+  /** "manual": entered by the user; "whoop": from a connected tracker */
+  data_source: "manual" | "whoop";
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  earned: boolean;
+  progress: number;
+  target: number;
+}
+
+export interface Points {
+  total: number;
+  level: number;
+  level_start: number;
+  next_level_at: number;
+  today: { date: string; points: number; awards: PointAward[] };
+  /** Points given by this request */
+  new: PointAward[];
+  recent: PointAward[];
+  achievements: Achievement[];
+  rules: { id: string; points: number; label: string; description: string }[];
+}

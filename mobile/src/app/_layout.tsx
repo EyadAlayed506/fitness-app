@@ -22,6 +22,7 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
               <Stack.Screen name="qr-stickers" options={{ headerShown: true, title: "QR stickers" }} />
               <Stack.Screen name="sleep" options={{ headerShown: true, title: "Sleep" }} />
+              <Stack.Screen name="points" options={{ headerShown: true, title: "Wellness points" }} />
             </Stack>
           </ToastProvider>
         </AuthProvider>
