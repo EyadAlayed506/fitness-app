@@ -20,13 +20,21 @@ from app.services import calculations as calc
 from app.services.accounts import delete_user
 from app.services.plan import PlanOut, build_plan
 from app.services.routine import Routine, generate_routine
+from app.services.schedule import effective_training_days, format_days, validate_days
 from app.services.units import to_cm, to_kg
 
 router = APIRouter(prefix="/me", tags=["me"])
 
 
 def profile_public(profile: Profile) -> ProfilePublic:
-    return ProfilePublic.model_validate(profile, update={"age": calc.age_on(profile.birth_date)})
+    return ProfilePublic.model_validate(
+        profile,
+        update={
+            "age": calc.age_on(profile.birth_date),
+            "training_days": effective_training_days(profile),
+            "training_days_chosen": profile.training_days is not None,
+        },
+    )
 
 
 @router.get("", response_model=UserPublic)
@@ -51,7 +59,7 @@ def save_profile(data: ProfileIn, user: CurrentUser, session: SessionDep):
         raise HTTPException(status_code=422, detail="Birth date must be in the past")
     if not 13 <= calc.age_on(data.birth_date) <= 100:
         raise HTTPException(status_code=422, detail="Age must be between 13 and 100")
-    values = data.model_dump(exclude={"height", "height_unit", "weight", "weight_unit"})
+    values = data.model_dump(exclude={"height", "height_unit", "weight", "weight_unit", "training_days"})
     height_cm = to_cm(data.height, data.height_unit)
     weight_kg = to_kg(data.weight, data.weight_unit)
     if not 100 <= height_cm <= 250:
@@ -60,6 +68,17 @@ def save_profile(data: ProfileIn, user: CurrentUser, session: SessionDep):
         raise HTTPException(status_code=422, detail="Weight must be between 30 and 350 kg")
 
     profile = session.get(Profile, user.id)
+    if data.training_days is not None:
+        try:
+            days = validate_days(data.training_days)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        values["training_days"] = format_days(days)
+        values["days_per_week"] = len(days)
+    elif profile is not None and profile.training_days and data.days_per_week == profile.days_per_week:
+        pass  # an older client that only knows the count: keep the days the user chose
+    else:
+        values["training_days"] = None  # count only: shown as "set automatically" until the user picks days
     weight_changed = profile is None or abs(profile.weight_kg - weight_kg) > 1e-6
     if profile is None:
         profile = Profile(user_id=user.id, height_cm=height_cm, weight_kg=weight_kg, **values)
@@ -172,5 +191,5 @@ def read_routine(profile: CurrentProfile, session: SessionDep):
     plan = build_plan(profile)
     catalogue = list(session.exec(select(Exercise)).all())
     return generate_routine(
-        catalogue, profile.days_per_week, profile.minutes_per_session, profile.equipment, plan.direction
+        catalogue, effective_training_days(profile), profile.minutes_per_session, profile.equipment, plan.direction
     )

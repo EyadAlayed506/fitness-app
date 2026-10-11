@@ -23,6 +23,7 @@ from app.services.accounts import delete_user
 from app.services.calculations import navy_body_fat
 from app.services.plan import build_plan
 from app.services.routine import generate_routine
+from app.services.schedule import format_days
 from app.services.units import to_base_amount
 
 EMAIL = "demo@fitness.app"
@@ -30,6 +31,7 @@ PASSWORD = "demo1234"
 DAYS = 70  # ten weeks of history
 START_WEIGHT = 97.0
 WEEKLY_LOSS = 0.55
+TRAINING_DAYS = [1, 3, 5, 6]  # Tuesday, Thursday, Saturday, Sunday
 
 STARTING_WEIGHTS = {  # kg for the first week; bodyweight exercises stay at 0
     "Chest Press": 50, "Barbell Bench Press": 60, "Incline Chest Press": 40, "Pec Deck": 35, "Cable Crossover": 15,
@@ -81,7 +83,7 @@ def main() -> None:
 
         profile = Profile(
             user_id=user.id, birth_date=date(1995, 3, 14), sex="male", height_cm=180, weight_kg=weights[today],
-            activity_level="moderate", goal="auto", diet_option="normal", days_per_week=4,
+            activity_level="moderate", goal="auto", diet_option="normal", days_per_week=len(TRAINING_DAYS), training_days=format_days(TRAINING_DAYS),
             minutes_per_session=60, equipment="gym", unit_system="metric",
         )
         session.add(profile)
@@ -106,9 +108,8 @@ def main() -> None:
 
         # Workouts: follow the generated routine on its weekdays
         catalogue = list(session.exec(select(Exercise)).all())
-        routine = generate_routine(catalogue, 4, 60, "gym", build_plan(profile).direction)
-        weekday_index = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4, "Saturday": 5}
-        by_weekday = {weekday_index[d.weekday]: d for d in routine.days}
+        routine = generate_routine(catalogue, TRAINING_DAYS, 60, "gym", build_plan(profile).direction)
+        by_weekday = {d.weekday_index: d for d in routine.days}
         names = {e.id: e for e in catalogue}
         for i in range(DAYS, 0, -1):
             day = today - timedelta(days=i)

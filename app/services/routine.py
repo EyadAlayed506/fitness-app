@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 from app.models.exercise import Exercise
+from app.services.schedule import WEEKDAY_NAMES, choose_split, day_names
 
 # Which equipment levels each profile setting may use
 ALLOWED_EQUIPMENT = {
@@ -22,33 +23,6 @@ DAY_TEMPLATES = {
     "Legs": ["quads", "hamstrings", "glutes", "calves", "quads", "core", "hamstrings", "calves"],
 }
 
-SPLITS = {
-    1: ["Full body A"],
-    2: ["Full body A", "Full body B"],
-    3: ["Full body A", "Full body B", "Full body A"],
-    4: ["Upper", "Lower", "Upper", "Lower"],
-    5: ["Upper", "Lower", "Push", "Pull", "Legs"],
-    6: ["Push", "Pull", "Legs", "Push", "Pull", "Legs"],
-}
-
-SPLIT_NAMES = {
-    1: "Full body",
-    2: "Full body A / B",
-    3: "Full body A / B / A",
-    4: "Upper / Lower",
-    5: "Upper / Lower / Push / Pull / Legs",
-    6: "Push / Pull / Legs x2",
-}
-
-WEEKDAYS = {
-    1: ["Monday"],
-    2: ["Monday", "Thursday"],
-    3: ["Monday", "Wednesday", "Friday"],
-    4: ["Monday", "Tuesday", "Thursday", "Friday"],
-    5: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-    6: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-}
-
 REPS_BY_DIRECTION = {"lose": "10-15", "gain": "6-12", "maintain": "8-12"}
 MINUTES_PER_EXERCISE = 9
 
@@ -66,6 +40,7 @@ class RoutineExercise:
 @dataclass
 class RoutineDay:
     weekday: str
+    weekday_index: int  # 0 = Monday ... 6 = Sunday
     title: str
     exercises: list[RoutineExercise] = field(default_factory=list)
     cardio_minutes: int = 0
@@ -74,6 +49,9 @@ class RoutineDay:
 @dataclass
 class Routine:
     split: str
+    split_reason: str
+    training_days: list[int]
+    rest_days: list[str]
     days_per_week: int
     minutes_per_session: int
     exercises_per_day: int
@@ -88,7 +66,7 @@ def exercises_per_session(minutes: int, cardio_minutes: int = 0) -> int:
 
 def generate_routine(
     catalogue: list[Exercise],
-    days_per_week: int,
+    training_days: list[int],
     minutes_per_session: int,
     equipment: str,
     direction: str,
@@ -107,12 +85,15 @@ def generate_routine(
     rest = 60 if direction == "lose" else 90
     sets = 3
 
+    training_days = sorted(set(training_days))
+    titles, split_name, split_reason = choose_split(training_days)
     days = []
     template_use: dict[str, int] = {}  # vary exercise choice when a day type repeats
-    for weekday, title in zip(WEEKDAYS[days_per_week], SPLITS[days_per_week]):
+    for weekday_index in training_days:  # calendar order, Monday first
+        title = titles[weekday_index]
         variant = template_use.get(title, 0)
         template_use[title] = variant + 1
-        day = RoutineDay(weekday=weekday, title=title, cardio_minutes=cardio)
+        day = RoutineDay(weekday=WEEKDAY_NAMES[weekday_index], weekday_index=weekday_index, title=title, cardio_minutes=cardio)
         used: set[int] = set()
         group_count: dict[str, int] = {}
         for group in DAY_TEMPLATES[title]:
@@ -134,8 +115,11 @@ def generate_routine(
     notes.append("When you hit the top of the rep range on every set, add weight next time.")
 
     return Routine(
-        split=SPLIT_NAMES[days_per_week],
-        days_per_week=days_per_week,
+        split=split_name,
+        split_reason=split_reason,
+        training_days=training_days,
+        rest_days=day_names(set(range(7)) - set(training_days)),
+        days_per_week=len(training_days),
         minutes_per_session=minutes_per_session,
         exercises_per_day=n_exercises,
         reps=reps,

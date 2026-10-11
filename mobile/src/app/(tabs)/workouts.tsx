@@ -7,7 +7,7 @@ import { Badge, Button, Card, CardHead, Field, LinkButton, ListRow, Row, Screen,
 import { ExerciseSearch, QrScanner, SetForm, SetsList, WorkoutDetail, type PickedExercise } from "@/components/WorkoutParts";
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
-import { duration, longDateTime, plural, timeOf, units } from "@/lib/format";
+import { WEEKDAYS_SHORT, duration, longDateTime, plural, timeOf, units, weekdayIndex } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
 import type { Routine, Workout } from "@/lib/types";
 
@@ -27,7 +27,7 @@ export default function Workouts() {
   const [history, setHistory] = useState<Workout[]>([]);
   const [active, setActive] = useState<Workout | null>(null);
   const [notes, setNotes] = useState("");
-  const [openDay, setOpenDay] = useState(0);
+  const [openDay, setOpenDay] = useState<number | null>(null); // weekday index; null = today or the next training day
   const [sheet, setSheet] = useState<SheetState>(null);
 
   const load = useCallback(async () => {
@@ -119,23 +119,34 @@ export default function Workouts() {
       <Section title="Your routine" />
       {routine ? (
         <Card>
-          <Txt variant="small">
-            {routine.exercises_per_day} exercises per session · {routine.minutes_per_session} min
+          <WeekStrip routine={routine} />
+          <Txt variant="small" style={{ marginTop: 10 }}>
+            {routine.split}: {routine.split_reason}
           </Txt>
-          {routine.days.map((d, i) => (
+          <Txt variant="small" style={{ marginTop: 4, marginBottom: 4 }}>
+            {routine.exercises_per_day} exercises per session · {routine.minutes_per_session} min. Change your days in Profile.
+          </Txt>
+          {routine.days.map((d, i) => {
+            const shown = openDay ?? nextTrainingDay(routine);
+            const open = shown === d.weekday_index;
+            const isToday = d.weekday_index === weekdayIndex();
+            return (
             <View key={d.weekday} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: t.border, paddingVertical: 10 }}>
               <Pressable
-                onPress={() => setOpenDay(openDay === i ? -1 : i)}
+                onPress={() => setOpenDay(open ? -1 : d.weekday_index)}
                 accessibilityRole="button"
-                accessibilityState={{ expanded: openDay === i }}
+                accessibilityState={{ expanded: open }}
                 style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
               >
-                <Txt>
-                  <Txt style={{ fontWeight: "700" }}>{d.weekday}</Txt> · {d.title}
-                </Txt>
-                <Ionicons name={openDay === i ? "chevron-up" : "chevron-down"} size={18} color={t.muted} />
+                <Row gap={6}>
+                  <Txt>
+                    <Txt style={{ fontWeight: "700" }}>{d.weekday}</Txt> · {d.title}
+                  </Txt>
+                  {isToday ? <Badge label="Today" tone="info" /> : null}
+                </Row>
+                <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={t.muted} />
               </Pressable>
-              {openDay === i ? (
+              {open ? (
                 <View style={{ marginTop: 8, gap: 6 }}>
                   {d.exercises.map((x, k) => (
                     <Row key={x.exercise_id} gap={6}>
@@ -152,7 +163,8 @@ export default function Workouts() {
                 </View>
               ) : null}
             </View>
-          ))}
+            );
+          })}
           <View style={{ marginTop: 6, gap: 3 }}>
             {routine.notes.map((n) => (
               <Txt key={n} variant="small">
@@ -202,5 +214,51 @@ export default function Workouts() {
         {sheet?.kind === "history" ? <WorkoutDetail workoutId={sheet.id} onDeleted={closeSheet} /> : null}
       </Sheet>
     </Screen>
+  );
+}
+
+/** Today if it's a training day, otherwise the next one. */
+function nextTrainingDay(routine: Routine): number {
+  const today = weekdayIndex();
+  for (let k = 0; k < 7; k++) {
+    const d = (today + k) % 7;
+    if (routine.training_days.includes(d)) return d;
+  }
+  return routine.training_days[0] ?? 0;
+}
+
+/** Monday to Sunday: training days with their session, rest days, and today. */
+function WeekStrip({ routine }: { routine: Routine }) {
+  const t = useTheme();
+  const today = weekdayIndex();
+  const titles = new Map(routine.days.map((d) => [d.weekday_index, d.title]));
+  return (
+    <View style={{ flexDirection: "row", gap: 4, marginTop: 8 }} accessibilityLabel={`Training days: ${routine.days.map((d) => d.weekday).join(", ")}`}>
+      {WEEKDAYS_SHORT.map((label, d) => {
+        const title = titles.get(d);
+        const isToday = d === today;
+        return (
+          <View
+            key={label}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              paddingVertical: 8,
+              borderRadius: 10,
+              backgroundColor: title ? t.accentSoft : t.surface2,
+              borderWidth: isToday ? 2 : 0,
+              borderColor: t.accent,
+            }}
+          >
+            <Txt variant="tiny" style={{ color: isToday ? t.accent : t.text2, fontWeight: isToday ? "700" : "500" }}>
+              {label}
+            </Txt>
+            <Txt variant="tiny" style={{ color: title ? t.accent : t.muted, fontWeight: "600", textAlign: "center" }} numberOfLines={2}>
+              {title ? title.replace("Full body", "Full") : "Rest"}
+            </Txt>
+          </View>
+        );
+      })}
+    </View>
   );
 }

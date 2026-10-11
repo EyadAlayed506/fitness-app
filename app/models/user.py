@@ -111,6 +111,9 @@ class Profile(ProfileBase, table=True):
     user_id: int = Field(foreign_key="user.id", primary_key=True)
     height_cm: float
     weight_kg: float  # latest weigh-in
+    # Weekdays the user trains, "0,2,4" (0 = Monday). None for profiles saved before days could be chosen.
+    training_days: str | None = None
+    sleep_goal_minutes: int | None = None  # None = the recommended amount for the user's age
 
 
 class ProfileIn(ProfileBase):
@@ -118,12 +121,18 @@ class ProfileIn(ProfileBase):
     height_unit: LengthUnit = LengthUnit.cm
     weight: float = Field(gt=0)
     weight_unit: WeightUnit = WeightUnit.kg
+    # The days the user trains (0 = Monday ... 6 = Sunday). days_per_week is worked out from them.
+    # Older clients that send only days_per_week still work (see services/schedule.py).
+    training_days: list[int] | None = None
 
 
 class ProfilePublic(ProfileBase):
     height_cm: float
     weight_kg: float
     age: int
+    training_days: list[int]
+    training_days_chosen: bool  # False: days were filled in automatically for an older profile
+    sleep_goal_minutes: int | None = None
 
 
 # ---------- Weigh-ins ----------

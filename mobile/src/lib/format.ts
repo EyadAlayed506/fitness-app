@@ -120,3 +120,11 @@ export function timeAgo(iso: string | null): string {
   if (min < 48 * 60) return `${Math.round(min / 60)} h ago`;
   return `${Math.round(min / 1440)} days ago`;
 }
+
+// ---------- weekdays (0 = Monday ... 6 = Sunday, same as the backend) ----------
+
+export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+export const WEEKDAYS_SHORT = WEEKDAYS.map((d) => d.slice(0, 3));
+/** Today's weekday in the backend's numbering (JavaScript counts from Sunday). */
+export const weekdayIndex = (d: Date = new Date()) => (d.getDay() + 6) % 7;
+export const dayList = (days: number[]) => [...days].sort((a, b) => a - b).map((d) => WEEKDAYS_SHORT[d]).join(", ");

@@ -3,8 +3,11 @@ import { View } from "react-native";
 
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { CM_PER_IN, KG_PER_LB, round } from "@/lib/format";
+import { CM_PER_IN, KG_PER_LB, dayList, round } from "@/lib/format";
+import { useTheme } from "@/lib/theme";
 import type { Profile, UnitSystem } from "@/lib/types";
+
+import { DayPicker } from "./DayPicker";
 
 import { Button, Card, Chips, ErrorText, Field, Row, Txt, type Choice } from "./ui";
 
@@ -35,6 +38,7 @@ const EQUIPMENT: Choice<string>[] = [
 const num = (s: string) => (s.trim() === "" ? NaN : Number(s.replace(",", ".")));
 
 export function ProfileForm({ profile, onSaved }: { profile: Profile | null; onSaved: () => void }) {
+  const t = useTheme();
   const { refresh } = useAuth();
   const [unitSystem, setUnitSystem] = useState<UnitSystem>(profile?.unit_system ?? "metric");
   const imperial = unitSystem === "imperial";
@@ -52,7 +56,8 @@ export function ProfileForm({ profile, onSaved }: { profile: Profile | null; onS
   const [activity, setActivity] = useState(profile?.activity_level ?? "moderate");
   const [goal, setGoal] = useState(profile?.goal ?? "auto");
   const [diet, setDiet] = useState(profile?.diet_option ?? "normal");
-  const [days, setDays] = useState(profile?.days_per_week ?? 3);
+  // New users start with no days picked, so the plan never assumes a schedule they didn't choose
+  const [days, setDays] = useState<number[]>(profile?.training_days_chosen ? profile.training_days : []);
   const [minutes, setMinutes] = useState(profile?.minutes_per_session ?? 45);
   const [equipment, setEquipment] = useState(profile?.equipment ?? "gym");
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +86,10 @@ export function ProfileForm({ profile, onSaved }: { profile: Profile | null; onS
       setError("Enter your height and weight.");
       return;
     }
+    if (days.length === 0) {
+      setError("Pick at least one day you can train.");
+      return;
+    }
     try {
       await api("/me/profile", {
         method: "PUT",
@@ -94,7 +103,7 @@ export function ProfileForm({ profile, onSaved }: { profile: Profile | null; onS
           activity_level: activity,
           goal,
           diet_option: diet,
-          days_per_week: days,
+          training_days: days,
           minutes_per_session: minutes,
           equipment,
           unit_system: unitSystem,
@@ -150,12 +159,12 @@ export function ProfileForm({ profile, onSaved }: { profile: Profile | null; onS
       </Card>
       <Card>
         <Txt variant="h3">Training availability</Txt>
-        <Chips
-          label="Days per week"
-          value={days}
-          onChange={setDays}
-          options={[1, 2, 3, 4, 5, 6].map((d) => ({ value: d, label: String(d) }))}
-        />
+        {profile && !profile.training_days_chosen ? (
+          <Txt variant="small" style={{ marginTop: 8, color: t.warnInk }}>
+            Your plan was using {dayList(profile.training_days)}, filled in automatically. Pick the days you actually train.
+          </Txt>
+        ) : null}
+        <DayPicker value={days} onChange={setDays} />
         <Chips
           label="Minutes per session"
           value={minutes}

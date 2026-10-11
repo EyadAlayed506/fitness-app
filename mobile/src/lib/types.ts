@@ -24,6 +24,9 @@ export interface Profile {
   height_cm: number;
   weight_kg: number;
   age: number;
+  training_days: number[]; // 0 = Monday ... 6 = Sunday
+  training_days_chosen: boolean; // false: filled in automatically for an older profile
+  sleep_goal_minutes: number | null;
 }
 
 export interface DietOption {
@@ -67,11 +70,14 @@ export interface RoutineExercise {
 
 export interface Routine {
   split: string;
+  split_reason: string;
+  training_days: number[];
+  rest_days: string[];
   days_per_week: number;
   minutes_per_session: number;
   exercises_per_day: number;
   reps: string;
-  days: { weekday: string; title: string; exercises: RoutineExercise[]; cardio_minutes: number }[];
+  days: { weekday: string; weekday_index: number; title: string; exercises: RoutineExercise[]; cardio_minutes: number }[];
   notes: string[];
 }
 
