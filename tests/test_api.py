@@ -250,3 +250,12 @@ def test_delete_account(client, auth):
     assert client.delete("/api/me", headers=auth).status_code == 204
     assert client.get("/api/me", headers=auth).status_code == 401
     signup_and_login(client)  # the email can be used again
+
+
+def test_cors_allows_the_expo_web_app(client):
+    r = client.options(
+        "/api/auth/login",
+        headers={"Origin": "http://localhost:8081", "Access-Control-Request-Method": "POST"},
+    )
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-origin"] in ("*", "http://localhost:8081")

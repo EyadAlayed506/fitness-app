@@ -400,8 +400,8 @@ async function renderHome() {
     <div class="card">
       <div class="card-head"><h3>Body mass index</h3><span class="badge ${BMI_BADGE[plan.bmi_category]}">${cap(plan.bmi_category)}</span></div>
       <div class="row between" style="align-items:flex-end">
-        <div class="hero num">${fmt(plan.bmi, 1)}</div>
-        <div class="small text-2" style="text-align:right">${fmtW(plan.weight_kg)} · ${fmt(fromCm(plan.height_cm), imperial() ? 1 : 0)} ${lUnit()}<br>Age ${plan.age}</div>
+        <div class="hero num">${plan.bmi.toFixed(1)}</div>
+        <div class="small text-2" style="text-align:right">${fmtW(state.profile.weight_kg)} · ${fmt(fromCm(state.profile.height_cm), imperial() ? 1 : 0)} ${lUnit()}<br>Age ${plan.age}</div>
       </div>
       <div class="scale-wrap">
         <div class="scale">${BMI_ZONES.map((z) => `<span style="flex:${z.to - z.from};background:${z.color}"></span>`).join("")}</div>

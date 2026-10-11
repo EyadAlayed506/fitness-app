@@ -2,13 +2,18 @@
 
 Sign up, get your BMI, daily calories and a workout plan, then log workouts, food and body measurements and watch your progress on charts.
 
-The backend is **FastAPI + SQLModel**. The screens in `app/static/` are a **web preview of the mobile app**: they run in any browser, phone-sized, and use the same API the mobile app will use. The design is in [ARCHITECTURE.md](ARCHITECTURE.md).
+The project has two parts:
+
+- **Backend** (this folder): **FastAPI + SQLModel**. It also serves a quick **web preview** at http://localhost:8000 that needs nothing else installed.
+- **Mobile app** ([`mobile/`](mobile/)): **React Native + Expo**. Runs on your phone with the Expo Go app, or in your PC's browser. See [mobile/README.md](mobile/README.md).
+
+The design is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 | Home | Workouts | Food | Progress |
 |---|---|---|---|
-| ![Home](docs/screenshots/home.png) | ![Workouts](docs/screenshots/workouts.png) | ![Food](docs/screenshots/food.png) | ![Progress](docs/screenshots/progress.png) |
+| ![Home](docs/screenshots/mobile-home.png) | ![Workouts](docs/screenshots/mobile-workouts.png) | ![Food](docs/screenshots/mobile-food.png) | ![Progress](docs/screenshots/mobile-progress.png) |
 
-## Run it on your PC
+## Run the backend on your PC
 
 You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.13 and all packages for you) and git.
 
@@ -37,7 +42,9 @@ uv run python -m app.demo
 uv run fastapi dev app/main.py
 ```
 
-**4. Open http://localhost:8000** and log in with **demo@fitness.app / demo1234**, or sign up with your own email.
+**4. Open http://localhost:8000** and log in with **demo@fitness.app / demo1234**, or sign up with your own email. This is the web preview.
+
+**5. The mobile app:** follow [mobile/README.md](mobile/README.md). In short, start the backend with `uv run fastapi dev app/main.py --host 0.0.0.0`, then in a second terminal `cd mobile`, `npm install`, `npx expo start`, and scan the QR code with Expo Go (or press `w` for the browser). You need Node.js 20+ for this part.
 
 The demo account has ten weeks of weigh-ins, workouts, food logs and measurements, so every chart has data. Running `uv run python -m app.demo` again resets it.
 
@@ -62,7 +69,7 @@ Also useful:
 
 **Scanning QR codes:** on a PC with a webcam it works at `http://localhost:8000`. To test, open the QR sticker page on your phone and hold it up to the webcam, or type the code printed under the sticker (e.g. `leg-press`).
 
-**Using it from your phone:** start the server with `uv run fastapi dev app/main.py --host 0.0.0.0`, then open `http://<your-PC's-IP>:8000` on a phone on the same Wi-Fi. Browsers only allow the camera on `localhost` or HTTPS, so on the phone type the QR code instead (the real mobile app will not have this limit).
+**Using it from your phone:** use the mobile app in [`mobile/`](mobile/) with Expo Go. Its camera scans QR codes directly.
 
 ## Settings
 
@@ -80,6 +87,7 @@ Copy `.env.example` to `.env` to change settings:
 
 ```
 fitness-app/
+├── mobile/              # React Native (Expo) app – see mobile/README.md
 ├── app/
 │   ├── main.py          # FastAPI app; serves the API under /api and the web preview at /
 │   ├── config.py        # settings from .env
@@ -90,11 +98,11 @@ fitness-app/
 │   ├── routers/         # one file per area: auth, me, exercises, workouts, foods, measurements, analytics, marketing
 │   ├── services/        # formulas, routine generator, units, food search, QR codes
 │   ├── seed/            # starter machine catalogue (48 exercises) and 38 common foods
-│   ├── static/          # web preview (HTML, CSS, JS, Chart.js)
+│   ├── static/          # web preview (HTML, CSS, JS, Chart.js), served at /
 │   └── demo.py          # demo account
-└── tests/               # 49 tests: formulas, units, routine, every API area
+└── tests/               # 50 tests: formulas, units, routine, every API area
 ```
 
-Not built yet (see the build phases in ARCHITECTURE.md): image features, sending marketing emails (provider not chosen), database migrations, the native mobile app.
+Not built yet (see the build phases in ARCHITECTURE.md): image features, sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.
 
 The calculations are standard estimates (Mifflin–St Jeor, 7,700 kcal per kg, Epley, U.S. Navy body fat), not medical advice.

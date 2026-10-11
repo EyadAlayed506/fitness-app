@@ -2,10 +2,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
+from app.config import get_settings
 from app.database import create_db_and_tables, engine
 from app.routers import (
     analytics,
@@ -31,13 +33,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Fitness App", version="0.1.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 api = APIRouter(prefix="/api")
 for module in (auth, me, exercises, workouts, foods, measurements, analytics, marketing):
     api.include_router(module.router)
 app.include_router(api)
 
-# Web preview of the app (the real client will be a mobile app using the same API)
+# Web preview of the app (the React Native app in mobile/ uses the same API)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 

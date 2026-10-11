@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     usda_api_key: str = "DEMO_KEY"
     off_user_agent: str = "FitnessApp/0.1 (contact@example.com)"
     external_timeout_seconds: float = 8.0
+    # Origins allowed to call the API from a browser (the Expo web app runs on another port).
+    # Login uses a bearer token, not cookies, so "*" is safe for development.
+    cors_origins: list[str] = ["*"]
 
 
 @lru_cache
