@@ -21,15 +21,15 @@ This document describes the design of the fitness app. Phases 1–4 (section 16)
 
 | Layer | Choice | Why |
 |---|---|---|
-| API | **FastAPI** (Python 3.13) | Same framework as the tutorial; automatic OpenAPI docs |
-| ORM / models | **SQLModel** | One class serves as both the table and the Pydantic schema (as in day10) |
-| Database | **SQLite** by default (a file, nothing to install), **PostgreSQL** in production via `DATABASE_URL` | PostgreSQL is already used in day10 |
+| API | **FastAPI** (Python 3.13) | Automatic OpenAPI docs, easy to test |
+| ORM / models | **SQLModel** | One class serves as both the table and the Pydantic schema |
+| Database | **SQLite** by default (a file, nothing to install), **PostgreSQL** in production via `DATABASE_URL` | No setup for development; a real server database in production |
 | Migrations | **Alembic** (phase 5; tables are created at startup until then) | Schema changes without dropping data |
 | Auth | **JWT** access tokens (PyJWT) + **Argon2** password hashing (pwdlib) | The approach the FastAPI docs recommend |
 | HTTP client | **httpx** (async) | Calls to food APIs |
 | Background jobs | FastAPI `BackgroundTasks` at first, **Celery/RQ + Redis** later | Sending emails should not block requests |
 | Client | **Mobile app in React Native** (with Expo: one codebase for Android and iOS, testable on a phone with the Expo Go app). Until it exists, a **web preview** in `app/static/` (plain HTML/JS + Chart.js) runs in the browser on the same API | QR scanning and charts live on the client; the API just serves JSON |
-| Tests | **pytest** + FastAPI `TestClient` (as in day8) | Fast tests with no external services |
+| Tests | **pytest** + FastAPI `TestClient` | Fast tests with no external services |
 
 ## 3. High-level architecture
 
@@ -56,7 +56,7 @@ Rules that keep this maintainable:
 ## 4. Project layout
 
 ```
-fitness_app/
+fitness-app/
 ├── ARCHITECTURE.md
 ├── README.md
 ├── pyproject.toml            # dependencies

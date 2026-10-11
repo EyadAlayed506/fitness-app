@@ -26,10 +26,8 @@ Close and reopen the terminal afterwards.
 
 **2. Get the code**
 ```bash
-git clone https://github.com/EyadAlayed506/fastapi_tutorial.git
-cd fastapi_tutorial
-git checkout claude/keen-dirac-t5f0tk
-cd fitness_app
+git clone https://github.com/EyadAlayed506/fitness-app.git
+cd fitness-app
 ```
 
 **3. Install, add demo data, start**
@@ -81,7 +79,7 @@ Copy `.env.example` to `.env` to change settings:
 ## Project layout
 
 ```
-fitness_app/
+fitness-app/
 ├── app/
 │   ├── main.py          # FastAPI app; serves the API under /api and the web preview at /
 │   ├── config.py        # settings from .env
