@@ -7,14 +7,16 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import select
 
 from app.database import SessionDep
-from app.deps import CurrentUser
+from app.deps import CurrentProfile, CurrentUser
 from app.models.exercise import BODY_REGION, Exercise
 from app.models.food import FoodLog
 from app.models.sleep import SleepEntry
 from app.models.user import Profile, WeightEntry
 from app.models.workout import WorkoutSession, WorkoutSet
+from app.services.activity import TzOffset, local_today, week_start
 from app.services.calculations import age_on, estimated_1rm, recommended_sleep_hours
 from app.services.plan import build_plan
+from app.services.weekly import WeeklySummary, weekly_summary
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -177,3 +179,19 @@ def sleep_series(user: CurrentUser, session: SessionDep, days: int = Query(defau
         "nights_logged_7d": len(last_week),
         "recommended_hours": [low, high],
     }
+
+
+@router.get("/weekly-summary", response_model=WeeklySummary)
+def read_weekly_summary(
+    profile: CurrentProfile,
+    session: SessionDep,
+    tz_offset: TzOffset = 0,
+    week: date | None = Query(default=None, description="Any day in the week; default this week"),
+):
+    """One week (Monday to Sunday) compared with the week before: workouts against the plan, lifts,
+    records, sleep, weight and points."""
+    today = local_today(tz_offset)
+    monday = week_start(week or today)
+    if monday > today:
+        raise HTTPException(status_code=422, detail="That week hasn't started yet")
+    return weekly_summary(session, profile, today, monday, tz_offset)

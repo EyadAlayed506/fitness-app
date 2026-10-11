@@ -1,3 +1,5 @@
+import datetime as dt
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +9,8 @@ from sqlmodel.pool import StaticPool
 from app import models  # noqa: F401  (register tables)
 from app.database import get_session
 from app.main import app
+from app.models.sleep import SleepEntry
+from app.models.workout import WorkoutSession, WorkoutSet
 from app.routers.foods import get_http_client
 from app.seed import seed_catalogue
 
@@ -106,3 +110,30 @@ def auth(client):
     r = client.put("/api/me/profile", json=PROFILE, headers=headers)
     assert r.status_code == 200, r.text
     return headers
+
+
+UTC_NOON = dt.time(12, tzinfo=dt.UTC)
+
+
+def add_workout(session, user, day: dt.date, sets: list[tuple[int, int, float]] | None = None) -> WorkoutSession:
+    """A finished workout at noon UTC on `day`. sets: (exercise_id, reps, weight_kg); default one set."""
+    start = dt.datetime.combine(day, UTC_NOON)
+    w = WorkoutSession(user_id=user.id, started_at=start, ended_at=start + dt.timedelta(hours=1))
+    session.add(w)
+    session.commit()
+    for i, (exercise_id, reps, weight) in enumerate(sets or [(1, 10, 40)]):
+        session.add(WorkoutSet(session_id=w.id, exercise_id=exercise_id, set_number=i + 1, reps=reps, weight_kg=weight))
+    session.commit()
+    return w
+
+
+def add_sleep(session, user, day: dt.date, minutes: int, source="manual", logged_on: dt.date | None = None):
+    """A night ending at 07:00 on `day`, logged that morning unless `logged_on` says otherwise."""
+    wake = dt.datetime.combine(day, dt.time(7))
+    e = SleepEntry(user_id=user.id, date=day, bedtime=wake - dt.timedelta(minutes=minutes), wake_time=wake,
+                   duration_minutes=minutes, source=source)
+    if logged_on:
+        e.created_at = dt.datetime.combine(logged_on, UTC_NOON)
+    session.add(e)
+    session.commit()
+    return e

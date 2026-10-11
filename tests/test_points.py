@@ -5,13 +5,11 @@ from sqlmodel import select
 
 from app.models.food import Food, FoodLog
 from app.models.points import PointAward
-from app.models.sleep import SleepEntry
 from app.models.user import Profile, User, WeightEntry
-from app.models.workout import WorkoutSession, WorkoutSet
 from app.services.activity import week_start
 from app.services.plan import build_plan
 from app.services.points import RULES, level_for
-from tests.conftest import PROFILE
+from tests.conftest import PROFILE, add_sleep, add_workout
 
 TODAY = dt.date.today()
 UTC_NOON = dt.time(12, tzinfo=dt.UTC)
@@ -33,27 +31,6 @@ def user(client, auth, session) -> User:
 def clear_weigh_ins(session):
     for w in session.exec(select(WeightEntry)).all():
         session.delete(w)
-    session.commit()
-
-
-def add_workout(session, user, day: dt.date, sets=1) -> WorkoutSession:
-    start = dt.datetime.combine(day, UTC_NOON)
-    w = WorkoutSession(user_id=user.id, started_at=start, ended_at=start + dt.timedelta(hours=1))
-    session.add(w)
-    session.commit()
-    for i in range(sets):
-        session.add(WorkoutSet(session_id=w.id, exercise_id=1, set_number=i + 1, reps=10, weight_kg=40))
-    session.commit()
-    return w
-
-
-def add_sleep(session, user, day: dt.date, minutes: int, source="manual", logged_on: dt.date | None = None):
-    wake = dt.datetime.combine(day, dt.time(7))
-    e = SleepEntry(user_id=user.id, date=day, bedtime=wake - dt.timedelta(minutes=minutes), wake_time=wake,
-                   duration_minutes=minutes, source=source)
-    if logged_on:
-        e.created_at = dt.datetime.combine(logged_on, UTC_NOON)
-    session.add(e)
     session.commit()
 
 

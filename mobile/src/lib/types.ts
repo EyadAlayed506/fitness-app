@@ -338,3 +338,58 @@ export interface Points {
   achievements: Achievement[];
   rules: { id: string; points: number; label: string; description: string }[];
 }
+
+export interface TopSet {
+  weight_kg: number;
+  reps: number;
+  date: string;
+}
+
+export interface WeeklySummary {
+  week_start: string;
+  week_end: string;
+  current_week: boolean;
+  days: { date: string; planned: boolean; trained: boolean; future: boolean }[];
+  planned: number;
+  planned_so_far: number;
+  completed: number;
+  completed_on_plan: number;
+  workouts: number;
+  previous_completed: number | null;
+  sets: number;
+  volume_kg: number;
+  previous_volume_kg: number | null;
+  exercises: {
+    exercise_id: number;
+    name: string;
+    sets: number;
+    top_set: TopSet;
+    previous_top_set: TopSet | null;
+    best_e1rm_kg: number | null;
+    previous_e1rm_kg: number | null;
+    record: string | null;
+  }[];
+  records: string[];
+  sleep: {
+    nights_logged: number;
+    average_minutes: number;
+    goal_minutes: number;
+    nights_meeting_goal: number;
+    from_whoop: number;
+    logged_by_hand: number;
+    previous_average_minutes: number | null;
+    previous_nights_logged: number;
+  } | null;
+  weight: {
+    latest_kg: number;
+    previous_latest_kg: number | null;
+    change_kg: number | null;
+    target_kg: number;
+    direction: "lose" | "gain" | "maintain";
+    to_target_kg: number;
+  } | null;
+  points: number;
+  previous_points: number;
+  history: { week_start: string; planned: number; completed: number }[];
+  notes: string[];
+}

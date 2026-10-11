@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 
 import { Chart, ChartCard, type ChartSeries } from "@/components/charts";
 import { SleepChart } from "@/components/SleepParts";
+import { WeeklySummaryCard } from "@/components/WeeklySummary";
 import { Button, Card, Chips, ErrorText, Field, Row, Screen, Section, Sheet, Txt, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
@@ -115,6 +116,8 @@ export default function Progress() {
 
   return (
     <Screen title="Progress" subtitle="Weight loss and strength over time">
+      <WeeklySummaryCard />
+
       <ChartCard
         title={`Body weight (${u.w})`}
         subtitle="Each weigh-in, the 7-day average and your BMI 22 target"
