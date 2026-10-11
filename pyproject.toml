@@ -1,0 +1,26 @@
+[project]
+name = "fitness-app"
+version = "0.1.0"
+description = "Fitness app: health plan, workout log, food log and progress charts"
+readme = "README.md"
+authors = [
+    { name = "Eyad alayed", email = "eyadalayed1@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.115",
+    "sqlmodel>=0.0.24",
+    "pyjwt>=2.10",
+    "pwdlib[argon2]>=0.2",
+    "pydantic-settings>=2.6",
+    "rapidfuzz>=3.10",
+    "segno>=1.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,6 +1,6 @@
 # Fitness App: Architecture
 
-This document describes the planned design of the fitness app. Nothing here is built yet. It is the base to agree on before writing code.
+This document describes the design of the fitness app. Phases 1–4 (section 16) are built; see [README.md](README.md) to run it.
 
 **Image features are out of scope for now** (exercise machine photo, food photo, Nutrition Facts label scan, plate + hand estimate). They will be designed and added once everything below works.
 
@@ -23,12 +23,12 @@ This document describes the planned design of the fitness app. Nothing here is b
 |---|---|---|
 | API | **FastAPI** (Python 3.13) | Same framework as the tutorial; automatic OpenAPI docs |
 | ORM / models | **SQLModel** | One class serves as both the table and the Pydantic schema (as in day10) |
-| Database | **PostgreSQL** (SQLite for tests and local dev) | Already used in day10 |
-| Migrations | **Alembic** | Schema changes without dropping data |
+| Database | **SQLite** by default (a file, nothing to install), **PostgreSQL** in production via `DATABASE_URL` | PostgreSQL is already used in day10 |
+| Migrations | **Alembic** (phase 5; tables are created at startup until then) | Schema changes without dropping data |
 | Auth | **JWT** access tokens (PyJWT) + **Argon2** password hashing (pwdlib) | The approach the FastAPI docs recommend |
 | HTTP client | **httpx** (async) | Calls to food APIs |
 | Background jobs | FastAPI `BackgroundTasks` at first, **Celery/RQ + Redis** later | Sending emails should not block requests |
-| Client | **Mobile app** (Flutter or React Native), the only client | QR scanning and charts live on the phone; the API just serves JSON |
+| Client | **Mobile app** (Flutter or React Native). Until it exists, a **web preview** in `app/static/` (plain HTML/JS + Chart.js) runs in the browser on the same API | QR scanning and charts live on the client; the API just serves JSON |
 | Tests | **pytest** + FastAPI `TestClient` (as in day8) | Fast tests with no external services |
 
 ## 3. High-level architecture
@@ -60,28 +60,30 @@ fitness_app/
 ├── ARCHITECTURE.md
 ├── README.md
 ├── pyproject.toml            # dependencies
-├── alembic/                  # migrations
 ├── app/
 │   ├── main.py               # create FastAPI app, include routers
 │   ├── config.py             # settings from .env (pydantic-settings)
 │   ├── database.py           # engine, get_session, SessionDep
 │   ├── security.py           # hashing, JWT create/verify
-│   ├── deps.py               # CurrentUser dependency
+│   ├── deps.py               # CurrentUser / CurrentProfile dependencies
+│   ├── demo.py               # demo account with ten weeks of data
 │   ├── models/               # SQLModel tables + Create/Public/Update schemas
 │   │   ├── user.py           # User, Profile, WeightEntry
 │   │   ├── exercise.py       # Exercise (machine catalogue)
 │   │   ├── workout.py        # WorkoutSession, WorkoutSet
 │   │   ├── food.py           # Food, FoodLog
 │   │   └── measurement.py    # BodyMeasurement
-│   ├── routers/              # one file per area in section 7
+│   ├── routers/              # one file per area in section 7 (analytics time series live in routers/analytics.py)
 │   ├── services/
 │   │   ├── calculations.py   # BMI, BMR, TDEE, diet plans, projections
 │   │   ├── routine.py        # workout routine generator
 │   │   ├── units.py          # unit conversion
-│   │   ├── food_search.py    # USDA + Open Food Facts clients, caching
-│   │   ├── analytics.py      # time series for charts
-│   │   └── qr.py             # generate QR sticker images
-│   └── seed/exercises.json   # starter machine catalogue
+│   │   ├── plan.py           # builds the health plan from a profile
+│   │   ├── food_search.py    # local fuzzy search + USDA + Open Food Facts clients
+│   │   ├── accounts.py       # delete a user and all their data
+│   │   └── qr.py             # QR sticker images
+│   ├── seed/                 # starter machine catalogue + built-in foods
+│   └── static/               # web preview of the mobile app
 └── tests/
 ```
 
@@ -117,7 +119,7 @@ erDiagram
         float height_cm
         float weight_kg "latest weigh-in"
         enum activity_level
-        enum goal "lose / maintain / gain"
+        enum goal "auto / lose / maintain / gain"
         enum diet_option "light / normal / extreme"
         int days_per_week
         int minutes_per_session
@@ -135,7 +137,9 @@ erDiagram
         string name UK "Lat Pulldown"
         string aliases "lat pull down, pulldown"
         string category "machine / free weight / cable / bodyweight"
+        enum muscle_group "chest / back / quads ..."
         string primary_muscles
+        string equipment "gym / home / bodyweight"
         string qr_code UK "required, printed on the machine"
     }
     WORKOUT_SESSION {
@@ -162,7 +166,7 @@ erDiagram
         int owner_id FK "null = global"
         string name
         string brand
-        enum source "usda / off / manual"
+        enum source "builtin / usda / off / manual"
         string external_id
         bool is_liquid
         float serving_size
@@ -274,7 +278,7 @@ female = 495 / (1.29579 − 0.35004·log10(waist + hip − neck) + 0.22100·log1
 
 ## 7. API endpoints
 
-All endpoints except sign-up, login and unsubscribe need `Authorization: Bearer <token>`.
+All paths are under `/api` (e.g. `/api/me/plan`). All endpoints except sign-up, login, unsubscribe and the QR sticker image need `Authorization: Bearer <token>`. The full list with request/response schemas is at `/docs` when the server runs.
 
 **Auth and profile**
 
@@ -306,7 +310,7 @@ All endpoints except sign-up, login and unsubscribe need `Authorization: Bearer 
 |---|---|---|
 | GET | `/exercises?search=lat pull` | Typed name, fuzzy match |
 | GET | `/exercises/qr/{code}` | Look up the machine by QR payload |
-| GET | `/exercises/{id}/qr.png` | QR sticker for a machine (admin only) |
+| GET | `/exercises/{id}/qr.png` | QR sticker image for a machine |
 | POST / GET | `/workouts` | Start a session / list sessions |
 | POST | `/workouts/{id}/sets` | Add a set (reps, weight, unit, RPE, notes) |
 | PATCH / DELETE | `/workouts/{id}/sets/{set_id}` | Edit / remove a set |
@@ -344,7 +348,7 @@ flowchart TD
 ```
 
 - **Typed name:** matches `name` and `aliases` with fuzzy matching, so "lat pull down" and "latpulldown" both find *Lat Pulldown*.
-- **QR code:** **every machine has a QR code.** When a machine is added to the catalogue the API generates a unique code, and the gym prints the sticker from `/exercises/{id}/qr.png` (admin only) and sticks it on the machine. The app only has to understand its own format (`fitapp://machine/<code>`). Decoding happens on the phone with the native camera library, so the server only does a database lookup.
+- **QR code:** **every machine has a QR code.** Each machine in the catalogue has a unique code, and the gym prints the sticker from `/exercises/{id}/qr.png` (the app has a printable sticker page) and sticks it on the machine. The image is public because the code is printed on the machine anyway; adding machines to the catalogue is done through the seed file until an admin screen exists. The app only has to understand its own format (`fitapp://machine/<code>`). Decoding happens on the phone with the native camera library, so the server only does a database lookup.
 
 ## 9. Food registry: external APIs
 
@@ -353,7 +357,7 @@ flowchart TD
 | **USDA FoodData Central** | Generic foods (rice, chicken breast, banana) with full nutrients | Free API key from api.data.gov |
 | **Open Food Facts** | Branded and packaged products; barcode lookup is an easy later addition | No key; send a descriptive User-Agent |
 
-Search flow: local DB (foods already imported or created) → USDA → Open Food Facts. Results the user picks are **imported into the local `FOOD` table**, which caches them and avoids repeated API calls. Both responses are normalised to per-100 g / per-100 ml values.
+Search flow: local DB (38 built-in common foods, foods already imported, the user's own foods) → USDA → Open Food Facts. If an API is down, local results still come back with a warning. Results the user picks are **imported into the local `FOOD` table**, which caches them and avoids repeated API calls. Both responses are normalised to per-100 g / per-100 ml values.
 
 ## 10. Units (`services/units.py`)
 
@@ -366,7 +370,7 @@ Search flow: local DB (foods already imported or created) → USDA → Open Food
 
 - `FOOD.is_liquid` decides which unit list the app shows.
 - A food can also be logged by **serving** (e.g. "1 slice") using its `serving_size` + `serving_unit`.
-- Logging a liquid by mass (or a solid by volume) is rejected unless the food has a density value.
+- Logging a liquid by mass (or a solid by volume) is rejected. USDA reports per 100 g, so USDA drinks are logged by mass or serving.
 
 ## 11. Workout routine generator (`services/routine.py`)
 
@@ -428,10 +432,10 @@ EMAIL_PROVIDER_API_KEY=...
 
 | Phase | Scope |
 |---|---|
-| 1. Core | Project setup, auth, profile, weigh-ins, BMI / calories / diet options / projection, marketing opt-in |
-| 2. Workouts | Exercise catalogue + seed data, name search, QR lookup, sessions and sets, routine generator |
-| 3. Food | USDA + Open Food Facts search, units, manual custom food, food log with daily totals |
-| 4. Analytics | Analytics endpoints, measurements + monthly compare |
+| 1. Core ✅ | Project setup, auth, profile, weigh-ins, BMI / calories / diet options / projection, marketing opt-in |
+| 2. Workouts ✅ | Exercise catalogue + seed data, name search, QR lookup, sessions and sets, routine generator |
+| 3. Food ✅ | USDA + Open Food Facts search, units, manual custom food, food log with daily totals |
+| 4. Analytics ✅ | Analytics endpoints, measurements + monthly compare, charts in the web preview |
 | 5. Production | Alembic migrations, background jobs, rate limiting, deployment (Docker) |
 | Later | Image features, designed once phases 1–5 work |
 
@@ -441,7 +445,7 @@ Each phase is usable on its own.
 
 | Question | Decision |
 |---|---|
-| Client | **Mobile app** only. QR scanning and charts are on the phone. |
+| Client | **Mobile app**. A web preview stands in until the mobile framework is chosen. |
 | Marketing email | The **email entered at sign-up** is used, with an opt-in checkbox. |
 | Gym QR codes | **Every machine has a QR code**, generated by the app and printed as a sticker. |
 | Image features | **Removed for now**; added after the rest works. |

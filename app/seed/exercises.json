@@ -1,0 +1,434 @@
+[
+ {
+  "name": "Chest Press",
+  "aliases": "chest press machine, seated chest press, machine press",
+  "category": "machine",
+  "muscle_group": "chest",
+  "primary_muscles": "pectorals, triceps, front delts",
+  "equipment": "gym",
+  "qr_code": "chest-press"
+ },
+ {
+  "name": "Barbell Bench Press",
+  "aliases": "bench press, flat bench, bb bench",
+  "category": "free weight",
+  "muscle_group": "chest",
+  "primary_muscles": "pectorals, triceps, front delts",
+  "equipment": "gym",
+  "qr_code": "barbell-bench-press"
+ },
+ {
+  "name": "Incline Chest Press",
+  "aliases": "incline press machine, incline machine press",
+  "category": "machine",
+  "muscle_group": "chest",
+  "primary_muscles": "upper pectorals, front delts",
+  "equipment": "gym",
+  "qr_code": "incline-chest-press"
+ },
+ {
+  "name": "Pec Deck",
+  "aliases": "pec fly, chest fly machine, butterfly",
+  "category": "machine",
+  "muscle_group": "chest",
+  "primary_muscles": "pectorals",
+  "equipment": "gym",
+  "qr_code": "pec-deck"
+ },
+ {
+  "name": "Cable Crossover",
+  "aliases": "cable fly, cable chest fly",
+  "category": "cable",
+  "muscle_group": "chest",
+  "primary_muscles": "pectorals",
+  "equipment": "gym",
+  "qr_code": "cable-crossover"
+ },
+ {
+  "name": "Dumbbell Bench Press",
+  "aliases": "db bench press, dumbbell press",
+  "category": "free weight",
+  "muscle_group": "chest",
+  "primary_muscles": "pectorals, triceps",
+  "equipment": "home",
+  "qr_code": "dumbbell-bench-press"
+ },
+ {
+  "name": "Push-up",
+  "aliases": "push up, pushup, press up",
+  "category": "bodyweight",
+  "muscle_group": "chest",
+  "primary_muscles": "pectorals, triceps, core",
+  "equipment": "bodyweight",
+  "qr_code": "push-up"
+ },
+ {
+  "name": "Lat Pulldown",
+  "aliases": "lat pull down, pulldown, lat machine",
+  "category": "machine",
+  "muscle_group": "back",
+  "primary_muscles": "lats, biceps",
+  "equipment": "gym",
+  "qr_code": "lat-pulldown"
+ },
+ {
+  "name": "Seated Cable Row",
+  "aliases": "cable row, seated row, low row",
+  "category": "cable",
+  "muscle_group": "back",
+  "primary_muscles": "mid back, lats, biceps",
+  "equipment": "gym",
+  "qr_code": "seated-cable-row"
+ },
+ {
+  "name": "Chest-Supported Row Machine",
+  "aliases": "machine row, t-bar row machine, row machine",
+  "category": "machine",
+  "muscle_group": "back",
+  "primary_muscles": "mid back, lats",
+  "equipment": "gym",
+  "qr_code": "chest-supported-row-machine"
+ },
+ {
+  "name": "Assisted Pull-up Machine",
+  "aliases": "assisted pull up, gravitron, assisted chin up",
+  "category": "machine",
+  "muscle_group": "back",
+  "primary_muscles": "lats, biceps",
+  "equipment": "gym",
+  "qr_code": "assisted-pull-up-machine"
+ },
+ {
+  "name": "Dumbbell Row",
+  "aliases": "one arm row, db row, single arm dumbbell row",
+  "category": "free weight",
+  "muscle_group": "back",
+  "primary_muscles": "lats, mid back",
+  "equipment": "home",
+  "qr_code": "dumbbell-row"
+ },
+ {
+  "name": "Pull-up",
+  "aliases": "pull up, pullup, chin-up bar",
+  "category": "bodyweight",
+  "muscle_group": "back",
+  "primary_muscles": "lats, biceps",
+  "equipment": "bodyweight",
+  "qr_code": "pull-up"
+ },
+ {
+  "name": "Inverted Row",
+  "aliases": "bodyweight row, australian pull-up",
+  "category": "bodyweight",
+  "muscle_group": "back",
+  "primary_muscles": "mid back, biceps",
+  "equipment": "bodyweight",
+  "qr_code": "inverted-row"
+ },
+ {
+  "name": "Shoulder Press Machine",
+  "aliases": "machine shoulder press, overhead press machine",
+  "category": "machine",
+  "muscle_group": "shoulders",
+  "primary_muscles": "delts, triceps",
+  "equipment": "gym",
+  "qr_code": "shoulder-press-machine"
+ },
+ {
+  "name": "Lateral Raise Machine",
+  "aliases": "machine lateral raise, side raise machine",
+  "category": "machine",
+  "muscle_group": "shoulders",
+  "primary_muscles": "side delts",
+  "equipment": "gym",
+  "qr_code": "lateral-raise-machine"
+ },
+ {
+  "name": "Reverse Pec Deck",
+  "aliases": "rear delt fly machine, reverse fly",
+  "category": "machine",
+  "muscle_group": "shoulders",
+  "primary_muscles": "rear delts, upper back",
+  "equipment": "gym",
+  "qr_code": "reverse-pec-deck"
+ },
+ {
+  "name": "Dumbbell Shoulder Press",
+  "aliases": "db shoulder press, seated dumbbell press",
+  "category": "free weight",
+  "muscle_group": "shoulders",
+  "primary_muscles": "delts, triceps",
+  "equipment": "home",
+  "qr_code": "dumbbell-shoulder-press"
+ },
+ {
+  "name": "Dumbbell Lateral Raise",
+  "aliases": "side raise, lateral raise",
+  "category": "free weight",
+  "muscle_group": "shoulders",
+  "primary_muscles": "side delts",
+  "equipment": "home",
+  "qr_code": "dumbbell-lateral-raise"
+ },
+ {
+  "name": "Pike Push-up",
+  "aliases": "pike pushup",
+  "category": "bodyweight",
+  "muscle_group": "shoulders",
+  "primary_muscles": "delts, triceps",
+  "equipment": "bodyweight",
+  "qr_code": "pike-push-up"
+ },
+ {
+  "name": "Leg Press",
+  "aliases": "leg press machine, 45 degree leg press",
+  "category": "machine",
+  "muscle_group": "quads",
+  "primary_muscles": "quads, glutes",
+  "equipment": "gym",
+  "qr_code": "leg-press"
+ },
+ {
+  "name": "Leg Extension",
+  "aliases": "leg extension machine, quad extension",
+  "category": "machine",
+  "muscle_group": "quads",
+  "primary_muscles": "quads",
+  "equipment": "gym",
+  "qr_code": "leg-extension"
+ },
+ {
+  "name": "Hack Squat",
+  "aliases": "hack squat machine",
+  "category": "machine",
+  "muscle_group": "quads",
+  "primary_muscles": "quads, glutes",
+  "equipment": "gym",
+  "qr_code": "hack-squat"
+ },
+ {
+  "name": "Barbell Back Squat",
+  "aliases": "squat, back squat",
+  "category": "free weight",
+  "muscle_group": "quads",
+  "primary_muscles": "quads, glutes, core",
+  "equipment": "gym",
+  "qr_code": "barbell-back-squat"
+ },
+ {
+  "name": "Goblet Squat",
+  "aliases": "dumbbell goblet squat",
+  "category": "free weight",
+  "muscle_group": "quads",
+  "primary_muscles": "quads, glutes",
+  "equipment": "home",
+  "qr_code": "goblet-squat"
+ },
+ {
+  "name": "Bodyweight Squat",
+  "aliases": "air squat, squat bodyweight",
+  "category": "bodyweight",
+  "muscle_group": "quads",
+  "primary_muscles": "quads, glutes",
+  "equipment": "bodyweight",
+  "qr_code": "bodyweight-squat"
+ },
+ {
+  "name": "Seated Leg Curl",
+  "aliases": "leg curl, hamstring curl machine",
+  "category": "machine",
+  "muscle_group": "hamstrings",
+  "primary_muscles": "hamstrings",
+  "equipment": "gym",
+  "qr_code": "seated-leg-curl"
+ },
+ {
+  "name": "Lying Leg Curl",
+  "aliases": "prone leg curl",
+  "category": "machine",
+  "muscle_group": "hamstrings",
+  "primary_muscles": "hamstrings",
+  "equipment": "gym",
+  "qr_code": "lying-leg-curl"
+ },
+ {
+  "name": "Dumbbell Romanian Deadlift",
+  "aliases": "db rdl, romanian deadlift, rdl",
+  "category": "free weight",
+  "muscle_group": "hamstrings",
+  "primary_muscles": "hamstrings, glutes",
+  "equipment": "home",
+  "qr_code": "dumbbell-romanian-deadlift"
+ },
+ {
+  "name": "Single-leg Romanian Deadlift",
+  "aliases": "single leg rdl, bodyweight rdl",
+  "category": "bodyweight",
+  "muscle_group": "hamstrings",
+  "primary_muscles": "hamstrings, glutes, balance",
+  "equipment": "bodyweight",
+  "qr_code": "single-leg-romanian-deadlift"
+ },
+ {
+  "name": "Hip Thrust Machine",
+  "aliases": "glute drive, hip thrust",
+  "category": "machine",
+  "muscle_group": "glutes",
+  "primary_muscles": "glutes",
+  "equipment": "gym",
+  "qr_code": "hip-thrust-machine"
+ },
+ {
+  "name": "Hip Abduction Machine",
+  "aliases": "abductor machine, outer thigh machine",
+  "category": "machine",
+  "muscle_group": "glutes",
+  "primary_muscles": "glute medius",
+  "equipment": "gym",
+  "qr_code": "hip-abduction-machine"
+ },
+ {
+  "name": "Dumbbell Hip Thrust",
+  "aliases": "db hip thrust",
+  "category": "free weight",
+  "muscle_group": "glutes",
+  "primary_muscles": "glutes, hamstrings",
+  "equipment": "home",
+  "qr_code": "dumbbell-hip-thrust"
+ },
+ {
+  "name": "Glute Bridge",
+  "aliases": "bridge, hip bridge",
+  "category": "bodyweight",
+  "muscle_group": "glutes",
+  "primary_muscles": "glutes, hamstrings",
+  "equipment": "bodyweight",
+  "qr_code": "glute-bridge"
+ },
+ {
+  "name": "Seated Calf Raise",
+  "aliases": "calf raise machine, seated calf",
+  "category": "machine",
+  "muscle_group": "calves",
+  "primary_muscles": "calves",
+  "equipment": "gym",
+  "qr_code": "seated-calf-raise"
+ },
+ {
+  "name": "Standing Calf Raise",
+  "aliases": "calf raise, bodyweight calf raise",
+  "category": "bodyweight",
+  "muscle_group": "calves",
+  "primary_muscles": "calves",
+  "equipment": "bodyweight",
+  "qr_code": "standing-calf-raise"
+ },
+ {
+  "name": "Biceps Curl Machine",
+  "aliases": "preacher curl machine, machine curl",
+  "category": "machine",
+  "muscle_group": "biceps",
+  "primary_muscles": "biceps",
+  "equipment": "gym",
+  "qr_code": "biceps-curl-machine"
+ },
+ {
+  "name": "Cable Curl",
+  "aliases": "cable biceps curl",
+  "category": "cable",
+  "muscle_group": "biceps",
+  "primary_muscles": "biceps",
+  "equipment": "gym",
+  "qr_code": "cable-curl"
+ },
+ {
+  "name": "Dumbbell Curl",
+  "aliases": "db curl, biceps curl",
+  "category": "free weight",
+  "muscle_group": "biceps",
+  "primary_muscles": "biceps",
+  "equipment": "home",
+  "qr_code": "dumbbell-curl"
+ },
+ {
+  "name": "Chin-up",
+  "aliases": "chin up, chinup, underhand pull-up",
+  "category": "bodyweight",
+  "muscle_group": "biceps",
+  "primary_muscles": "biceps, lats",
+  "equipment": "bodyweight",
+  "qr_code": "chin-up"
+ },
+ {
+  "name": "Triceps Pushdown",
+  "aliases": "cable pushdown, rope pushdown, tricep pushdown",
+  "category": "cable",
+  "muscle_group": "triceps",
+  "primary_muscles": "triceps",
+  "equipment": "gym",
+  "qr_code": "triceps-pushdown"
+ },
+ {
+  "name": "Triceps Dip Machine",
+  "aliases": "seated dip machine, dip machine",
+  "category": "machine",
+  "muscle_group": "triceps",
+  "primary_muscles": "triceps, chest",
+  "equipment": "gym",
+  "qr_code": "triceps-dip-machine"
+ },
+ {
+  "name": "Dumbbell Overhead Triceps Extension",
+  "aliases": "overhead extension, db triceps extension",
+  "category": "free weight",
+  "muscle_group": "triceps",
+  "primary_muscles": "triceps",
+  "equipment": "home",
+  "qr_code": "dumbbell-overhead-triceps-extension"
+ },
+ {
+  "name": "Bench Dip",
+  "aliases": "bench dips, chair dip",
+  "category": "bodyweight",
+  "muscle_group": "triceps",
+  "primary_muscles": "triceps",
+  "equipment": "bodyweight",
+  "qr_code": "bench-dip"
+ },
+ {
+  "name": "Ab Crunch Machine",
+  "aliases": "crunch machine, abdominal machine",
+  "category": "machine",
+  "muscle_group": "core",
+  "primary_muscles": "abs",
+  "equipment": "gym",
+  "qr_code": "ab-crunch-machine"
+ },
+ {
+  "name": "Cable Crunch",
+  "aliases": "kneeling cable crunch",
+  "category": "cable",
+  "muscle_group": "core",
+  "primary_muscles": "abs",
+  "equipment": "gym",
+  "qr_code": "cable-crunch"
+ },
+ {
+  "name": "Plank",
+  "aliases": "front plank",
+  "category": "bodyweight",
+  "muscle_group": "core",
+  "primary_muscles": "abs, obliques",
+  "equipment": "bodyweight",
+  "qr_code": "plank"
+ },
+ {
+  "name": "Dead Bug",
+  "aliases": "deadbug",
+  "category": "bodyweight",
+  "muscle_group": "core",
+  "primary_muscles": "abs",
+  "equipment": "bodyweight",
+  "qr_code": "dead-bug"
+ }
+]
