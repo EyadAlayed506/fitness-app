@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlmodel import SQLModel, select
+from sqlmodel import Field, SQLModel, select
 
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
@@ -205,6 +205,25 @@ def read_routine(profile: CurrentProfile, session: SessionDep):
     return user_routine(session, profile)
 
 
+class SleepGoalIn(SQLModel):
+    minutes: int | None = Field(default=None, ge=4 * 60, le=12 * 60)  # None: the amount recommended for your age
+
+
+class SleepGoalOut(SQLModel):
+    goal_minutes: int
+    goal_custom: bool
+    recommended_hours: tuple[int, int]
+
+
+@router.put("/sleep-goal", response_model=SleepGoalOut)
+def save_sleep_goal(data: SleepGoalIn, profile: CurrentProfile, session: SessionDep):
+    profile.sleep_goal_minutes = data.minutes
+    session.add(profile)
+    session.commit()
+    goal = sleep_goal(profile)
+    return SleepGoalOut(goal_minutes=goal.minutes, goal_custom=goal.custom, recommended_hours=goal.recommended_hours)
+
+
 class RecommendationsOut(SQLModel):
     date: date
     items: list[Recommendation]
@@ -212,7 +231,7 @@ class RecommendationsOut(SQLModel):
 
 
 @router.get("/recommendations", response_model=RecommendationsOut)
-def read_recommendations(profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = 0):
+def read_recommendations(profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = None):
     """Today's suggestions from the plan, last night's sleep, WHOOP recovery and recent workouts."""
     today = local_today(tz_offset)
     monday = today - timedelta(days=today.weekday())

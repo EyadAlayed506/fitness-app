@@ -98,7 +98,7 @@ def _award(rule_id: str, key: str, day: dt.date, reason: str, source: str, user_
 
 
 def candidate_awards(
-    session: Session, user: User, profile: Profile, today: dt.date, tz_offset: int, existing: set[str]
+    session: Session, user: User, profile: Profile, today: dt.date, tz_offset: int | None, existing: set[str]
 ) -> list[PointAward]:
     """Awards the user has earned in the lookback window and doesn't have yet."""
     start = max(today - dt.timedelta(days=LOOKBACK_DAYS - 1), local_date(user.created_at, tz_offset))
@@ -170,7 +170,7 @@ def candidate_awards(
     return new
 
 
-def evaluate(session: Session, user: User, profile: Profile, today: dt.date, tz_offset: int) -> list[PointAward]:
+def evaluate(session: Session, user: User, profile: Profile, today: dt.date, tz_offset: int | None) -> list[PointAward]:
     """Give any points earned recently that haven't been given yet. Safe to call any number of times."""
     existing = set(session.exec(select(PointAward.key).where(PointAward.user_id == user.id)).all())
     new = candidate_awards(session, user, profile, today, tz_offset, existing)

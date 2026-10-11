@@ -2,16 +2,17 @@ import { Redirect, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView } from "react-native";
 
-import { QUALITY, SleepChart, SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
-import { Badge, Card, ListRow, Loading, Row, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
+import { LastNightCard, SleepConsistencyCard, SleepGoalForm, SleepWeekCard } from "@/components/SleepDashboard";
+import { QUALITY, SleepChart, SleepForm, qualityLabel, trackerSummary } from "@/components/SleepParts";
+import { Badge, Card, ListRow, Loading, Section, Sheet, Txt, useToast } from "@/components/ui";
 import { WhoopCard, syncSummary } from "@/components/WhoopCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { clockOf, fmt, hoursMinutes, longDate } from "@/lib/format";
+import { clockOf, hoursMinutes, longDate, tzOffset } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
 import type { SleepAnalytics, SleepEntry, WhoopStatus, WhoopSyncResult } from "@/lib/types";
 
-type SheetState = { kind: "new" } | { kind: "edit"; entry: SleepEntry } | null;
+type SheetState = { kind: "new" } | { kind: "edit"; entry: SleepEntry } | { kind: "goal" } | null;
 
 export default function Sleep() {
   const t = useTheme();
@@ -23,9 +24,11 @@ export default function Sleep() {
   const [sheet, setSheet] = useState<SheetState>(null);
 
   const load = useCallback(async () => {
+    // give any sleep-goal points first, so the nights that earned them are marked
+    await api(`/points?tz_offset=${tzOffset()}`).catch(() => null);
     const [list, analytics, status] = await Promise.all([
       api<SleepEntry[]>("/sleep?limit=60"),
-      api<SleepAnalytics>("/analytics/sleep?days=14"),
+      api<SleepAnalytics>(`/analytics/sleep?days=14&tz_offset=${tzOffset()}`),
       api<WhoopStatus>("/whoop"),
     ]);
     setEntries(list);
@@ -58,22 +61,12 @@ export default function Sleep() {
     toast(message);
     await load();
   };
-  const range = stats?.recommended_hours ?? [7, 9];
 
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }}>
-      <Card>
-        <Row>
-          <Stat label="7-day average" value={stats?.average_hours_7d != null ? hoursMinutes(stats.average_hours_7d * 60) : "–"} />
-          <Stat label="Avg. quality" value={stats?.average_quality_7d != null ? `${fmt(stats.average_quality_7d, 1)} / 5` : "–"} />
-        </Row>
-        <Row style={{ marginTop: 10, justifyContent: "space-between" }}>
-          <Txt variant="small">
-            {stats ? `${stats.nights_logged_7d} of the last 7 nights logged · aim for ${range[0]}–${range[1]} h` : " "}
-          </Txt>
-          {rangeBadge(stats?.average_hours_7d ?? null, range)}
-        </Row>
-      </Card>
+      {stats ? <LastNightCard data={stats} onEditGoal={() => setSheet({ kind: "goal" })} /> : null}
+      {stats ? <SleepWeekCard data={stats} /> : null}
+      {stats ? <SleepConsistencyCard data={stats} /> : null}
 
       <WhoopCard
         status={whoop}
@@ -118,6 +111,9 @@ export default function Sleep() {
 
       <Sheet visible={sheet?.kind === "new"} title="Log sleep" onClose={() => setSheet(null)}>
         {sheet?.kind === "new" ? <SleepForm onSaved={saved} /> : null}
+      </Sheet>
+      <Sheet visible={sheet?.kind === "goal"} title="Sleep goal" onClose={() => setSheet(null)}>
+        {sheet?.kind === "goal" && stats ? <SleepGoalForm data={stats} onSaved={saved} /> : null}
       </Sheet>
       <Sheet visible={sheet?.kind === "edit"} title="Edit sleep" onClose={() => setSheet(null)}>
         {sheet?.kind === "edit" ? <SleepForm entry={sheet.entry} onSaved={saved} /> : null}

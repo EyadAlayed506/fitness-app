@@ -166,7 +166,7 @@ def _avg(values: list[int]) -> int | None:
     return round(sum(values) / len(values)) if values else None
 
 
-def weekly_summary(session: Session, profile: Profile, today: dt.date, monday: dt.date, tz_offset: int) -> WeeklySummary:
+def weekly_summary(session: Session, profile: Profile, today: dt.date, monday: dt.date, tz_offset: int | None) -> WeeklySummary:
     uid = profile.user_id
     sunday = monday + dt.timedelta(days=6)
     current = monday <= today <= sunday

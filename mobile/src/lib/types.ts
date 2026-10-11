@@ -283,14 +283,39 @@ export interface WhoopSyncResult {
   last_sync_at: string | null;
 }
 
+export interface SleepNight {
+  /** total for the night including naps */
+  minutes: number;
+  main_minutes: number;
+  bedtime: string;
+  wake_time: string;
+  source: "manual" | "whoop";
+  quality: number | null;
+  /** only when a tracker measured them; never estimated for manual logs */
+  stages: { light: number | null; deep: number | null; rem: number | null; awake: number | null } | null;
+  recovery_score: number | null;
+  /** earned sleep-goal points */
+  points: boolean;
+}
+
 export interface SleepAnalytics {
   labels: string[];
   series: SeriesData[];
   quality: (number | null)[];
+  /** one per label; null = not logged */
+  nights: (SleepNight | null)[];
   average_hours_7d: number | null;
   average_quality_7d: number | null;
   nights_logged_7d: number;
+  /** null unless both weeks have enough nights to compare */
+  average_hours_prev_7d: number | null;
+  nights_logged_prev_7d: number;
+  nights_at_goal_7d: number;
+  goal_minutes: number;
+  goal_custom: boolean;
   recommended_hours: [number, number];
+  bedtime_spread_minutes: number | null;
+  wake_spread_minutes: number | null;
 }
 
 export interface Recommendation {

@@ -21,7 +21,7 @@ RECENT_DAYS = 14
 
 
 @router.get("", response_model=PointsOut)
-def read_points(user: CurrentUser, profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = 0):
+def read_points(user: CurrentUser, profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = None):
     """Points total, level, today's points with reasons, and achievements. Gives any new points first."""
     today = local_today(tz_offset)
     new = evaluate(session, user, profile, today, tz_offset)

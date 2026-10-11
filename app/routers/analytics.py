@@ -1,7 +1,7 @@
 """Chart-ready time series: {labels: [...], series: [{name, data}]}."""
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 from sqlmodel import select
@@ -10,15 +10,19 @@ from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
 from app.models.exercise import BODY_REGION, Exercise
 from app.models.food import FoodLog
+from app.models.points import PointAward
 from app.models.sleep import SleepEntry
 from app.models.user import Profile, WeightEntry
 from app.models.workout import WorkoutSession, WorkoutSet
-from app.services.activity import TzOffset, local_today, week_start
-from app.services.calculations import age_on, estimated_1rm, recommended_sleep_hours
+from app.services.activity import TzOffset, local_today, sleep_goal, week_start
+from app.services.calculations import estimated_1rm
 from app.services.plan import build_plan
 from app.services.weekly import WeeklySummary, weekly_summary
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+
+COMPARE_MIN_NIGHTS = 3  # nights needed in each week before comparing averages
+CONSISTENCY_MIN_NIGHTS = 3
 
 
 @router.get("/weight")
@@ -147,37 +151,106 @@ def weekly_volume(user: CurrentUser, session: SessionDep, weeks: int = Query(def
     }
 
 
+def _clock_minutes(moment: datetime, around: int) -> int:
+    """Minutes since midnight, shifted so times near `around` (e.g. bedtimes near midnight) don't wrap."""
+    m = moment.hour * 60 + moment.minute
+    return m + 1440 if m < around - 720 else m - 1440 if m > around + 720 else m
+
+
+def _spread(values: list[int]) -> int | None:
+    """Typical distance from the middle time, in minutes (mean absolute deviation from the median)."""
+    if len(values) < CONSISTENCY_MIN_NIGHTS:
+        return None
+    mid = sorted(values)[len(values) // 2]
+    return round(sum(abs(v - mid) for v in values) / len(values))
+
+
+def _night(e: SleepEntry | None, total: int, awarded: set[date]) -> dict | None:
+    if e is None:
+        return None
+    stages = e.source != "manual" and any(
+        x is not None for x in (e.light_minutes, e.deep_minutes, e.rem_minutes, e.awake_minutes)
+    )
+    return {
+        "minutes": total,
+        "main_minutes": e.duration_minutes,
+        "bedtime": e.bedtime.isoformat(),
+        "wake_time": e.wake_time.isoformat(),
+        "source": e.source,
+        "quality": e.quality,
+        # sleep stages only when the tracker measured them; never estimated for manual logs
+        "stages": {
+            "light": e.light_minutes, "deep": e.deep_minutes, "rem": e.rem_minutes, "awake": e.awake_minutes,
+        } if stages else None,
+        "recovery_score": e.recovery_score,
+        "points": e.date in awarded,
+    }
+
+
 @router.get("/sleep")
-def sleep_series(user: CurrentUser, session: SessionDep, days: int = Query(default=14, ge=1, le=90)):
-    """Hours slept and sleep quality per night, plus 7-day averages and the recommended range."""
-    end = date.today()
+def sleep_series(
+    user: CurrentUser,
+    session: SessionDep,
+    days: int = Query(default=14, ge=1, le=90),
+    tz_offset: TzOffset = None,
+):
+    """Sleep per night with the goal, 7-day averages against the 7 days before, and bedtime consistency.
+
+    Nights without data are null (shown as "not logged"), never zero.
+    """
+    end = local_today(tz_offset)
     start = end - timedelta(days=days - 1)
+    span_start = min(start, end - timedelta(days=13))  # always load two weeks for the comparison
     entries = session.exec(
-        select(SleepEntry).where(SleepEntry.user_id == user.id, SleepEntry.date >= start, SleepEntry.date <= end)
+        select(SleepEntry).where(SleepEntry.user_id == user.id, SleepEntry.date >= span_start, SleepEntry.date <= end)
     ).all()
-    nights = [start + timedelta(days=i) for i in range(days)]
-    minutes = {d: 0 for d in nights}
-    qualities: dict[date, list[int]] = {d: [] for d in nights}
+    all_nights = [span_start + timedelta(days=i) for i in range((end - span_start).days + 1)]
+    minutes = {d: 0 for d in all_nights}
+    qualities: dict[date, list[int]] = {d: [] for d in all_nights}
+    main: dict[date, SleepEntry] = {}
     for e in entries:  # naps on the same day add up
         minutes[e.date] += e.duration_minutes
         if e.quality:
             qualities[e.date].append(e.quality)
+        if e.date not in main or e.duration_minutes > main[e.date].duration_minutes:
+            main[e.date] = e
+    nights = [start + timedelta(days=i) for i in range(days)]
 
     hours = [round(minutes[d] / 60, 2) if minutes[d] else None for d in nights]
     quality = [round(sum(q) / len(q), 1) if q else None for q in (qualities[d] for d in nights)]
-    last_week = [h for d, h in zip(nights, hours) if h is not None and d > end - timedelta(days=7)]
-    last_week_q = [q for d, q in zip(nights, quality) if q is not None and d > end - timedelta(days=7)]
+    week = [d for d in all_nights if d > end - timedelta(days=7)]
+    prev_week = [d for d in all_nights if end - timedelta(days=14) < d <= end - timedelta(days=7)]
+    last_week = [minutes[d] / 60 for d in week if minutes[d]]
+    last_week_q = [q for d in week for q in qualities[d]]
+    prev = [minutes[d] / 60 for d in prev_week if minutes[d]]
 
     profile = session.get(Profile, user.id)
-    low, high = recommended_sleep_hours(age_on(profile.birth_date)) if profile else (7, 9)
+    goal = sleep_goal(profile)
+    awarded = set(
+        session.exec(
+            select(PointAward.day).where(PointAward.user_id == user.id, PointAward.rule == "sleep_goal", PointAward.day >= start)
+        ).all()
+    )
+    week_main = [main[d] for d in week if d in main]
     return {
         "labels": [d.isoformat() for d in nights],
         "series": [{"name": "Hours slept", "data": hours}],
         "quality": quality,
+        "nights": [_night(main.get(d), minutes[d], awarded) for d in nights],
         "average_hours_7d": round(sum(last_week) / len(last_week), 2) if last_week else None,
         "average_quality_7d": round(sum(last_week_q) / len(last_week_q), 1) if last_week_q else None,
         "nights_logged_7d": len(last_week),
-        "recommended_hours": [low, high],
+        # the 7 days before, only when both weeks have enough nights to compare
+        "average_hours_prev_7d": round(sum(prev) / len(prev), 2)
+        if len(prev) >= COMPARE_MIN_NIGHTS and len(last_week) >= COMPARE_MIN_NIGHTS else None,
+        "nights_logged_prev_7d": len(prev),
+        "nights_at_goal_7d": sum(minutes[d] >= goal.minutes for d in week if minutes[d]),
+        "goal_minutes": goal.minutes,
+        "goal_custom": goal.custom,
+        "recommended_hours": list(goal.recommended_hours),
+        # how much bedtime and wake-up time moved around over the last 7 nights (main sleep only)
+        "bedtime_spread_minutes": _spread([_clock_minutes(e.bedtime, 0) for e in week_main]),
+        "wake_spread_minutes": _spread([_clock_minutes(e.wake_time, 7 * 60) for e in week_main]),
     }
 
 
@@ -185,7 +258,7 @@ def sleep_series(user: CurrentUser, session: SessionDep, days: int = Query(defau
 def read_weekly_summary(
     profile: CurrentProfile,
     session: SessionDep,
-    tz_offset: TzOffset = 0,
+    tz_offset: TzOffset = None,
     week: date | None = Query(default=None, description="Any day in the week; default this week"),
 ):
     """One week (Monday to Sunday) compared with the week before: workouts against the plan, lifts,

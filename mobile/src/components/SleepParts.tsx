@@ -175,10 +175,10 @@ export function SleepChart({ data }: { data: SleepAnalytics }) {
   const t = useTheme();
   const [low, high] = data.recommended_hours;
   const labels = data.labels.map(shortDate);
+  const goal = Math.round((data.goal_minutes / 60) * 100) / 100;
   const series: ChartSeries[] = [
     { name: "Hours slept", data: data.series[0].data, color: t.series[0], type: "bar" },
-    { name: `${low} h (min)`, data: [low], color: t.muted, type: "ref" },
-    { name: `${high} h (max)`, data: [high], color: t.muted, type: "ref" },
+    { name: `Goal ${data.goal_minutes % 60 ? hoursMinutes(data.goal_minutes) : `${data.goal_minutes / 60} h`}`, data: [goal], color: t.text2, type: "ref" },
   ];
   const tableSeries: ChartSeries[] = [
     series[0],
@@ -187,7 +187,7 @@ export function SleepChart({ data }: { data: SleepAnalytics }) {
   return (
     <ChartCard
       title={`Sleep, last ${data.labels.length} nights`}
-      subtitle={`Hours per night. Recommended for you: ${low}–${high} h`}
+      subtitle={`Hours per night against your goal. Recommended for your age: ${low}–${high} h. Gaps are nights not logged.`}
       empty={!data.series[0].data.some((v) => v != null)}
       emptyText="Log your sleep to see it here."
       table={{ labels, series: tableSeries }}

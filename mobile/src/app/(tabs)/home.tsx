@@ -4,6 +4,7 @@ import { Pressable, View } from "react-native";
 
 import { MacroBars } from "@/components/MacroBars";
 import { SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
+import { goalHours } from "@/components/SleepDashboard";
 import { TodayCard } from "@/components/TodayCard";
 import { PointsCard } from "@/components/PointsParts";
 import { Badge, Button, Card, CardHead, Field, LinkButton, Meter, Row, Screen, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
@@ -43,7 +44,7 @@ export default function Home() {
     const [food, sleeps, stats, recs] = await Promise.all([
       api<FoodDay>(`/food-logs?date=${todayISO()}`),
       api<SleepEntry[]>("/sleep?limit=1"),
-      api<SleepAnalytics>("/analytics/sleep?days=7"),
+      api<SleepAnalytics>(`/analytics/sleep?days=7&tz_offset=${tzOffset()}`),
       api<Recommendations>(`/me/recommendations?tz_offset=${tzOffset()}`).catch(() => null),
     ]);
     setToday(recs);
@@ -161,8 +162,7 @@ export default function Home() {
             {sleepStats?.average_hours_7d != null ? (
               <Row style={{ justifyContent: "space-between", marginTop: 8 }}>
                 <Txt variant="small">
-                  7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · aim for {sleepStats.recommended_hours[0]}–
-                  {sleepStats.recommended_hours[1]} h
+                  7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · goal {goalHours(sleepStats.goal_minutes)}
                 </Txt>
                 {rangeBadge(sleepStats.average_hours_7d, sleepStats.recommended_hours)}
               </Row>

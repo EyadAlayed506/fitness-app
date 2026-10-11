@@ -20,20 +20,22 @@ from app.services.plan import build_plan
 from app.services.routine import Routine, generate_routine
 from app.services.schedule import effective_training_days
 
-# Query parameter the app sends: -new Date().getTimezoneOffset()
+# Query parameter the app sends: -new Date().getTimezoneOffset(). Without it, the server's own time zone is used.
 TzOffset = Annotated[
-    int,
+    int | None,
     Query(ge=-14 * 60, le=14 * 60, description="The user's UTC offset in minutes (e.g. 120 for UTC+2)"),
 ]
 
 
-def local_date(moment: dt.datetime, tz_offset: int) -> dt.date:
+def local_date(moment: dt.datetime, tz_offset: int | None) -> dt.date:
     if moment.tzinfo is None:  # SQLite hands back naive UTC
         moment = moment.replace(tzinfo=dt.UTC)
+    if tz_offset is None:
+        return moment.astimezone().date()
     return (moment.astimezone(dt.UTC) + dt.timedelta(minutes=tz_offset)).date()
 
 
-def local_today(tz_offset: int) -> dt.date:
+def local_today(tz_offset: int | None) -> dt.date:
     return local_date(dt.datetime.now(dt.UTC), tz_offset)
 
 
@@ -53,7 +55,7 @@ class DoneWorkout:
 
 
 def completed_workouts(
-    session: Session, user_id: int, start: dt.date, end: dt.date, tz_offset: int
+    session: Session, user_id: int, start: dt.date, end: dt.date, tz_offset: int | None
 ) -> list[DoneWorkout]:
     """Finished workouts with sets whose local date is between start and end (inclusive), oldest first."""
     lo = dt.datetime.combine(start - dt.timedelta(days=1), dt.time(), dt.UTC)
