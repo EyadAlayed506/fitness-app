@@ -78,13 +78,14 @@ export function Chart({ labels, series, stacked = false, height = 200, xTitle, d
       lo -= 1;
       hi += 1;
     }
-    const step = niceStep(hi - lo, 4);
+    // whole-number charts (digits = 0, e.g. counts) never get fractional ticks
+    const step = digits === 0 ? Math.max(1, niceStep(hi - lo, 4)) : niceStep(hi - lo, 4);
     const min = Math.floor(lo / step) * step;
     const max = Math.ceil(hi / step) * step;
     const list: number[] = [];
     for (let v = min; v <= max + step / 2; v += step) list.push(Math.round(v * 1e6) / 1e6);
     return { ticks: list, yMin: min, yMax: max };
-  }, [series, stacked, n]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [series, stacked, n, digits]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const y = (v: number) => PAD.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
   const band = n ? plotW / n : 0;

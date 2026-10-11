@@ -49,6 +49,7 @@ class Context:
     # finished workouts from the start of this week (or the lookback window, whichever is earlier) to today
     workouts: list[DoneWorkout]
     imperial: bool = False
+    since: dt.date | None = None  # the day the user signed up: earlier days were never planned
 
     def weight(self, kg: float) -> str:
         return f"{kg / BODY_WEIGHT_TO_KG['lb']:.1f} lb".replace(".0 lb", " lb") if self.imperial else f"{kg:g} kg"
@@ -188,10 +189,15 @@ def whoop_recovery(ctx: Context) -> list[Recommendation]:
 def missed_sessions(ctx: Context) -> list[Recommendation]:
     """Planned sessions earlier this week that didn't happen. Never suggests making them up."""
     monday = ctx.today - dt.timedelta(days=ctx.today.weekday())
-    planned = [monday + dt.timedelta(days=d) for d in ctx.routine.training_days if monday + dt.timedelta(days=d) < ctx.today]
+    first = max(monday, ctx.since) if ctx.since else monday
+    planned = [
+        monday + dt.timedelta(days=d)
+        for d in ctx.routine.training_days
+        if first <= monday + dt.timedelta(days=d) < ctx.today
+    ]
     if not planned:
         return []
-    done = len({w.day for w in ctx.workouts if monday <= w.day < ctx.today})
+    done = min(len(planned), len({w.day for w in ctx.workouts if first <= w.day < ctx.today}))
     missed = len(planned) - done
     if missed <= 0:
         return []
@@ -204,7 +210,7 @@ def missed_sessions(ctx: Context) -> list[Recommendation]:
         Recommendation(
             "missed_sessions",
             "info",
-            f"{done} of {len(planned)} planned sessions so far this week",
+            f"{done} of {len(planned)} planned session{'s' if len(planned) > 1 else ''} so far this week",
             advice,
             reasons=[f"{len(planned)} training day{'s' if len(planned) > 1 else ''} so far this week, {done} with a workout logged"],
             sources=["Your training days", "Your workouts"],

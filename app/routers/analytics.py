@@ -14,7 +14,13 @@ from app.models.points import PointAward
 from app.models.sleep import SleepEntry
 from app.models.user import Profile, WeightEntry
 from app.models.workout import WorkoutSession, WorkoutSet
-from app.services.activity import TzOffset, local_today, sleep_goal, week_start
+from app.services.activity import (
+    TzOffset,
+    local_date,
+    local_today,
+    sleep_goal,
+    week_start,
+)
 from app.services.calculations import estimated_1rm
 from app.services.plan import build_plan
 from app.services.weekly import WeeklySummary, weekly_summary
@@ -256,6 +262,7 @@ def sleep_series(
 
 @router.get("/weekly-summary", response_model=WeeklySummary)
 def read_weekly_summary(
+    user: CurrentUser,
     profile: CurrentProfile,
     session: SessionDep,
     tz_offset: TzOffset = None,
@@ -267,4 +274,4 @@ def read_weekly_summary(
     monday = week_start(week or today)
     if monday > today:
         raise HTTPException(status_code=422, detail="That week hasn't started yet")
-    return weekly_summary(session, profile, today, monday, tz_offset)
+    return weekly_summary(session, profile, today, monday, tz_offset, since=local_date(user.created_at, tz_offset))

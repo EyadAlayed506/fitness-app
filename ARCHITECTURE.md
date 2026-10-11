@@ -1,6 +1,6 @@
 # Fitness App: Architecture
 
-This document describes the design of the fitness app. Phases 1–4 (section 16) are built; see [README.md](README.md) to run it.
+This document describes the design of the fitness app. Phases 1–4d (section 16) are built; see [README.md](README.md) to run it.
 
 **Image features are out of scope for now** (exercise machine photo, food photo, Nutrition Facts label scan, plate + hand estimate). They will be designed and added once everything below works.
 
@@ -16,7 +16,13 @@ This document describes the design of the fitness app. Phases 1–4 (section 16)
 | Custom food | **Manual** entry of calories, macros and sub-macros |
 | Visualisations | Body weight trend, calories vs target, lifting progress (estimated 1RM, volume), body measurements |
 | Measurements (optional) | Waist, shoulders, chest, hips, neck, arms, thighs, with month-to-month comparison |
-| Sleep | Log bedtime, wake-up time, quality (1–5) and notes by hand; hours per night vs the recommended range for your age, 7-day averages. Trackers (Health Connect, WHOOP, Apple Health) are planned, see section 18 |
+| Training days | The user picks the actual weekdays they train (any combination, 1–6 days); the routine, calendar, suggestions, weekly summary and points all use them (section 11) |
+| Exercise library | Curated how-to cues, movement pattern and default rest per exercise; alternatives from the catalogue only (section 19) |
+| Rest timer | Starts by itself after each logged set with the exercise's rest time; pause, resume, skip, restart, ±15 s remembered per exercise (section 19) |
+| Today | Rule-based suggestions with reasons: the planned session or rest day, short sleep, WHOOP recovery, missed sessions, progression. No AI (section 19) |
+| Weekly summary | Planned vs done, lifts against last time, records, sleep, weight goal, points, last 8 weeks (section 19) |
+| Wellness points | Points for recorded healthy habits, levels and achievements; never taken away (section 19) |
+| Sleep | Log by hand or import from WHOOP (section 18). Dashboard: last night vs a sleep goal, stages for tracker nights, 7-night chart with goal line, week-on-week average, bedtime / wake-up consistency |
 
 ## 2. Tech stack
 
@@ -72,14 +78,23 @@ fitness-app/
 │   ├── demo.py               # demo account with ten weeks of data
 │   ├── models/               # SQLModel tables + Create/Public/Update schemas
 │   │   ├── user.py           # User, Profile, WeightEntry
-│   │   ├── exercise.py       # Exercise (machine catalogue)
+│   │   ├── exercise.py       # Exercise (curated catalogue), RestPreference
+│   │   ├── sleep.py, whoop.py  # SleepEntry, WhoopConnection
+│   │   ├── points.py         # PointAward
 │   │   ├── workout.py        # WorkoutSession, WorkoutSet
 │   │   ├── food.py           # Food, FoodLog
 │   │   └── measurement.py    # BodyMeasurement
 │   ├── routers/              # one file per area in section 7 (analytics time series live in routers/analytics.py)
 │   ├── services/
 │   │   ├── calculations.py   # BMI, BMR, TDEE, diet plans, projections
+│   │   ├── schedule.py       # training weekdays: validation, split choice, recovery spacing
 │   │   ├── routine.py        # workout routine generator
+│   │   ├── alternatives.py   # exercise alternatives from the catalogue
+│   │   ├── activity.py       # shared reads: local dates, finished workouts, nights, sleep goal
+│   │   ├── recommendations.py  # today's rule-based suggestions
+│   │   ├── weekly.py         # weekly progress summary
+│   │   ├── points.py         # wellness points rules, levels, achievements
+│   │   ├── whoop.py          # WHOOP OAuth + sync
 │   │   ├── units.py          # unit conversion
 │   │   ├── plan.py           # builds the health plan from a profile
 │   │   ├── food_search.py    # local fuzzy search + USDA + Open Food Facts clients
@@ -106,6 +121,9 @@ erDiagram
     USER ||--o{ FOOD : "creates (custom)"
     USER ||--o{ BODY_MEASUREMENT : records
     USER ||--o{ SLEEP_ENTRY : logs
+    USER ||--o{ REST_PREFERENCE : sets
+    EXERCISE ||--o{ REST_PREFERENCE : "rest for"
+    USER ||--o{ POINT_AWARD : earns
 
     USER {
         int id PK
@@ -125,7 +143,9 @@ erDiagram
         enum activity_level
         enum goal "auto / lose / maintain / gain"
         enum diet_option "light / normal / extreme"
-        int days_per_week
+        int days_per_week "derived from training_days"
+        string training_days "0,2,4 (0 = Monday); null = older profile, days filled in automatically"
+        int sleep_goal_minutes "null = recommended for age"
         int minutes_per_session
         enum equipment "gym / home / bodyweight"
         enum unit_system "metric / imperial"
@@ -145,6 +165,24 @@ erDiagram
         string primary_muscles
         string equipment "gym / home / bodyweight"
         string qr_code UK "required, printed on the machine"
+        string pattern "movement pattern, e.g. squat"
+        string instructions "curated how-to cues, one per line"
+        int default_rest_seconds
+    }
+    REST_PREFERENCE {
+        int user_id PK
+        int exercise_id PK
+        int seconds "the user's own rest time for this exercise"
+    }
+    POINT_AWARD {
+        int id PK
+        int user_id FK
+        string rule
+        string key "unique per user, e.g. sleep_goal:2026-10-12"
+        int points
+        date day
+        string reason
+        string data_source "manual / whoop"
     }
     WORKOUT_SESSION {
         int id PK
@@ -317,7 +355,9 @@ All paths are under `/api` (e.g. `/api/me/plan`). All endpoints except sign-up, 
 |---|---|---|
 | GET | `/me/plan` | BMI, category, target weight, weight change, BMR, TDEE, all three diet options with calories, difference, weekly change, weeks to target |
 | GET | `/me/plan/projection?option=normal` | Week-by-week projected weight |
-| GET | `/me/routine` | Workout routine generated from availability |
+| GET | `/me/routine` | Workout routine on the user's training days, with the split and why it was chosen |
+| GET | `/me/recommendations?tz_offset=` | Today's rule-based suggestions, each with reasons and the data used |
+| PUT | `/me/sleep-goal` | Nightly sleep goal in minutes, or `null` for the amount recommended for the user's age |
 
 **Marketing**
 
@@ -333,6 +373,8 @@ All paths are under `/api` (e.g. `/api/me/plan`). All endpoints except sign-up, 
 | GET | `/exercises?search=lat pull` | Typed name, fuzzy match |
 | GET | `/exercises/qr/{code}` | Look up the machine by QR payload |
 | GET | `/exercises/{id}/qr.png` | QR sticker image for a machine |
+| GET | `/exercises/{id}/alternatives?all_equipment=` | Catalogue alternatives, "similar" (same movement) or "different" (same muscles), with reasons and differences |
+| GET / PUT | `/exercises/{id}/rest` | The user's rest time for an exercise (`{seconds}` or `null` for the default) |
 | POST / GET | `/workouts` | Start a session / list sessions |
 | POST | `/workouts/{id}/sets` | Add a set (reps, weight, unit, RPE, notes) |
 | PATCH / DELETE | `/workouts/{id}/sets/{set_id}` | Edit / remove a set |
@@ -356,6 +398,15 @@ All paths are under `/api` (e.g. `/api/me/plan`). All endpoints except sign-up, 
 | GET | `/analytics/calories?from=&to=` | Daily intake vs target, macro split |
 | GET | `/analytics/exercise/{id}` | Estimated 1RM and volume over time |
 | GET | `/analytics/volume?group=week` | Weekly training volume per muscle group |
+| GET | `/analytics/weekly-summary?week=&tz_offset=` | One week against the plan and the week before (section 19) |
+
+**Points**
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/points?tz_offset=` | Gives any points earned since the last check, then returns total, level, today, last 2 weeks, achievements and the rules |
+
+`tz_offset` is the app's UTC offset in minutes (`-new Date().getTimezoneOffset()`), so "today" and "this week" are the user's own. Without it the server's time zone is used.
 
 **Sleep**
 
@@ -363,7 +414,7 @@ All paths are under `/api` (e.g. `/api/me/plan`). All endpoints except sign-up, 
 |---|---|---|
 | POST / GET | `/sleep` | Log a sleep (bedtime, wake-up time, quality, notes) / list recent sleeps |
 | PATCH / DELETE | `/sleep/{id}` | Edit / remove |
-| GET | `/analytics/sleep?days=14` | Hours and quality per night, 7-day averages, recommended range for the user's age |
+| GET | `/analytics/sleep?days=14&tz_offset=` | Per night: hours, bed / wake times, source, stages (tracker nights only), points earned; null for nights not logged. The goal, 7-day average and the 7 days before (only when both have 3+ nights), bedtime and wake-up spread |
 
 Sleep times are stored as the user's local clock times (no timezone), because "went to bed at 23:30" means 23:30 wherever the user is. A sleep that overlaps one already logged is refused (409), so the same night is never counted twice; separate sleeps on the same day (naps) add up.
 
@@ -404,22 +455,29 @@ Search flow: local DB (38 built-in common foods, foods already imported, the use
 - A food can also be logged by **serving** (e.g. "1 slice") using its `serving_size` + `serving_unit`.
 - Logging a liquid by mass (or a solid by volume) is rejected. USDA reports per 100 g, so USDA drinks are logged by mass or serving.
 
-## 11. Workout routine generator (`services/routine.py`)
+## 11. Workout routine generator (`services/schedule.py`, `services/routine.py`)
 
-Rule-based to start; inputs come from the profile.
+Rule-based; inputs come from the profile.
 
-| Days per week | Split |
-|---|---|
-| 1–2 | Full body |
-| 3 | Full body A / B / A |
-| 4 | Upper / Lower × 2 |
-| 5 | Upper / Lower / Push / Pull / Legs |
-| 6 | Push / Pull / Legs × 2 |
+**Training days.** The user picks the actual weekdays (any combination of 1–6 days, validated on the server). `days_per_week` is derived from them. Sessions are only placed on those days; every other day is a rest day. Profiles saved before days could be picked keep working: they get a fixed, explicit default for their count (`LEGACY_DEFAULT_DAYS`, e.g. 3 → Mon / Wed / Fri) and the app asks the user to pick their own. Changing the days changes the plan from then on; logged workouts are never touched.
 
-- **Minutes per session** sets the number of exercises (about 8–10 minutes per exercise including rest). For example, 30 min → 3–4 exercises, 60 min → 6–7.
+**Split, chosen from the days** (`choose_split`), so demanding sessions on back-to-back days train different muscles:
+
+| Days | No back-to-back days | Some back-to-back days |
+|---|---|---|
+| 1 | Full body | – |
+| 2 | Full body A / B | Upper / Lower |
+| 3 | Full body A / B / A | Push / Pull / Legs |
+| 4 | Upper / Lower × 2 | Upper / Lower × 2 |
+| 5 | Upper / Lower / Push / Pull / Legs | same |
+| 6 | Push / Pull / Legs × 2 | same |
+
+The rotation starts after the longest rest gap (Sunday → Monday counts as back to back), and the routine says why the split was picked. Tests check every combination of days for no repeated muscle groups on consecutive days.
+
+- **Minutes per session** sets the number of exercises (about 9 minutes per exercise including rest).
 - **Goal** sets rep ranges: fat loss 10–15 reps + 10–20 min cardio; muscle gain 6–12 reps; maintain 8–12.
 - **Equipment** (gym / home / bodyweight) filters the exercise catalogue.
-- Exercises are picked from the catalogue by muscle group, so every routine links to real `EXERCISE` rows the user can log against.
+- Each exercise carries its own rest time (`default_rest_seconds`, or the user's saved one).
 
 ## 12. Visualisations
 
@@ -434,7 +492,11 @@ The API returns **chart-ready JSON** (`{labels: [...], series: [{name, data}]}`)
 | Lift progress | Line: estimated 1RM per exercise | `/analytics/exercise/{id}` |
 | Training volume | Stacked bar per week by muscle group | `/analytics/volume` |
 | Measurements | Grouped bar: this month vs last month per body part | `/measurements/compare` |
-| Sleep | Bar per night with the recommended range as two reference lines | `/analytics/sleep` |
+| Sleep, 14 nights | Bar per night with the goal as a reference line | `/analytics/sleep` |
+| Last 7 nights | Bars coloured by source (WHOOP / by hand), dashed goal line, "not logged" markers | `/analytics/sleep` |
+| Bedtime and wake-up | One bar per night on an 18:00–12:00 timeline | `/analytics/sleep` |
+| Sleep stages | Stacked bar, only for nights a tracker measured | `/analytics/sleep` |
+| Planned vs done | Grouped bars per week, last 8 weeks | `/analytics/weekly-summary` |
 
 ## 13. Security and privacy
 
@@ -459,7 +521,9 @@ EMAIL_PROVIDER_API_KEY=...       # later, when an email provider is picked
 
 - **Unit tests** for `calculations`, `units` and `routine`, with known inputs and expected outputs (e.g. BMI for 80 kg / 180 cm = 24.7).
 - **API tests** with `TestClient` on an in-memory SQLite database, overriding `get_session` through FastAPI's dependency overrides.
-- **External food APIs mocked** in tests (saved sample responses), so tests run offline.
+- **External food APIs mocked** in tests (saved sample responses), so tests run offline. WHOOP is tested against an `httpx.MockTransport` fake.
+- **Rule services** (schedule, recommendations, points, weekly summary) are tested directly and through the API, including missing data.
+- **Mobile logic** that doesn't need React (the rest timer state machine) is tested with Node's built-in test runner: `cd mobile && npm test`.
 
 ## 16. Build phases
 
@@ -470,8 +534,8 @@ EMAIL_PROVIDER_API_KEY=...       # later, when an email provider is picked
 | 3. Food ✅ | USDA + Open Food Facts search, units, manual custom food, food log with daily totals |
 | 4. Analytics ✅ | Analytics endpoints, measurements + monthly compare, charts in the web preview |
 | 4b. Mobile app ✅ | React Native (Expo) app with every screen: auth, profile, plan, workouts (name + camera QR), food, progress charts, measurements |
-| 4c. Sleep log ✅ | Manual sleep logging, Sleep screen, Home card, sleep chart (mobile app) |
-| Later | Sleep from trackers, see section 18 |
+| 4c. Sleep log ✅ | Manual sleep logging, Sleep screen, Home card, sleep chart (mobile app), WHOOP import (section 18) |
+| 4d. Coaching ✅ | Training weekdays, exercise library and alternatives, rest timer, today's suggestions, weekly summary, wellness points, sleep dashboard (section 19) |
 | 5. Production | Alembic migrations, background jobs, rate limiting, deployment (Docker) |
 | Later | Image features, designed once phases 1–5 work |
 
@@ -486,7 +550,9 @@ Each phase is usable on its own.
 | Gym QR codes | **Every machine has a QR code**, generated by the app and printed as a sticker. |
 | Image features | **Removed for now**; added after the rest works. |
 | Email provider | **Later.** Opt-in and unsubscribe are built; sending is added when a provider is picked (Brevo's free plan is the front runner). |
-| Sleep data | **Manual log first** (free, works for everyone). Trackers later, in the order below. |
+| Sleep data | **Manual log or WHOOP**, the user chooses. Health Connect / Apple Health later. |
+| Suggestions | **Rules, not AI.** Small, readable rules with reasons; no LLM or ML model. |
+| Equipment recognition | **Deferred.** No model is trained or bundled; see section 19 for where it plugs in. |
 
 ## 18. Sleep from trackers
 
@@ -504,3 +570,21 @@ Users choose: type sleep in, or connect WHOOP. Imported sleeps sit next to manua
 - Tested against a fake WHOOP server (`tests/test_whoop.py`), not a real WHOOP account.
 
 Not built: Health Connect (Android, needs a development build) and Apple Health (needs the paid Apple Developer Program).
+
+## 19. Coaching features
+
+All rule-based, all from data the user recorded. Shared reads (the user's local dates, finished workouts, the main sleep of each night, the sleep goal, the routine) are in `services/activity.py` so every feature counts things the same way.
+
+**Exercise library and alternatives** (`seed/exercises.json`, `services/alternatives.py`). Every catalogue exercise has a movement pattern, 3–5 standard how-to cues and a default rest. The seed updates existing rows by QR code, so older databases get the new details with the same ids. Alternatives come only from the catalogue: same pattern = "similar" (with equipment differences spelled out), a few close pattern pairs (flat / incline press, dip / triceps extension) = "similar" with the difference stated, same main muscle group with another pattern = "different", never presented as a like-for-like swap. Filtered to the user's equipment unless they ask to see everything. The catalogue has no experience levels yet, so alternatives aren't filtered by experience.
+
+**Rest timer** (`mobile/src/lib/restTimer.ts`, `components/RestTimer.tsx`). A pure state machine (idle / running / paused / done) with one countdown per workout screen; starting again replaces the countdown, so two can never run. Saving a set starts it with the exercise's rest time (the user's saved one, else the default). Moving to another exercise sets the next rest without cutting the current one. ±15 s changes are saved per exercise (`REST_PREFERENCE`, 15–600 s). At zero the phone vibrates (a short tone in the browser) and a message shows. Time is kept as an end timestamp, so it stays right after the app was in the background, but there's no system notification while the app is closed (that needs `expo-notifications`).
+
+**Today's suggestions** (`services/recommendations.py`). Each rule is a function `(context) -> [Recommendation]` listed in `RULES`: planned session or rest day (or "done for today"); a night at least 1 h under the sleep goal on a training day → "consider going lighter"; WHOOP recovery below 34 % → easier session, 67 %+ → train as planned (WHOOP's own bands); planned sessions missed earlier this week → carry on, never double up; every set at the top of the rep range last time → small step up (skipped on days the other rules suggest going lighter). Missing data makes a rule stay silent. Suggestions never change the plan and carry a not-medical-advice note.
+
+**Weekly summary** (`services/weekly.py`). Monday–Sunday in the user's time zone: days trained against planned days (and other days), workouts, sets, volume, each lift's best set against the last time it was done, estimated 1RM, records (only when beating earlier history: "Best estimated 1RM yet" or "Heaviest weight yet"), sleep average and nights at goal with WHOOP / by-hand counts, latest weigh-in against the weight goal, points, and planned vs done for 8 weeks. Comparisons with the week before only when that week has data; anything missing is null, not zero. The summary says it doesn't claim sleep caused changes in training. "Planned" for past weeks uses the current training days, because earlier schedules aren't stored.
+
+**Wellness points** (`services/points.py`, table `POINT_AWARD`). One `RULES` table: finished workout +20 (one a day, up to the plan's sessions per week, so extra sessions don't earn more and rest days never cost anything), full planned week +30, sleep goal reached +10 (WHOOP, or logged by hand within 2 days), eating within 10 % of the calorie target on a finished day with 2+ foods logged by the next day +10, weekly weigh-in +5. Points are given when `/points` is checked, over the last 14 days and only since sign-up; the unique `(user_id, key)` makes this safe to repeat. Points are never taken away, even if the record is later deleted. Levels start at 0, 100, 300, 600, 1000, … points; achievements are counts of awards. No leaderboard or spending.
+
+**Sleep dashboard.** See the sleep rows in sections 7 and 12. Sleep stages are only shown for tracker nights; nothing is estimated for manual logs. Bedtime / wake-up consistency is the typical distance from the middle time over the last 7 nights (needs 3+ nights), shown as plain numbers without health claims.
+
+**Equipment recognition (deferred).** Not built and no model is trained. Where it would plug in: a `POST /exercises/recognize` endpoint that takes a photo and returns catalogue exercise ids with confidence. It feeds the same `SetForm` as QR and name search (`added_via` would get a new value), and the same alternatives and rest timer, so nothing else changes.

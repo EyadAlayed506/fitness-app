@@ -64,7 +64,7 @@ export function WeeklySummaryCard() {
 
       <WeekDays summary={s} />
       <Txt variant="small" style={{ marginTop: 8 }}>
-        {s.completed} of {s.planned} planned sessions
+        {s.completed} of {s.planned} planned session{s.planned === 1 ? "" : "s"}
         {s.current_week && s.planned_so_far < s.planned ? ` (${s.planned_so_far} so far)` : ""}
         {s.completed > s.completed_on_plan ? ` · ${s.completed - s.completed_on_plan} on other days` : ""}
         {s.previous_completed != null ? ` · last week ${s.previous_completed}` : ""}

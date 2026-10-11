@@ -20,7 +20,11 @@ def summary(client, auth, week: dt.date | None = None):
 
 def setup_user(client, auth, session) -> User:
     assert client.put("/api/me/profile", json={**PROFILE, "training_days": [0, 3]}, headers=auth).status_code == 200
-    return session.exec(select(User)).one()
+    user = session.exec(select(User)).one()
+    user.created_at = dt.datetime.now(dt.UTC) - dt.timedelta(days=60)
+    session.add(user)
+    session.commit()
+    return user
 
 
 def test_week_compared_with_the_week_before(client, auth, session):
@@ -75,3 +79,15 @@ def test_future_week_is_refused(client, auth, session):
     setup_user(client, auth, session)
     r = client.get(f"/api/analytics/weekly-summary?week={TODAY + dt.timedelta(days=8)}", headers=auth)
     assert r.status_code == 422
+
+
+def test_days_before_sign_up_are_not_planned(client, auth, session):
+    assert client.put("/api/me/profile", json={**PROFILE, "training_days": [0, 3]}, headers=auth).status_code == 200
+    user = session.exec(select(User)).one()
+    user.created_at = dt.datetime.combine(LAST_WEEK + dt.timedelta(days=2), dt.time(12), dt.UTC)  # signed up Wednesday
+    session.add(user)
+    session.commit()
+    s = summary(client, auth, LAST_WEEK)
+    assert s["planned"] == 1  # Thursday only; Monday was before sign-up
+    assert [d["planned"] for d in s["days"]][:4] == [False, False, False, True]
+    assert s["history"][0]["planned"] == 0

@@ -166,7 +166,10 @@ def _avg(values: list[int]) -> int | None:
     return round(sum(values) / len(values)) if values else None
 
 
-def weekly_summary(session: Session, profile: Profile, today: dt.date, monday: dt.date, tz_offset: int | None) -> WeeklySummary:
+def weekly_summary(
+    session: Session, profile: Profile, today: dt.date, monday: dt.date, tz_offset: int | None, since: dt.date
+) -> WeeklySummary:
+    """`since`: the day the user signed up. Days before it don't count as planned."""
     uid = profile.user_id
     sunday = monday + dt.timedelta(days=6)
     current = monday <= today <= sunday
@@ -179,10 +182,10 @@ def weekly_summary(session: Session, profile: Profile, today: dt.date, monday: d
     before = [w for w in all_workouts if w.day < monday]
     prev_week = [w for w in before if w.day >= monday - dt.timedelta(days=7)]
 
-    planned = planned_days(days_, monday, sunday)
+    planned = planned_days(days_, max(monday, since), sunday)
     trained_days = {w.day for w in this_week}
     days = [
-        DayStatus(d, d.weekday() in days_, d in trained_days, d > today)
+        DayStatus(d, d.weekday() in days_ and d >= since, d in trained_days, d > today)
         for d in (monday + dt.timedelta(days=i) for i in range(7))
     ]
 
@@ -234,7 +237,7 @@ def weekly_summary(session: Session, profile: Profile, today: dt.date, monday: d
         m = monday - dt.timedelta(weeks=k)
         end = min(m + dt.timedelta(days=6), today)
         history.append(
-            WeekCount(m, len(planned_days(days_, m, m + dt.timedelta(days=6))),
+            WeekCount(m, len(planned_days(days_, max(m, since), m + dt.timedelta(days=6))),
                       len({w.day for w in all_workouts if m <= w.day <= end}))
         )
     return WeeklySummary(

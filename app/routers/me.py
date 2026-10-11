@@ -20,6 +20,7 @@ from app.services.accounts import delete_user
 from app.services.activity import (
     TzOffset,
     completed_workouts,
+    local_date,
     local_today,
     sleep_goal,
     sleep_nights,
@@ -231,7 +232,7 @@ class RecommendationsOut(SQLModel):
 
 
 @router.get("/recommendations", response_model=RecommendationsOut)
-def read_recommendations(profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = None):
+def read_recommendations(user: CurrentUser, profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = None):
     """Today's suggestions from the plan, last night's sleep, WHOOP recovery and recent workouts."""
     today = local_today(tz_offset)
     monday = today - timedelta(days=today.weekday())
@@ -243,5 +244,6 @@ def read_recommendations(profile: CurrentProfile, session: SessionDep, tz_offset
         last_night=sleep_nights(session, profile.user_id, today, today).get(today),
         workouts=completed_workouts(session, profile.user_id, start, today, tz_offset),
         imperial=profile.unit_system == "imperial",
+        since=local_date(user.created_at, tz_offset),
     )
     return RecommendationsOut(date=today, items=recommend(ctx), disclaimer=DISCLAIMER)

@@ -60,6 +60,7 @@ npx expo start          # start the dev server (phone + browser)
 npx expo start --web    # open straight in the browser
 npm run typecheck       # TypeScript check
 npx expo lint           # lint
+npm test                # rest timer logic tests (Node built-in test runner)
 npx expo install <pkg>  # add a package (picks the version that matches the Expo SDK)
 ```
 
@@ -72,10 +73,11 @@ mobile/
 │   ├── app/               # screens (Expo Router: every file is a route)
 │   │   ├── _layout.tsx    # providers: login state, theme, toasts
 │   │   ├── index.tsx      # sends you to login, profile setup or Home
-│   │   ├── login.tsx  signup.tsx  onboarding.tsx  qr-stickers.tsx  sleep.tsx
+│   │   ├── login.tsx  signup.tsx  onboarding.tsx  qr-stickers.tsx  sleep.tsx  points.tsx
 │   │   └── (tabs)/        # Home, Workouts, Food, Progress, Profile
-│   ├── components/        # UI kit, charts, profile form, workout and food parts
-│   └── lib/               # API client, login state, units/formatting, theme, types
+│   ├── components/        # UI kit, charts, profile form + day picker, workout parts, exercise info,
+│   │                      # rest timer, Today card, points, weekly summary, sleep dashboard, food parts
+│   └── lib/               # API client, login state, units/formatting, theme, types, rest timer logic (+ tests)
 ```
 
 Charts are drawn with `react-native-svg` (`src/components/charts.tsx`), so they work in Expo Go and in the browser without extra native code. Tap a chart to see the values; "Table" shows the same numbers as a table.

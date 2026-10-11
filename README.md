@@ -60,12 +60,16 @@ Also useful:
 | Account | Sign up (with an "email me ads and discounts" checkbox), log in, delete account |
 | Profile | Birth date, sex, height, weight, activity level, goal, diet, training days, minutes per session, equipment, kg/cm or lb/in |
 | Health plan | BMI + category, healthy weight range, kg to lose/gain for BMI 22, resting and maintenance calories, light / normal / extreme diet with calorie difference, kg per week and weeks to goal |
-| Routine | Workout plan built from your days per week, minutes per session, equipment and goal |
-| Workouts | Start a workout, add exercises by **typing the name** (typos are fine) or **scanning the machine's QR code**, log reps, weight (kg or lb), RPE, rest and notes |
+| Routine | Pick the **weekdays you train** (e.g. Sun / Tue / Thu); sessions go on those days only, the rest are rest days. The split is chosen so back-to-back days train different muscles, and the app says why |
+| Today (Home) | Rule-based suggestions with their reasons: today's session or a rest day, "consider going lighter" after a short night or low WHOOP recovery, missed sessions (never "make them up"), when to add weight. Your plan is never changed for you |
+| Workouts | Start a workout, add exercises by **typing the name** (typos are fine) or **scanning the machine's QR code**, log reps, weight (kg or lb), RPE and notes. Each exercise has how-to steps and **alternatives** from the library ("similar movement" or "different movement") |
+| Rest timer | Starts by itself after every set with that exercise's rest time; pause, resume, skip, restart, ±15 s (remembered per exercise); vibrates (or beeps in the browser) at zero |
+| Weekly summary | Progress tab: sessions done vs planned, each lift against last time, records, sleep, weight goal and points, compared with the week before; planned vs done for 8 weeks |
+| Wellness points | Points for finished workouts, a full planned week, reaching your sleep goal, eating to plan and weekly weigh-ins; levels and achievements. Never taken away, no penalties for rest days |
 | QR stickers | Workouts tab → "Print QR stickers" shows a printable code for every machine |
 | Food | Search the built-in list, **USDA FoodData Central** and **Open Food Facts**; units change with the food (g/kg/oz/lb for solids, ml/l/cup/gallon… for drinks, or servings); create custom foods by hand with all macros and sub-macros |
 | Progress | Weight trend, projected weight per diet option, calories vs target, macros, lift progress (estimated 1RM), weekly volume per body region, sleep per night (mobile app), month-to-month body measurements with body-fat estimate |
-| Sleep (mobile app) | Choose how to track: **type it in** or **connect WHOOP** (sleep, stages, sleep performance and recovery imported automatically). Log bedtime, wake-up time, quality and notes; last night and the 7-day average on Home; a Sleep screen with history and a chart against the recommended hours for your age. Overlapping entries are refused so a night isn't counted twice |
+| Sleep (mobile app) | Choose how to track: **type it in** or **connect WHOOP** (sleep, stages, sleep performance and recovery imported automatically). Log bedtime, wake-up time, quality and notes; set a sleep goal (or use the amount recommended for your age); last night against the goal, sleep stages for WHOOP nights, a 7-night chart with the goal line, this week vs the week before, and bedtime / wake-up consistency. Overlapping entries are refused so a night isn't counted twice |
 | Emails | Opt in/out in the Profile tab; every user has a one-click unsubscribe link (`/api/marketing/unsubscribe/{token}`) |
 
 **Scanning QR codes:** on a PC with a webcam it works at `http://localhost:8000`. To test, open the QR sticker page on your phone and hold it up to the webcam, or type the code printed under the sticker (e.g. `leg-press`).
@@ -107,14 +111,14 @@ fitness-app/
 │   ├── security.py      # password hashing (Argon2) and login tokens (JWT)
 │   ├── deps.py          # CurrentUser / CurrentProfile dependencies
 │   ├── models/          # SQLModel tables and request/response schemas
-│   ├── routers/         # one file per area: auth, me, exercises, workouts, foods, measurements, analytics, marketing
-│   ├── services/        # formulas, routine generator, units, food search, QR codes
+│   ├── routers/         # one file per area: auth, me, exercises, workouts, foods, measurements, sleep, whoop, analytics, points, marketing
+│   ├── services/        # formulas, training days + routine, alternatives, suggestions, weekly summary, points, units, food search, WHOOP, QR codes
 │   ├── seed/            # starter machine catalogue (48 exercises) and 38 common foods
 │   ├── static/          # web preview (HTML, CSS, JS, Chart.js), served at /
 │   └── demo.py          # demo account
-└── tests/               # 58 tests: formulas, units, routine, sleep, every API area
+└── tests/               # pytest: formulas, units, training days, routine, suggestions, points, weekly summary, sleep, WHOOP, every API area
 ```
 
-Not built yet (see the build phases in ARCHITECTURE.md): sleep from trackers (Health Connect, WHOOP, Apple Health), image features, sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.
+Not built yet (see the build phases in ARCHITECTURE.md): Health Connect / Apple Health, image features (including equipment recognition), sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.
 
 The calculations are standard estimates (Mifflin–St Jeor, 7,700 kcal per kg, Epley, U.S. Navy body fat), not medical advice.

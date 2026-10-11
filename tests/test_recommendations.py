@@ -141,3 +141,13 @@ def test_api_returns_suggestions_with_disclaimer(client, auth):
     assert body["items"][0]["id"] == "plan_for_today"
     assert all({"title", "message", "reasons", "sources", "kind"} <= set(i) for i in body["items"])
     assert client.get("/api/me/recommendations?tz_offset=5000", headers=auth).status_code == 422
+
+
+def test_days_before_sign_up_are_not_missed(catalogue):
+    friday = MONDAY + dt.timedelta(days=4)
+    c = ctx(catalogue, friday)
+    c.since = friday  # signed up today
+    assert "missed_sessions" not in ids(recommend(c))
+    c.since = MONDAY + dt.timedelta(days=2)  # Wednesday: only Wednesday counts
+    missed = next(r for r in recommend(c) if r.id == "missed_sessions")
+    assert missed.title == "0 of 1 planned session so far this week"
