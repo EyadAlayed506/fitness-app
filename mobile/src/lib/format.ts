@@ -128,3 +128,6 @@ export const WEEKDAYS_SHORT = WEEKDAYS.map((d) => d.slice(0, 3));
 /** Today's weekday in the backend's numbering (JavaScript counts from Sunday). */
 export const weekdayIndex = (d: Date = new Date()) => (d.getDay() + 6) % 7;
 export const dayList = (days: number[]) => [...days].sort((a, b) => a - b).map((d) => WEEKDAYS_SHORT[d]).join(", ");
+
+/** The device's UTC offset in minutes (UTC+2 → 120). The server uses it to know the user's "today". */
+export const tzOffset = () => -new Date().getTimezoneOffset();

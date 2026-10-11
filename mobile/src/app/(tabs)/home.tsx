@@ -4,13 +4,14 @@ import { Pressable, View } from "react-native";
 
 import { MacroBars } from "@/components/MacroBars";
 import { SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
+import { TodayCard } from "@/components/TodayCard";
 import { Badge, Button, Card, CardHead, Field, LinkButton, Meter, Row, Screen, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth, useProfile } from "@/lib/auth";
-import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, units } from "@/lib/format";
+import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, tzOffset, units } from "@/lib/format";
 import { profilePayload } from "@/lib/profile";
 import { useTheme } from "@/lib/theme";
-import type { DietOption, FoodDay, Plan, SleepAnalytics, SleepEntry, WhoopStatus } from "@/lib/types";
+import type { DietOption, FoodDay, Plan, Recommendations, SleepAnalytics, SleepEntry, WhoopStatus } from "@/lib/types";
 
 const BMI_BADGE = { underweight: "info", normal: "good", overweight: "warn", obese: "bad" } as const;
 const SCALE_MIN = 15;
@@ -24,6 +25,7 @@ export default function Home() {
   const [day, setDay] = useState<FoodDay | null>(null);
   const [lastSleep, setLastSleep] = useState<SleepEntry | null>(null);
   const [sleepStats, setSleepStats] = useState<SleepAnalytics | null>(null);
+  const [today, setToday] = useState<Recommendations | null>(null);
   const [whoopConnected, setWhoopConnected] = useState(false);
   const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
@@ -36,11 +38,13 @@ export default function Home() {
       // bring in last night's WHOOP sleep (at most every 30 minutes); failures just show older data
       await api("/whoop/sync?stale_minutes=30", { method: "POST" }).catch(() => null);
     }
-    const [food, sleeps, stats] = await Promise.all([
+    const [food, sleeps, stats, recs] = await Promise.all([
       api<FoodDay>(`/food-logs?date=${todayISO()}`),
       api<SleepEntry[]>("/sleep?limit=1"),
       api<SleepAnalytics>("/analytics/sleep?days=7"),
+      api<Recommendations>(`/me/recommendations?tz_offset=${tzOffset()}`).catch(() => null),
     ]);
+    setToday(recs);
     setDay(food);
     setLastSleep(sleeps[0] ?? null);
     setSleepStats(stats);
@@ -83,6 +87,8 @@ export default function Home() {
         setRefreshing(false);
       }}
     >
+      {today ? <TodayCard data={today} /> : null}
+
       <Card>
         <CardHead title="Body mass index" right={<Badge label={cap(plan.bmi_category)} tone={BMI_BADGE[plan.bmi_category]} />} />
         <Row style={{ justifyContent: "space-between", alignItems: "flex-end" }}>

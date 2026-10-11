@@ -1,11 +1,10 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlmodel import select
+from sqlmodel import SQLModel, select
 
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
-from app.models.exercise import Exercise
 from app.models.user import (
     MarketingUpdate,
     Profile,
@@ -18,8 +17,23 @@ from app.models.user import (
 )
 from app.services import calculations as calc
 from app.services.accounts import delete_user
+from app.services.activity import (
+    TzOffset,
+    completed_workouts,
+    local_today,
+    sleep_goal,
+    sleep_nights,
+    user_routine,
+)
 from app.services.plan import PlanOut, build_plan
-from app.services.routine import Routine, generate_routine
+from app.services.recommendations import (
+    DISCLAIMER,
+    PROGRESSION_LOOKBACK_DAYS,
+    Context,
+    Recommendation,
+    recommend,
+)
+from app.services.routine import Routine
 from app.services.schedule import effective_training_days, format_days, validate_days
 from app.services.units import to_cm, to_kg
 
@@ -188,8 +202,27 @@ def read_projection(profile: CurrentProfile):
 
 @router.get("/routine", response_model=Routine)
 def read_routine(profile: CurrentProfile, session: SessionDep):
-    plan = build_plan(profile)
-    catalogue = list(session.exec(select(Exercise)).all())
-    return generate_routine(
-        catalogue, effective_training_days(profile), profile.minutes_per_session, profile.equipment, plan.direction
+    return user_routine(session, profile)
+
+
+class RecommendationsOut(SQLModel):
+    date: date
+    items: list[Recommendation]
+    disclaimer: str
+
+
+@router.get("/recommendations", response_model=RecommendationsOut)
+def read_recommendations(profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = 0):
+    """Today's suggestions from the plan, last night's sleep, WHOOP recovery and recent workouts."""
+    today = local_today(tz_offset)
+    monday = today - timedelta(days=today.weekday())
+    start = min(monday, today - timedelta(days=PROGRESSION_LOOKBACK_DAYS))
+    ctx = Context(
+        today=today,
+        routine=user_routine(session, profile),
+        sleep_goal=sleep_goal(profile),
+        last_night=sleep_nights(session, profile.user_id, today, today).get(today),
+        workouts=completed_workouts(session, profile.user_id, start, today, tz_offset),
+        imperial=profile.unit_system == "imperial",
     )
+    return RecommendationsOut(date=today, items=recommend(ctx), disclaimer=DISCLAIMER)

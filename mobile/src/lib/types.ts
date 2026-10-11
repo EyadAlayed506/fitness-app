@@ -292,3 +292,18 @@ export interface SleepAnalytics {
   nights_logged_7d: number;
   recommended_hours: [number, number];
 }
+
+export interface Recommendation {
+  id: string;
+  kind: "plan" | "rest" | "lighter" | "progress" | "info";
+  title: string;
+  message: string;
+  reasons: string[];
+  sources: string[];
+}
+
+export interface Recommendations {
+  date: string;
+  items: Recommendation[];
+  disclaimer: string;
+}
