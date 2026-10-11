@@ -3,14 +3,14 @@ import { useCallback, useState } from "react";
 import { Pressable, View } from "react-native";
 
 import { MacroBars } from "@/components/MacroBars";
-import { SleepForm, qualityLabel, rangeBadge } from "@/components/SleepParts";
+import { SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
 import { Badge, Button, Card, CardHead, Field, LinkButton, Meter, Row, Screen, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth, useProfile } from "@/lib/auth";
 import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, units } from "@/lib/format";
 import { profilePayload } from "@/lib/profile";
 import { useTheme } from "@/lib/theme";
-import type { DietOption, FoodDay, Plan, SleepAnalytics, SleepEntry } from "@/lib/types";
+import type { DietOption, FoodDay, Plan, SleepAnalytics, SleepEntry, WhoopStatus } from "@/lib/types";
 
 const BMI_BADGE = { underweight: "info", normal: "good", overweight: "warn", obese: "bad" } as const;
 const SCALE_MIN = 15;
@@ -24,11 +24,18 @@ export default function Home() {
   const [day, setDay] = useState<FoodDay | null>(null);
   const [lastSleep, setLastSleep] = useState<SleepEntry | null>(null);
   const [sleepStats, setSleepStats] = useState<SleepAnalytics | null>(null);
+  const [whoopConnected, setWhoopConnected] = useState(false);
   const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    const whoop = await api<WhoopStatus>("/whoop").catch(() => null);
+    setWhoopConnected(!!whoop?.connected);
+    if (whoop?.connected) {
+      // bring in last night's WHOOP sleep (at most every 30 minutes); failures just show older data
+      await api("/whoop/sync?stale_minutes=30", { method: "POST" }).catch(() => null);
+    }
     const [food, sleeps, stats] = await Promise.all([
       api<FoodDay>(`/food-logs?date=${todayISO()}`),
       api<SleepEntry[]>("/sleep?limit=1"),
@@ -131,10 +138,14 @@ export default function Home() {
                 <Txt variant="big">{hoursMinutes(lastSleep.duration_minutes)}</Txt>
                 <Txt variant="muted"> {lastSleep.date === todayISO() ? "last night" : `night to ${shortDate(lastSleep.date)}`}</Txt>
               </Txt>
-              {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
+              <Row gap={6}>
+                {lastSleep.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : null}
+                {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
+              </Row>
             </Row>
             <Txt variant="small" style={{ marginTop: 2 }}>
               {clockOf(lastSleep.bedtime)} → {clockOf(lastSleep.wake_time)}
+              {lastSleep.source !== "manual" && trackerSummary(lastSleep) ? ` · ${trackerSummary(lastSleep)}` : ""}
             </Txt>
             {sleepStats?.average_hours_7d != null ? (
               <Row style={{ justifyContent: "space-between", marginTop: 8 }}>
@@ -147,9 +158,18 @@ export default function Home() {
             ) : null}
           </>
         ) : (
-          <Txt variant="small">No sleep logged yet. Log last night to see how sleep fits with your training and weight.</Txt>
+          <Txt variant="small">
+            No sleep yet. Log last night by hand, or connect WHOOP on the Sleep screen to import it automatically.
+          </Txt>
         )}
-        <Button title="Log sleep" icon="moon" kind="soft" onPress={() => setLoggingSleep(true)} style={{ marginTop: 12 }} />
+        {whoopConnected ? (
+          <Button title="Open sleep" icon="moon" kind="soft" onPress={() => router.push("/sleep")} style={{ marginTop: 12 }} />
+        ) : (
+          <Row style={{ marginTop: 12 }}>
+            <Button title="Log sleep" icon="moon" kind="soft" onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
+            <Button title="Connect WHOOP" kind="ghost" onPress={() => router.push("/sleep")} />
+          </Row>
+        )}
       </Card>
       <Sheet visible={loggingSleep} title="Log sleep" onClose={() => setLoggingSleep(false)}>
         {loggingSleep ? (

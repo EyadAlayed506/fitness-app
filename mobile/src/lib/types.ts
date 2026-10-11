@@ -224,7 +224,30 @@ export interface SleepEntry {
   duration_minutes: number;
   quality: number | null;
   notes: string;
-  source: "manual";
+  source: "manual" | "whoop";
+  // from WHOOP
+  light_minutes?: number | null;
+  deep_minutes?: number | null;
+  rem_minutes?: number | null;
+  awake_minutes?: number | null;
+  performance_pct?: number | null;
+  recovery_score?: number | null;
+}
+
+export interface WhoopStatus {
+  configured: boolean;
+  connected: boolean;
+  whoop_name: string;
+  connected_at: string | null;
+  last_sync_at: string | null;
+}
+
+export interface WhoopSyncResult {
+  imported: number;
+  updated: number;
+  replaced_manual: number;
+  skipped: boolean;
+  last_sync_at: string | null;
 }
 
 export interface SleepAnalytics {

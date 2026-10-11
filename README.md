@@ -65,7 +65,7 @@ Also useful:
 | QR stickers | Workouts tab → "Print QR stickers" shows a printable code for every machine |
 | Food | Search the built-in list, **USDA FoodData Central** and **Open Food Facts**; units change with the food (g/kg/oz/lb for solids, ml/l/cup/gallon… for drinks, or servings); create custom foods by hand with all macros and sub-macros |
 | Progress | Weight trend, projected weight per diet option, calories vs target, macros, lift progress (estimated 1RM), weekly volume per body region, sleep per night (mobile app), month-to-month body measurements with body-fat estimate |
-| Sleep (mobile app) | Log bedtime, wake-up time, quality and notes; last night and the 7-day average on Home; a Sleep screen with history and a chart against the recommended hours for your age. Overlapping entries are refused so a night isn't counted twice |
+| Sleep (mobile app) | Choose how to track: **type it in** or **connect WHOOP** (sleep, stages, sleep performance and recovery imported automatically). Log bedtime, wake-up time, quality and notes; last night and the 7-day average on Home; a Sleep screen with history and a chart against the recommended hours for your age. Overlapping entries are refused so a night isn't counted twice |
 | Emails | Opt in/out in the Profile tab; every user has a one-click unsubscribe link (`/api/marketing/unsubscribe/{token}`) |
 
 **Scanning QR codes:** on a PC with a webcam it works at `http://localhost:8000`. To test, open the QR sticker page on your phone and hold it up to the webcam, or type the code printed under the sticker (e.g. `leg-press`).
@@ -83,6 +83,17 @@ Copy `.env.example` to `.env` to change settings:
 | `JWT_EXPIRE_MINUTES` | `30` | How long a login lasts |
 | `USDA_API_KEY` | `DEMO_KEY` | `DEMO_KEY` allows only a few searches per hour. Get a free key at https://api.data.gov/signup/ |
 | `OFF_USER_AGENT` | `FitnessApp/0.1 (...)` | Open Food Facts asks apps to identify themselves |
+| `WHOOP_CLIENT_ID`, `WHOOP_CLIENT_SECRET` | empty (WHOOP off) | From your app at https://developer.whoop.com (needs a WHOOP membership). Without them the app offers manual sleep logging only |
+| `WHOOP_REDIRECT_URI` | `http://localhost:8000/api/whoop/callback` | Must match the redirect URL registered in the WHOOP dashboard exactly |
+
+### Connecting WHOOP
+
+1. Log in at https://developer.whoop.com with your WHOOP account and create an app.
+2. Add the redirect URL `http://localhost:8000/api/whoop/callback` and pick the scopes `read:profile`, `read:sleep`, `read:recovery` and `offline`.
+3. Put the app's Client ID and Client Secret in `.env` as `WHOOP_CLIENT_ID` and `WHOOP_CLIENT_SECRET`, then restart the backend.
+4. In the app: Sleep → **Connect WHOOP**. Do this from the browser on your PC (press `w` in Expo), because the WHOOP login sends you back to `localhost`. The connection belongs to your account, so the phone app syncs too afterwards.
+
+The app imports the last 30 days, then syncs again when you open Home or the Sleep screen (at most every 15–30 minutes) or tap **Sync now**. WHOOP nights replace nights you typed in by hand for the same time.
 
 ## Project layout
 

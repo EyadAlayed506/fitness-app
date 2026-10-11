@@ -8,6 +8,7 @@ from app.models.sleep import (
     SleepEntryIn,
     SleepEntryPublic,
     SleepEntryUpdate,
+    SleepSource,
     check_times,
 )
 from app.models.user import User
@@ -67,6 +68,8 @@ def list_sleep(user: CurrentUser, session: SessionDep, limit: int = Query(defaul
 @router.patch("/{entry_id}", response_model=SleepEntryPublic)
 def update_sleep(entry_id: int, data: SleepEntryUpdate, user: CurrentUser, session: SessionDep):
     entry = _get_owned(session, entry_id, user)
+    if entry.source != SleepSource.manual and ({"bedtime", "wake_time"} & data.model_fields_set):
+        raise HTTPException(status_code=409, detail=f"The times of this sleep come from {entry.source.upper()} and can't be changed")
     # quality can be cleared with null; null for the other fields means "leave as is"
     changes = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None or k == "quality"}
     bedtime = changes.get("bedtime") or entry.bedtime

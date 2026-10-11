@@ -4,6 +4,7 @@ from app.models.food import Food, FoodLog
 from app.models.measurement import BodyMeasurement
 from app.models.sleep import SleepEntry
 from app.models.user import Profile, User, WeightEntry
+from app.models.whoop import WhoopConnection
 from app.models.workout import WorkoutSession, WorkoutSet
 
 
@@ -15,5 +16,6 @@ def delete_user(session: Session, user: User) -> None:
         session.exec(delete(model).where(model.user_id == user.id))
     session.exec(delete(Food).where(Food.owner_id == user.id))
     session.exec(delete(Profile).where(Profile.user_id == user.id))
+    session.exec(delete(WhoopConnection).where(WhoopConnection.user_id == user.id))
     session.delete(user)
     session.commit()

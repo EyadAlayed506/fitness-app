@@ -225,7 +225,14 @@ erDiagram
         int duration_minutes
         int quality "1-5, optional"
         string notes
-        enum source "manual (later: whoop / health_connect / apple_health)"
+        enum source "manual / whoop"
+        string external_id "tracker id"
+        int light_minutes "WHOOP"
+        int deep_minutes "WHOOP"
+        int rem_minutes "WHOOP"
+        int awake_minutes "WHOOP"
+        float performance_pct "WHOOP"
+        float recovery_score "WHOOP"
     }
 ```
 
@@ -481,14 +488,19 @@ Each phase is usable on its own.
 | Email provider | **Later.** Opt-in and unsubscribe are built; sending is added when a provider is picked (Brevo's free plan is the front runner). |
 | Sleep data | **Manual log first** (free, works for everyone). Trackers later, in the order below. |
 
-## 18. Sleep from trackers (planned)
+## 18. Sleep from trackers
 
-The `source` field on `SLEEP_ENTRY` is there so imported sleeps sit next to manual ones.
+Users choose: type sleep in, or connect WHOOP. Imported sleeps sit next to manual ones in `SLEEP_ENTRY` (`source`, `external_id`).
 
-| Order | Source | How | Cost / requirements |
-|---|---|---|---|
-| 1 | **Health Connect** (Android) | Read sleep sessions on the phone, send them to `/sleep` | Free. Needs a development build of the app (not Expo Go) |
-| 2 | **WHOOP** | OAuth on the backend, read the WHOOP API (v2) sleep collection and its webhooks | API free; needs a WHOOP membership to build, and users need a WHOOP. 10 users until WHOOP approves the app |
-| 3 | **Apple Health** (iPhone) | Read HealthKit sleep analysis on the phone | Needs the paid Apple Developer Program ($99/year) and a development build |
+**WHOOP (built).** `app/services/whoop.py`, `app/routers/whoop.py`, table `WHOOP_CONNECTION` (one per user: OAuth tokens, state, last sync).
+- Login: `POST /api/whoop/connect` returns WHOOP's OAuth URL (scopes `offline read:profile read:sleep read:recovery`, random `state`, valid 15 minutes). WHOOP redirects the browser to `GET /api/whoop/callback`, which exchanges the code, reads the profile and imports the last 30 days.
+- Sync: `POST /api/whoop/sync?stale_minutes=N` reads `v2/activity/sleep` and `v2/recovery` since the last sync (minus 3 days, because WHOOP scores nights after a delay), with pagination. Tokens refresh automatically; rotated refresh tokens are saved.
+- Mapping: times are converted to the clock time where the user slept (`timezone_offset`), duration is time asleep (light + deep + REM), stages and sleep performance are stored, quality maps performance to 1–5 (85 %+ = 5), recovery comes from the matching recovery record.
+- A WHOOP night replaces typed-in sleeps that overlap it; re-syncs update by WHOOP id (no duplicates) and keep the user's notes. Times of WHOOP nights can't be edited.
+- A revoked or expired WHOOP login disconnects WHOOP (HTTP 409, never 401, so the user stays logged in to this app). WHOOP being down returns 502 and changes nothing.
+- No webhooks: they need a public HTTPS address, which a backend on a home PC doesn't have. Syncing on app open covers it.
+- `GET /api/whoop`, `DELETE /api/whoop` (revokes access at WHOOP; imported sleep stays).
+- Tokens are stored as plain text in the database. Encrypt them before running the app for real users.
+- Tested against a fake WHOOP server (`tests/test_whoop.py`), not a real WHOOP account.
 
-Imported sleeps would carry their source and the tracker's id, so a re-sync updates instead of duplicating.
+Not built: Health Connect (Android, needs a development build) and Apple Health (needs the paid Apple Developer Program).

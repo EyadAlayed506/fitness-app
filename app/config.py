@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     # Origins allowed to call the API from a browser (the Expo web app runs on another port).
     # Login uses a bearer token, not cookies, so "*" is safe for development.
     cors_origins: list[str] = ["*"]
+    # WHOOP (optional): create an app at https://developer.whoop.com and copy its keys here.
+    # The redirect URL registered there must be exactly whoop_redirect_uri.
+    whoop_client_id: str = ""
+    whoop_client_secret: str = ""
+    whoop_redirect_uri: str = "http://localhost:8000/api/whoop/callback"
+    whoop_base_url: str = "https://api.prod.whoop.com"  # only changed for testing against a fake WHOOP
 
 
 @lru_cache

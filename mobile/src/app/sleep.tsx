@@ -2,13 +2,14 @@ import { Redirect, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView } from "react-native";
 
-import { QUALITY, SleepChart, SleepForm, qualityLabel, rangeBadge } from "@/components/SleepParts";
-import { Button, Card, ListRow, Loading, Row, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
+import { QUALITY, SleepChart, SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
+import { Badge, Card, ListRow, Loading, Row, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
+import { WhoopCard, syncSummary } from "@/components/WhoopCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { clockOf, fmt, hoursMinutes, longDate } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
-import type { SleepAnalytics, SleepEntry } from "@/lib/types";
+import type { SleepAnalytics, SleepEntry, WhoopStatus, WhoopSyncResult } from "@/lib/types";
 
 type SheetState = { kind: "new" } | { kind: "edit"; entry: SleepEntry } | null;
 
@@ -18,17 +19,35 @@ export default function Sleep() {
   const { ready, token } = useAuth();
   const [entries, setEntries] = useState<SleepEntry[]>([]);
   const [stats, setStats] = useState<SleepAnalytics | null>(null);
+  const [whoop, setWhoop] = useState<WhoopStatus | null>(null);
   const [sheet, setSheet] = useState<SheetState>(null);
 
   const load = useCallback(async () => {
-    const [list, analytics] = await Promise.all([api<SleepEntry[]>("/sleep?limit=60"), api<SleepAnalytics>("/analytics/sleep?days=14")]);
+    const [list, analytics, status] = await Promise.all([
+      api<SleepEntry[]>("/sleep?limit=60"),
+      api<SleepAnalytics>("/analytics/sleep?days=14"),
+      api<WhoopStatus>("/whoop"),
+    ]);
     setEntries(list);
     setStats(analytics);
+    setWhoop(status);
+    return status;
   }, []);
   useFocusEffect(
     useCallback(() => {
-      if (token) load().catch(() => {});
-    }, [load, token]),
+      if (!token) return;
+      (async () => {
+        const status = await load();
+        // Pull new WHOOP sleep when the screen opens (at most every 15 minutes)
+        if (status.connected) {
+          const r = await api<WhoopSyncResult>("/whoop/sync?stale_minutes=15", { method: "POST" }).catch(() => null);
+          if (r && !r.skipped) {
+            if (r.imported || r.replaced_manual) toast(syncSummary(r));
+            await load();
+          }
+        }
+      })().catch(() => {});
+    }, [load, token, toast]),
   );
 
   if (!ready) return <Loading />;
@@ -54,8 +73,16 @@ export default function Sleep() {
           </Txt>
           {rangeBadge(stats?.average_hours_7d ?? null, range)}
         </Row>
-        <Button title="Log sleep" icon="moon" onPress={() => setSheet({ kind: "new" })} style={{ marginTop: 12 }} />
       </Card>
+
+      <WhoopCard
+        status={whoop}
+        onChanged={async () => {
+          await load();
+        }}
+        onLogManually={() => setSheet({ kind: "new" })}
+        toast={toast}
+      />
 
       {stats ? <SleepChart data={stats} /> : null}
 
@@ -67,7 +94,15 @@ export default function Sleep() {
               key={e.id}
               first={i === 0}
               title={`${longDate(e.date)} · ${hoursMinutes(e.duration_minutes)}`}
-              subtitle={`${clockOf(e.bedtime)} → ${clockOf(e.wake_time)}${e.quality ? ` · ${qualityLabel(e.quality)}` : ""}${e.notes ? ` · ${e.notes}` : ""}`}
+              subtitle={[
+                `${clockOf(e.bedtime)} → ${clockOf(e.wake_time)}`,
+                e.quality ? qualityLabel(e.quality) : "",
+                e.source !== "manual" ? trackerSummary(e) : "",
+                e.notes,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              right={e.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : undefined}
               onPress={() => setSheet({ kind: "edit", entry: e })}
             />
           ))

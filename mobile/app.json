@@ -35,7 +35,8 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "scheme": "fitnessapp",
     "experiments": {

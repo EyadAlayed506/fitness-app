@@ -11,7 +11,8 @@ MAX_SLEEP_HOURS = 20
 
 class SleepSource(StrEnum):
     manual = "manual"
-    # Planned (see ARCHITECTURE.md): whoop, health_connect, apple_health
+    whoop = "whoop"
+    # Planned (see ARCHITECTURE.md): health_connect, apple_health
 
 
 class SleepEntry(SQLModel, table=True):
@@ -22,11 +23,19 @@ class SleepEntry(SQLModel, table=True):
     date: dt.date = Field(index=True)  # the morning the user woke up
     bedtime: NaiveDatetime  # local clock time, no timezone
     wake_time: NaiveDatetime
-    duration_minutes: int
+    duration_minutes: int  # time asleep when a tracker reports it, otherwise bedtime to wake-up
     quality: int | None = None  # 1 (very poor) to 5 (great)
     notes: str = ""
     source: SleepSource = SleepSource.manual
     created_at: dt.datetime = Field(default_factory=utcnow)
+    # Filled in by trackers (WHOOP)
+    external_id: str | None = Field(default=None, index=True)
+    light_minutes: int | None = None
+    deep_minutes: int | None = None
+    rem_minutes: int | None = None
+    awake_minutes: int | None = None
+    performance_pct: float | None = None  # WHOOP sleep performance
+    recovery_score: float | None = None  # WHOOP recovery the next morning
 
 
 def _wall_clock(value: dt.datetime | None) -> dt.datetime | None:
@@ -73,3 +82,9 @@ class SleepEntryPublic(SQLModel):
     quality: int | None
     notes: str
     source: SleepSource
+    light_minutes: int | None = None
+    deep_minutes: int | None = None
+    rem_minutes: int | None = None
+    awake_minutes: int | None = None
+    performance_pct: float | None = None
+    recovery_score: float | None = None

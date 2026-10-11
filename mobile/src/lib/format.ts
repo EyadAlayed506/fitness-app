@@ -110,3 +110,13 @@ export function parseClock(text: string): number | null {
 export function clockText(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
+
+/** "just now", "5 min ago", "3 h ago", "2 days ago" for a UTC timestamp from the API */
+export function timeAgo(iso: string | null): string {
+  if (!iso) return "never";
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  if (min < 48 * 60) return `${Math.round(min / 60)} h ago`;
+  return `${Math.round(min / 1440)} days ago`;
+}
