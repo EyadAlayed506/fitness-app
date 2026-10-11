@@ -6,7 +6,15 @@
   "muscle_group": "chest",
   "primary_muscles": "pectorals, triceps, front delts",
   "equipment": "gym",
-  "qr_code": "chest-press"
+  "qr_code": "chest-press",
+  "pattern": "horizontal_press",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Set the seat so the handles line up with the middle of your chest.",
+   "Keep your back and head against the pad.",
+   "Push the handles forward until your arms are almost straight, without locking the elbows.",
+   "Bring them back slowly until you feel a stretch in the chest."
+  ]
  },
  {
   "name": "Barbell Bench Press",
@@ -15,7 +23,16 @@
   "muscle_group": "chest",
   "primary_muscles": "pectorals, triceps, front delts",
   "equipment": "gym",
-  "qr_code": "barbell-bench-press"
+  "qr_code": "barbell-bench-press",
+  "pattern": "horizontal_press",
+  "default_rest_seconds": 150,
+  "instructions": [
+   "Lie on the bench with your eyes under the bar and feet flat on the floor.",
+   "Grip the bar a little wider than shoulder width.",
+   "Lower the bar with control to the middle of your chest.",
+   "Press it back up over your shoulders.",
+   "Use a spotter or safety bars when lifting heavy."
+  ]
  },
  {
   "name": "Incline Chest Press",
@@ -24,7 +41,15 @@
   "muscle_group": "chest",
   "primary_muscles": "upper pectorals, front delts",
   "equipment": "gym",
-  "qr_code": "incline-chest-press"
+  "qr_code": "incline-chest-press",
+  "pattern": "incline_press",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Set the seat so the handles start at upper-chest height.",
+   "Keep your back against the pad.",
+   "Press up and forward until your arms are almost straight.",
+   "Lower slowly to the starting position."
+  ]
  },
  {
   "name": "Pec Deck",
@@ -33,7 +58,15 @@
   "muscle_group": "chest",
   "primary_muscles": "pectorals",
   "equipment": "gym",
-  "qr_code": "pec-deck"
+  "qr_code": "pec-deck",
+  "pattern": "chest_fly",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Set the seat so the handles are at chest height.",
+   "Keep a slight bend in your elbows throughout.",
+   "Bring the handles together in front of your chest.",
+   "Open your arms slowly until you feel a stretch, not pain, in the chest."
+  ]
  },
  {
   "name": "Cable Crossover",
@@ -42,7 +75,15 @@
   "muscle_group": "chest",
   "primary_muscles": "pectorals",
   "equipment": "gym",
-  "qr_code": "cable-crossover"
+  "qr_code": "cable-crossover",
+  "pattern": "chest_fly",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Set both pulleys at shoulder height or above and take one handle in each hand.",
+   "Step forward into a split stance with a slight lean.",
+   "With elbows slightly bent, bring your hands together in front of your chest.",
+   "Return slowly, keeping the same elbow angle."
+  ]
  },
  {
   "name": "Dumbbell Bench Press",
@@ -51,7 +92,15 @@
   "muscle_group": "chest",
   "primary_muscles": "pectorals, triceps",
   "equipment": "home",
-  "qr_code": "dumbbell-bench-press"
+  "qr_code": "dumbbell-bench-press",
+  "pattern": "horizontal_press",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Lie on a flat bench holding a dumbbell in each hand at chest level.",
+   "Keep your feet flat and shoulder blades pulled back.",
+   "Press the dumbbells up until your arms are almost straight.",
+   "Lower them with control to the sides of your chest."
+  ]
  },
  {
   "name": "Push-up",
@@ -60,7 +109,15 @@
   "muscle_group": "chest",
   "primary_muscles": "pectorals, triceps, core",
   "equipment": "bodyweight",
-  "qr_code": "push-up"
+  "qr_code": "push-up",
+  "pattern": "horizontal_press",
+  "default_rest_seconds": 90,
+  "instructions": [
+   "Start in a high plank with hands a little wider than shoulder width.",
+   "Keep your body in a straight line from head to heels.",
+   "Lower your chest towards the floor, elbows at about 45 degrees.",
+   "Push back up. Do them with knees on the floor to make it easier."
+  ]
  },
  {
   "name": "Lat Pulldown",
@@ -69,7 +126,15 @@
   "muscle_group": "back",
   "primary_muscles": "lats, biceps",
   "equipment": "gym",
-  "qr_code": "lat-pulldown"
+  "qr_code": "lat-pulldown",
+  "pattern": "vertical_pull",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Adjust the knee pad so your legs are held in place.",
+   "Grip the bar a little wider than shoulder width.",
+   "Pull the bar down to your upper chest, leading with your elbows.",
+   "Let it rise slowly until your arms are straight."
+  ]
  },
  {
   "name": "Seated Cable Row",
@@ -78,7 +143,15 @@
   "muscle_group": "back",
   "primary_muscles": "mid back, lats, biceps",
   "equipment": "gym",
-  "qr_code": "seated-cable-row"
+  "qr_code": "seated-cable-row",
+  "pattern": "horizontal_pull",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Sit with feet on the platform and knees slightly bent.",
+   "Keep your back straight and chest up.",
+   "Pull the handle to your lower ribs, squeezing your shoulder blades together.",
+   "Return slowly until your arms are straight."
+  ]
  },
  {
   "name": "Chest-Supported Row Machine",
@@ -87,7 +160,15 @@
   "muscle_group": "back",
   "primary_muscles": "mid back, lats",
   "equipment": "gym",
-  "qr_code": "chest-supported-row-machine"
+  "qr_code": "chest-supported-row-machine",
+  "pattern": "horizontal_pull",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Set the seat so your chest rests on the pad and you can reach the handles.",
+   "Pull the handles back, squeezing your shoulder blades together.",
+   "Keep your chest on the pad the whole time.",
+   "Return slowly until your arms are straight."
+  ]
  },
  {
   "name": "Assisted Pull-up Machine",
@@ -96,7 +177,15 @@
   "muscle_group": "back",
   "primary_muscles": "lats, biceps",
   "equipment": "gym",
-  "qr_code": "assisted-pull-up-machine"
+  "qr_code": "assisted-pull-up-machine",
+  "pattern": "vertical_pull",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Choose the counterweight: more weight means more help.",
+   "Kneel or stand on the platform and grip the handles.",
+   "Pull yourself up until your chin is above your hands.",
+   "Lower slowly until your arms are straight."
+  ]
  },
  {
   "name": "Dumbbell Row",
@@ -105,7 +194,15 @@
   "muscle_group": "back",
   "primary_muscles": "lats, mid back",
   "equipment": "home",
-  "qr_code": "dumbbell-row"
+  "qr_code": "dumbbell-row",
+  "pattern": "horizontal_pull",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Put one hand and one knee on a bench, back flat.",
+   "Hold a dumbbell in the other hand with the arm straight.",
+   "Pull the dumbbell towards your hip, keeping the elbow close to your body.",
+   "Lower slowly and repeat, then switch sides."
+  ]
  },
  {
   "name": "Pull-up",
@@ -114,7 +211,15 @@
   "muscle_group": "back",
   "primary_muscles": "lats, biceps",
   "equipment": "bodyweight",
-  "qr_code": "pull-up"
+  "qr_code": "pull-up",
+  "pattern": "vertical_pull",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Hang from the bar with hands a little wider than shoulder width, palms facing away.",
+   "Pull yourself up until your chin is above the bar.",
+   "Lower slowly until your arms are straight.",
+   "Use a resistance band or the assisted machine if you can't do a full rep yet."
+  ]
  },
  {
   "name": "Inverted Row",
@@ -123,7 +228,15 @@
   "muscle_group": "back",
   "primary_muscles": "mid back, biceps",
   "equipment": "bodyweight",
-  "qr_code": "inverted-row"
+  "qr_code": "inverted-row",
+  "pattern": "horizontal_pull",
+  "default_rest_seconds": 90,
+  "instructions": [
+   "Lie under a bar set at about waist height and grip it with straight arms.",
+   "Keep your body straight from head to heels.",
+   "Pull your chest up to the bar.",
+   "Lower slowly. Bend your knees to make it easier."
+  ]
  },
  {
   "name": "Shoulder Press Machine",
@@ -132,7 +245,15 @@
   "muscle_group": "shoulders",
   "primary_muscles": "delts, triceps",
   "equipment": "gym",
-  "qr_code": "shoulder-press-machine"
+  "qr_code": "shoulder-press-machine",
+  "pattern": "vertical_press",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Set the seat so the handles start at shoulder height.",
+   "Keep your back against the pad.",
+   "Press the handles up until your arms are almost straight.",
+   "Lower slowly back to shoulder height."
+  ]
  },
  {
   "name": "Lateral Raise Machine",
@@ -141,7 +262,15 @@
   "muscle_group": "shoulders",
   "primary_muscles": "side delts",
   "equipment": "gym",
-  "qr_code": "lateral-raise-machine"
+  "qr_code": "lateral-raise-machine",
+  "pattern": "lateral_raise",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Set the seat so your shoulders line up with the machine's pivot.",
+   "Place your arms against the pads.",
+   "Raise your arms out to the sides to shoulder height.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Reverse Pec Deck",
@@ -150,7 +279,15 @@
   "muscle_group": "shoulders",
   "primary_muscles": "rear delts, upper back",
   "equipment": "gym",
-  "qr_code": "reverse-pec-deck"
+  "qr_code": "reverse-pec-deck",
+  "pattern": "rear_delt_fly",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Sit facing the machine with your chest against the pad.",
+   "Hold the handles with arms straight in front of you, elbows slightly bent.",
+   "Move your arms out and back until they're in line with your body.",
+   "Return slowly."
+  ]
  },
  {
   "name": "Dumbbell Shoulder Press",
@@ -159,7 +296,15 @@
   "muscle_group": "shoulders",
   "primary_muscles": "delts, triceps",
   "equipment": "home",
-  "qr_code": "dumbbell-shoulder-press"
+  "qr_code": "dumbbell-shoulder-press",
+  "pattern": "vertical_press",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Sit on a bench with back support, a dumbbell in each hand at shoulder height.",
+   "Press the dumbbells up until your arms are almost straight.",
+   "Keep your lower back against the bench.",
+   "Lower slowly back to shoulder height."
+  ]
  },
  {
   "name": "Dumbbell Lateral Raise",
@@ -168,7 +313,15 @@
   "muscle_group": "shoulders",
   "primary_muscles": "side delts",
   "equipment": "home",
-  "qr_code": "dumbbell-lateral-raise"
+  "qr_code": "dumbbell-lateral-raise",
+  "pattern": "lateral_raise",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Stand with a light dumbbell in each hand at your sides.",
+   "With a slight bend in the elbows, raise your arms out to the sides to shoulder height.",
+   "Avoid swinging your body.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Pike Push-up",
@@ -177,7 +330,15 @@
   "muscle_group": "shoulders",
   "primary_muscles": "delts, triceps",
   "equipment": "bodyweight",
-  "qr_code": "pike-push-up"
+  "qr_code": "pike-push-up",
+  "pattern": "vertical_press",
+  "default_rest_seconds": 90,
+  "instructions": [
+   "Start in a push-up position, then walk your feet in and lift your hips so your body forms an upside-down V.",
+   "Bend your elbows to lower the top of your head towards the floor.",
+   "Push back up.",
+   "Elevate your hands or reduce the range to make it easier."
+  ]
  },
  {
   "name": "Leg Press",
@@ -186,7 +347,15 @@
   "muscle_group": "quads",
   "primary_muscles": "quads, glutes",
   "equipment": "gym",
-  "qr_code": "leg-press"
+  "qr_code": "leg-press",
+  "pattern": "squat",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Sit with your back flat against the pad and feet shoulder-width apart on the platform.",
+   "Release the safety handles.",
+   "Lower the platform until your knees are at about 90 degrees, keeping your lower back on the pad.",
+   "Push back up without locking your knees, then put the safety handles back on when done."
+  ]
  },
  {
   "name": "Leg Extension",
@@ -195,7 +364,15 @@
   "muscle_group": "quads",
   "primary_muscles": "quads",
   "equipment": "gym",
-  "qr_code": "leg-extension"
+  "qr_code": "leg-extension",
+  "pattern": "knee_extension",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Set the back pad so your knees line up with the machine's pivot.",
+   "Put the ankle pad just above your feet.",
+   "Straighten your legs to lift the pad.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Hack Squat",
@@ -204,7 +381,15 @@
   "muscle_group": "quads",
   "primary_muscles": "quads, glutes",
   "equipment": "gym",
-  "qr_code": "hack-squat"
+  "qr_code": "hack-squat",
+  "pattern": "squat",
+  "default_rest_seconds": 150,
+  "instructions": [
+   "Stand on the platform with your back and shoulders against the pads, feet shoulder-width apart.",
+   "Release the safety handles.",
+   "Bend your knees to lower yourself until your thighs are about parallel to the platform.",
+   "Push back up through your whole foot."
+  ]
  },
  {
   "name": "Barbell Back Squat",
@@ -213,7 +398,16 @@
   "muscle_group": "quads",
   "primary_muscles": "quads, glutes, core",
   "equipment": "gym",
-  "qr_code": "barbell-back-squat"
+  "qr_code": "barbell-back-squat",
+  "pattern": "squat",
+  "default_rest_seconds": 150,
+  "instructions": [
+   "Rest the bar on your upper back, not your neck, and stand with feet about shoulder-width apart.",
+   "Brace your core and keep your chest up.",
+   "Bend your hips and knees to sit down as low as you can with good form.",
+   "Stand back up, pushing through your whole foot.",
+   "Use a squat rack with safety bars."
+  ]
  },
  {
   "name": "Goblet Squat",
@@ -222,7 +416,15 @@
   "muscle_group": "quads",
   "primary_muscles": "quads, glutes",
   "equipment": "home",
-  "qr_code": "goblet-squat"
+  "qr_code": "goblet-squat",
+  "pattern": "squat",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Hold one dumbbell vertically against your chest with both hands.",
+   "Stand with feet a little wider than shoulder width.",
+   "Squat down between your knees, keeping your chest up.",
+   "Stand back up."
+  ]
  },
  {
   "name": "Bodyweight Squat",
@@ -231,7 +433,15 @@
   "muscle_group": "quads",
   "primary_muscles": "quads, glutes",
   "equipment": "bodyweight",
-  "qr_code": "bodyweight-squat"
+  "qr_code": "bodyweight-squat",
+  "pattern": "squat",
+  "default_rest_seconds": 90,
+  "instructions": [
+   "Stand with feet about shoulder-width apart, arms in front for balance.",
+   "Sit your hips back and down, keeping your chest up.",
+   "Go as low as is comfortable.",
+   "Stand back up."
+  ]
  },
  {
   "name": "Seated Leg Curl",
@@ -240,7 +450,15 @@
   "muscle_group": "hamstrings",
   "primary_muscles": "hamstrings",
   "equipment": "gym",
-  "qr_code": "seated-leg-curl"
+  "qr_code": "seated-leg-curl",
+  "pattern": "knee_flexion",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Set the back pad so your knees line up with the machine's pivot.",
+   "Put the lower pad just above your heels and lock the thigh pad.",
+   "Bend your knees to pull the pad down and back.",
+   "Return slowly."
+  ]
  },
  {
   "name": "Lying Leg Curl",
@@ -249,7 +467,15 @@
   "muscle_group": "hamstrings",
   "primary_muscles": "hamstrings",
   "equipment": "gym",
-  "qr_code": "lying-leg-curl"
+  "qr_code": "lying-leg-curl",
+  "pattern": "knee_flexion",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Lie face down with your knees just past the end of the bench.",
+   "Put the pad just above your heels.",
+   "Bend your knees to bring the pad towards your glutes.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Dumbbell Romanian Deadlift",
@@ -258,7 +484,15 @@
   "muscle_group": "hamstrings",
   "primary_muscles": "hamstrings, glutes",
   "equipment": "home",
-  "qr_code": "dumbbell-romanian-deadlift"
+  "qr_code": "dumbbell-romanian-deadlift",
+  "pattern": "hip_hinge",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Stand holding a dumbbell in each hand in front of your thighs.",
+   "With a slight bend in the knees, push your hips back and lower the dumbbells along your legs.",
+   "Keep your back flat; stop when you feel a stretch in the back of your legs.",
+   "Drive your hips forward to stand up."
+  ]
  },
  {
   "name": "Single-leg Romanian Deadlift",
@@ -267,7 +501,15 @@
   "muscle_group": "hamstrings",
   "primary_muscles": "hamstrings, glutes, balance",
   "equipment": "bodyweight",
-  "qr_code": "single-leg-romanian-deadlift"
+  "qr_code": "single-leg-romanian-deadlift",
+  "pattern": "hip_hinge",
+  "default_rest_seconds": 90,
+  "instructions": [
+   "Stand on one leg with a slight bend in the knee.",
+   "Hinge at the hips, letting the other leg rise behind you, back flat.",
+   "Lower until your body is close to horizontal or you feel a stretch.",
+   "Return to standing. Hold onto something for balance if needed."
+  ]
  },
  {
   "name": "Hip Thrust Machine",
@@ -276,7 +518,15 @@
   "muscle_group": "glutes",
   "primary_muscles": "glutes",
   "equipment": "gym",
-  "qr_code": "hip-thrust-machine"
+  "qr_code": "hip-thrust-machine",
+  "pattern": "hip_extension",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Sit with your upper back against the pad and the belt or pad across your hips.",
+   "Feet flat, about shoulder-width apart.",
+   "Push through your heels to lift your hips until your body is straight from shoulders to knees.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Hip Abduction Machine",
@@ -285,7 +535,14 @@
   "muscle_group": "glutes",
   "primary_muscles": "glute medius",
   "equipment": "gym",
-  "qr_code": "hip-abduction-machine"
+  "qr_code": "hip-abduction-machine",
+  "pattern": "hip_abduction",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Sit with your back against the pad and the pads on the outside of your knees.",
+   "Push your knees out against the pads.",
+   "Return slowly."
+  ]
  },
  {
   "name": "Dumbbell Hip Thrust",
@@ -294,7 +551,15 @@
   "muscle_group": "glutes",
   "primary_muscles": "glutes, hamstrings",
   "equipment": "home",
-  "qr_code": "dumbbell-hip-thrust"
+  "qr_code": "dumbbell-hip-thrust",
+  "pattern": "hip_extension",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Sit on the floor with your upper back against a bench and a dumbbell on your hips, held with both hands.",
+   "Feet flat, knees bent.",
+   "Push through your heels to lift your hips until your body is straight from shoulders to knees.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Glute Bridge",
@@ -303,7 +568,15 @@
   "muscle_group": "glutes",
   "primary_muscles": "glutes, hamstrings",
   "equipment": "bodyweight",
-  "qr_code": "glute-bridge"
+  "qr_code": "glute-bridge",
+  "pattern": "hip_extension",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Lie on your back with knees bent and feet flat on the floor.",
+   "Push through your heels to lift your hips until your body is straight from shoulders to knees.",
+   "Squeeze your glutes at the top.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Seated Calf Raise",
@@ -312,7 +585,15 @@
   "muscle_group": "calves",
   "primary_muscles": "calves",
   "equipment": "gym",
-  "qr_code": "seated-calf-raise"
+  "qr_code": "seated-calf-raise",
+  "pattern": "calf_raise",
+  "default_rest_seconds": 60,
+  "instructions": [
+   "Sit with the balls of your feet on the platform and the pad on your thighs.",
+   "Lower your heels as far as is comfortable.",
+   "Push up onto your toes as high as you can.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Standing Calf Raise",
@@ -321,7 +602,15 @@
   "muscle_group": "calves",
   "primary_muscles": "calves",
   "equipment": "bodyweight",
-  "qr_code": "standing-calf-raise"
+  "qr_code": "standing-calf-raise",
+  "pattern": "calf_raise",
+  "default_rest_seconds": 60,
+  "instructions": [
+   "Stand with the balls of your feet on a step, holding something for balance.",
+   "Lower your heels below the step.",
+   "Rise up onto your toes as high as you can.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Biceps Curl Machine",
@@ -330,7 +619,15 @@
   "muscle_group": "biceps",
   "primary_muscles": "biceps",
   "equipment": "gym",
-  "qr_code": "biceps-curl-machine"
+  "qr_code": "biceps-curl-machine",
+  "pattern": "elbow_flexion",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Set the seat so your upper arms rest on the pad.",
+   "Grip the handles with your palms up.",
+   "Curl the handles up by bending your elbows.",
+   "Lower slowly until your arms are almost straight."
+  ]
  },
  {
   "name": "Cable Curl",
@@ -339,7 +636,15 @@
   "muscle_group": "biceps",
   "primary_muscles": "biceps",
   "equipment": "gym",
-  "qr_code": "cable-curl"
+  "qr_code": "cable-curl",
+  "pattern": "elbow_flexion",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Stand facing a low pulley holding a bar or handle with palms up.",
+   "Keep your elbows at your sides.",
+   "Curl the handle up towards your shoulders.",
+   "Lower slowly."
+  ]
  },
  {
   "name": "Dumbbell Curl",
@@ -348,7 +653,15 @@
   "muscle_group": "biceps",
   "primary_muscles": "biceps",
   "equipment": "home",
-  "qr_code": "dumbbell-curl"
+  "qr_code": "dumbbell-curl",
+  "pattern": "elbow_flexion",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Stand with a dumbbell in each hand, palms facing forward.",
+   "Keep your elbows at your sides.",
+   "Curl the dumbbells up towards your shoulders.",
+   "Lower slowly without swinging."
+  ]
  },
  {
   "name": "Chin-up",
@@ -357,7 +670,15 @@
   "muscle_group": "biceps",
   "primary_muscles": "biceps, lats",
   "equipment": "bodyweight",
-  "qr_code": "chin-up"
+  "qr_code": "chin-up",
+  "pattern": "vertical_pull",
+  "default_rest_seconds": 120,
+  "instructions": [
+   "Hang from the bar with hands shoulder-width apart, palms facing you.",
+   "Pull yourself up until your chin is above the bar.",
+   "Lower slowly until your arms are straight.",
+   "Use a resistance band or the assisted machine if needed."
+  ]
  },
  {
   "name": "Triceps Pushdown",
@@ -366,7 +687,15 @@
   "muscle_group": "triceps",
   "primary_muscles": "triceps",
   "equipment": "gym",
-  "qr_code": "triceps-pushdown"
+  "qr_code": "triceps-pushdown",
+  "pattern": "elbow_extension",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Stand facing a high pulley holding a bar or rope.",
+   "Keep your elbows at your sides.",
+   "Push the handle down until your arms are straight.",
+   "Let it rise slowly until your forearms are about parallel to the floor."
+  ]
  },
  {
   "name": "Triceps Dip Machine",
@@ -375,7 +704,14 @@
   "muscle_group": "triceps",
   "primary_muscles": "triceps, chest",
   "equipment": "gym",
-  "qr_code": "triceps-dip-machine"
+  "qr_code": "triceps-dip-machine",
+  "pattern": "dip",
+  "default_rest_seconds": 90,
+  "instructions": [
+   "Sit with your back against the pad and grip the handles at your sides.",
+   "Push the handles down until your arms are almost straight.",
+   "Return slowly."
+  ]
  },
  {
   "name": "Dumbbell Overhead Triceps Extension",
@@ -384,7 +720,15 @@
   "muscle_group": "triceps",
   "primary_muscles": "triceps",
   "equipment": "home",
-  "qr_code": "dumbbell-overhead-triceps-extension"
+  "qr_code": "dumbbell-overhead-triceps-extension",
+  "pattern": "elbow_extension",
+  "default_rest_seconds": 75,
+  "instructions": [
+   "Sit or stand holding one dumbbell with both hands above your head.",
+   "Keep your upper arms close to your head.",
+   "Lower the dumbbell behind your head by bending your elbows.",
+   "Straighten your arms to lift it back up."
+  ]
  },
  {
   "name": "Bench Dip",
@@ -393,7 +737,15 @@
   "muscle_group": "triceps",
   "primary_muscles": "triceps",
   "equipment": "bodyweight",
-  "qr_code": "bench-dip"
+  "qr_code": "bench-dip",
+  "pattern": "dip",
+  "default_rest_seconds": 90,
+  "instructions": [
+   "Sit on the edge of a bench with hands next to your hips, then slide off so your weight is on your hands.",
+   "Bend your elbows to lower your body, keeping your back close to the bench.",
+   "Push back up.",
+   "Bend your knees more to make it easier. Skip it if it hurts your shoulders."
+  ]
  },
  {
   "name": "Ab Crunch Machine",
@@ -402,7 +754,14 @@
   "muscle_group": "core",
   "primary_muscles": "abs",
   "equipment": "gym",
-  "qr_code": "ab-crunch-machine"
+  "qr_code": "ab-crunch-machine",
+  "pattern": "trunk_flexion",
+  "default_rest_seconds": 60,
+  "instructions": [
+   "Set the seat and hold the handles or pads.",
+   "Curl your upper body forward by tightening your abs.",
+   "Return slowly."
+  ]
  },
  {
   "name": "Cable Crunch",
@@ -411,7 +770,14 @@
   "muscle_group": "core",
   "primary_muscles": "abs",
   "equipment": "gym",
-  "qr_code": "cable-crunch"
+  "qr_code": "cable-crunch",
+  "pattern": "trunk_flexion",
+  "default_rest_seconds": 60,
+  "instructions": [
+   "Kneel facing a high pulley holding a rope beside your head.",
+   "Curl your upper body down towards your knees using your abs, not your arms.",
+   "Return slowly."
+  ]
  },
  {
   "name": "Plank",
@@ -420,7 +786,15 @@
   "muscle_group": "core",
   "primary_muscles": "abs, obliques",
   "equipment": "bodyweight",
-  "qr_code": "plank"
+  "qr_code": "plank",
+  "pattern": "anti_extension",
+  "default_rest_seconds": 60,
+  "instructions": [
+   "Rest on your forearms and toes, elbows under your shoulders.",
+   "Keep your body in a straight line from head to heels.",
+   "Brace your core and breathe steadily.",
+   "Hold for the time you choose. Put your knees down to make it easier."
+  ]
  },
  {
   "name": "Dead Bug",
@@ -429,6 +803,14 @@
   "muscle_group": "core",
   "primary_muscles": "abs",
   "equipment": "bodyweight",
-  "qr_code": "dead-bug"
+  "qr_code": "dead-bug",
+  "pattern": "anti_extension",
+  "default_rest_seconds": 60,
+  "instructions": [
+   "Lie on your back with arms pointing up and knees bent at 90 degrees above your hips.",
+   "Press your lower back gently into the floor.",
+   "Slowly lower the opposite arm and leg towards the floor.",
+   "Return and switch sides."
+  ]
  }
 ]

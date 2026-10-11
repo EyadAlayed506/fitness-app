@@ -106,10 +106,10 @@ def generate_routine(
             group_count[group] = k + 1
             ex = options[(k + variant) % len(options)]
             used.add(ex.id)
-            day.exercises.append(RoutineExercise(ex.id, ex.name, group, sets, reps, rest))
+            day.exercises.append(RoutineExercise(ex.id, ex.name, group, sets, reps, ex.default_rest_seconds or rest))
         days.append(day)
 
-    notes = [f"{sets} sets of {reps} reps, rest {rest} s between sets."]
+    notes = [f"{sets} sets of {reps} reps. Each exercise has its own rest time; the rest timer starts after every set."]
     if cardio:
         notes.append(f"Finish each session with {cardio} min of cardio (bike, rower or brisk walk).")
     notes.append("When you hit the top of the rep range on every set, add weight next time.")

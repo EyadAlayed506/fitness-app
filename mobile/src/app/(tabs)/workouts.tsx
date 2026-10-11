@@ -3,7 +3,9 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, View } from "react-native";
 
-import { Badge, Button, Card, CardHead, Field, LinkButton, ListRow, Row, Screen, Section, Sheet, Txt, useToast } from "@/components/ui";
+import { ExerciseInfo } from "@/components/ExerciseInfo";
+import { RestTimerPanel, useRestTimer } from "@/components/RestTimer";
+import { Badge, Button, Card, CardHead, Field, IconButton, LinkButton, ListRow, Row, Screen, Section, Sheet, Txt, useToast } from "@/components/ui";
 import { ExerciseSearch, QrScanner, SetForm, SetsList, WorkoutDetail, type PickedExercise } from "@/components/WorkoutParts";
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
@@ -15,6 +17,7 @@ type SheetState =
   | { kind: "search" }
   | { kind: "scan" }
   | { kind: "set"; exercise: PickedExercise; via: "name" | "qr" }
+  | { kind: "info"; exercise: PickedExercise }
   | { kind: "history"; id: number }
   | null;
 
@@ -29,6 +32,8 @@ export default function Workouts() {
   const [notes, setNotes] = useState("");
   const [openDay, setOpenDay] = useState<number | null>(null); // weekday index; null = today or the next training day
   const [sheet, setSheet] = useState<SheetState>(null);
+  // One rest timer for the whole screen, so there's never more than one countdown
+  const timer = useRestTimer((name) => toast(name ? `Rest is over. Time for your next set of ${name}` : "Rest is over. Time for your next set"));
 
   const load = useCallback(async () => {
     const [list, r] = await Promise.all([api<Workout[]>("/workouts?limit=15"), api<Routine>("/me/routine")]);
@@ -54,6 +59,7 @@ export default function Workouts() {
       toast("Start a workout first, then tap an exercise to log it");
       return;
     }
+    timer.loadExercise(exercise.id, exercise.name).catch(() => {});
     setSheet({ kind: "set", exercise, via });
   };
 
@@ -69,6 +75,7 @@ export default function Workouts() {
             <Button title="Type exercise" icon="search" onPress={() => setSheet({ kind: "search" })} style={{ flex: 1 }} />
             <Button title="Scan QR" icon="qr-code" kind="soft" onPress={() => setSheet({ kind: "scan" })} style={{ flex: 1 }} />
           </Row>
+          {sheet?.kind !== "set" ? <RestTimerPanel timer={timer} compact /> : null}
           <View style={{ marginTop: 14 }}>
             <SetsList
               sets={active.sets}
@@ -154,9 +161,14 @@ export default function Workouts() {
                         {k + 1}.
                       </Txt>
                       <LinkButton title={x.name} onPress={() => logExercise({ id: x.exercise_id, name: x.name }, "name")} />
-                      <Txt variant="tiny">
+                      <Txt variant="tiny" style={{ flex: 1 }}>
                         {x.sets} × {x.reps}
                       </Txt>
+                      <IconButton
+                        icon="information-circle-outline"
+                        label={`How to do ${x.name}, and alternatives`}
+                        onPress={() => setSheet({ kind: "info", exercise: { id: x.exercise_id, name: x.name } })}
+                      />
                     </Row>
                   ))}
                   {d.cardio_minutes ? <Txt variant="muted">+ {d.cardio_minutes} min cardio</Txt> : null}
@@ -198,16 +210,32 @@ export default function Workouts() {
       </Row>
 
       <Sheet visible={sheet?.kind === "search"} title="Add exercise" onClose={closeSheet}>
-        <ExerciseSearch onPick={(e) => setSheet({ kind: "set", exercise: e, via: "name" })} />
+        <ExerciseSearch onPick={(e) => logExercise(e, "name")} />
       </Sheet>
       <Sheet visible={sheet?.kind === "scan"} title="Scan machine QR code" onClose={closeSheet}>
         {sheet?.kind === "scan" ? (
-          <QrScanner onFound={(e) => setSheet({ kind: "set", exercise: { id: e.id, name: e.name }, via: "qr" })} />
+          <QrScanner onFound={(e) => logExercise({ id: e.id, name: e.name }, "qr")} />
         ) : null}
       </Sheet>
       <Sheet visible={sheet?.kind === "set"} title={sheet?.kind === "set" ? sheet.exercise.name : ""} onClose={closeSheet}>
         {sheet?.kind === "set" && active ? (
-          <SetForm workoutId={active.id} exercise={sheet.exercise} addedVia={sheet.via} onSaved={toast} />
+          <SetForm
+            key={sheet.exercise.id}
+            workoutId={active.id}
+            exercise={sheet.exercise}
+            addedVia={sheet.via}
+            timer={timer}
+            onSaved={toast}
+            onInfo={() => setSheet({ kind: "info", exercise: sheet.exercise })}
+          />
+        ) : null}
+      </Sheet>
+      <Sheet visible={sheet?.kind === "info"} title={sheet?.kind === "info" ? sheet.exercise.name : ""} onClose={closeSheet}>
+        {sheet?.kind === "info" ? (
+          <ExerciseInfo
+            exerciseId={sheet.exercise.id}
+            onUse={active ? (e) => logExercise(e, "name") : undefined}
+          />
         ) : null}
       </Sheet>
       <Sheet visible={sheet?.kind === "history"} title="Workout" onClose={closeSheet}>

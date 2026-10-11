@@ -90,6 +90,33 @@ export interface Exercise {
   primary_muscles: string;
   equipment: string;
   qr_code: string;
+  /** Movement pattern, e.g. "squat"; used to find like-for-like alternatives. */
+  pattern: string | null;
+  /** Short how-to cues from the curated library (empty when there are none). */
+  instructions: string[];
+  default_rest_seconds: number;
+}
+
+export interface ExerciseAlternative {
+  exercise: Exercise;
+  /** "similar": same movement; "different": same muscles, another movement (not a like-for-like swap). */
+  match: "similar" | "different";
+  reasons: string[];
+  differences: string[];
+}
+
+export interface ExerciseAlternatives {
+  exercise: Exercise;
+  equipment: string | null;
+  filtered_by_equipment: boolean;
+  alternatives: ExerciseAlternative[];
+}
+
+export interface RestSetting {
+  exercise_id: number;
+  default_seconds: number;
+  preferred_seconds: number | null;
+  seconds: number;
 }
 
 export interface WorkoutSet {

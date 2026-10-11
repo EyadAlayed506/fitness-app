@@ -1,20 +1,23 @@
 import itertools
-import json
 
 import pytest
 
 from app.models.exercise import Exercise
-from app.seed import SEED_DIR
+from app.seed import exercise_rows
 from app.services.routine import generate_routine
-from app.services.schedule import back_to_back_pairs, choose_split, cycle_order, validate_days
+from app.services.schedule import (
+    back_to_back_pairs,
+    choose_split,
+    cycle_order,
+    validate_days,
+)
 
 MON, TUE, WED, THU, FRI, SAT, SUN = range(7)
 
 
 @pytest.fixture
 def catalogue():
-    rows = json.loads((SEED_DIR / "exercises.json").read_text())
-    return [Exercise(id=i + 1, **r) for i, r in enumerate(rows)]
+    return [Exercise(id=i + 1, **r) for i, r in enumerate(exercise_rows())]
 
 
 EXAMPLE_DAYS = [[MON], [SAT, SUN], [MON, THU], [MON, WED, FRI], [SUN, TUE, THU], [SAT, SUN, MON],

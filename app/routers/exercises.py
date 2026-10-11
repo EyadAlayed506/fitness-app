@@ -4,7 +4,17 @@ from sqlmodel import select
 
 from app.database import SessionDep
 from app.deps import CurrentUser
-from app.models.exercise import Exercise, ExercisePublic
+from app.models.exercise import (
+    AlternativePublic,
+    AlternativesOut,
+    Exercise,
+    ExercisePublic,
+    RestPreference,
+    RestSetting,
+    RestSettingIn,
+)
+from app.models.user import Profile
+from app.services.alternatives import find_alternatives
 from app.services.qr import parse_qr_payload, qr_png
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
@@ -66,3 +76,68 @@ def exercise_qr_sticker(exercise_id: int, session: SessionDep):
     if exercise is None:
         raise HTTPException(status_code=404, detail="Exercise not found")
     return Response(content=qr_png(exercise.qr_code), media_type="image/png")
+
+
+def _get_exercise(session, exercise_id: int) -> Exercise:
+    exercise = session.get(Exercise, exercise_id)
+    if exercise is None:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    return exercise
+
+
+@router.get("/{exercise_id}/alternatives", response_model=AlternativesOut)
+def exercise_alternatives(exercise_id: int, user: CurrentUser, session: SessionDep, all_equipment: bool = False):
+    """Other exercises from the catalogue for when this one's equipment isn't available.
+
+    "similar" = same movement pattern; "different" = same muscles, different movement (not equivalent).
+    Filtered to the equipment in the user's profile unless all_equipment=true.
+    """
+    exercise = _get_exercise(session, exercise_id)
+    profile = session.get(Profile, user.id)
+    equipment = profile.equipment if profile else None
+    alternatives = find_alternatives(exercise, list(session.exec(select(Exercise)).all()), equipment, all_equipment)
+    return AlternativesOut(
+        exercise=ExercisePublic.model_validate(exercise),
+        equipment=equipment,
+        filtered_by_equipment=not all_equipment and equipment is not None,
+        alternatives=[
+            AlternativePublic(
+                exercise=ExercisePublic.model_validate(a.exercise), match=a.match, reasons=a.reasons, differences=a.differences
+            )
+            for a in alternatives
+        ],
+    )
+
+
+def _rest_setting(session, user_id: int, exercise: Exercise) -> RestSetting:
+    pref = session.get(RestPreference, (user_id, exercise.id))
+    default = ExercisePublic.model_validate(exercise).default_rest_seconds
+    return RestSetting(
+        exercise_id=exercise.id,
+        default_seconds=default,
+        preferred_seconds=pref.seconds if pref else None,
+        seconds=pref.seconds if pref else default,
+    )
+
+
+@router.get("/{exercise_id}/rest", response_model=RestSetting)
+def read_rest(exercise_id: int, user: CurrentUser, session: SessionDep):
+    """Rest time between sets for this exercise: the user's own choice if they set one, else the default."""
+    return _rest_setting(session, user.id, _get_exercise(session, exercise_id))
+
+
+@router.put("/{exercise_id}/rest", response_model=RestSetting)
+def save_rest(exercise_id: int, data: RestSettingIn, user: CurrentUser, session: SessionDep):
+    """Remember the user's rest time for this exercise. seconds=null goes back to the default."""
+    exercise = _get_exercise(session, exercise_id)
+    pref = session.get(RestPreference, (user.id, exercise.id))
+    if data.seconds is None:
+        if pref:
+            session.delete(pref)
+    elif pref:
+        pref.seconds = data.seconds
+        session.add(pref)
+    else:
+        session.add(RestPreference(user_id=user.id, exercise_id=exercise.id, seconds=data.seconds))
+    session.commit()
+    return _rest_setting(session, user.id, exercise)

@@ -8,7 +8,8 @@ import { cap, duration, longDateTime, plural, round, units } from "@/lib/format"
 import { useTheme } from "@/lib/theme";
 import type { Exercise, Workout, WorkoutSet } from "@/lib/types";
 
-import { Badge, Button, Chips, ErrorText, Field, IconButton, ListRow, Row, Txt } from "./ui";
+import { RestTimerPanel, type RestTimer } from "./RestTimer";
+import { Badge, Button, Chips, ErrorText, Field, IconButton, LinkButton, ListRow, Row, Txt } from "./ui";
 
 export type PickedExercise = { id: number; name: string };
 
@@ -160,12 +161,18 @@ export function SetForm({
   workoutId,
   exercise,
   addedVia,
+  timer,
   onSaved,
+  onInfo,
 }: {
   workoutId: number;
   exercise: PickedExercise;
   addedVia: "name" | "qr";
+  /** The workout screen's single rest timer: it starts by itself after each saved set. */
+  timer: RestTimer;
   onSaved: (msg: string) => void;
+  /** Open the how-to and alternatives for this exercise. */
+  onInfo: () => void;
 }) {
   const { profile } = useProfile();
   const u = units(profile.unit_system);
@@ -174,7 +181,6 @@ export function SetForm({
   const [weight, setWeight] = useState("");
   const [unit, setUnit] = useState<string>(u.w);
   const [rpe, setRpe] = useState("");
-  const [rest, setRest] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -188,7 +194,6 @@ export function SetForm({
         setReps(String(last.reps));
         setWeight(String(round(units(profile.unit_system).fromKg(last.weight_kg), 1)));
         setRpe(last.rpe ? String(last.rpe) : "");
-        setRest(last.rest_seconds ? String(last.rest_seconds) : "");
       }
     },
     [exercise.id, profile.unit_system],
@@ -208,12 +213,12 @@ export function SetForm({
           weight: Number(weight.replace(",", ".")) || 0,
           unit,
           rpe: rpe ? Number(rpe) : null,
-          rest_seconds: rest ? Number(rest) : null,
           notes,
           added_via: addedVia,
         },
       });
       setNotes("");
+      timer.dispatch({ type: "start", now: Date.now() });
       onSaved(`Set saved: ${reps} × ${weight || 0} ${unit}`);
       applyPrevious(await api<Workout>(`/workouts/${workoutId}`));
     } catch (e) {
@@ -223,6 +228,11 @@ export function SetForm({
 
   return (
     <View>
+      <View style={{ marginBottom: 10 }}>
+        <LinkButton title="How to do it · alternatives" onPress={onInfo} />
+      </View>
+      <RestTimerPanel timer={timer} />
+      <View style={{ height: 12 }} />
       {previous.length ? (
         <>
           <Txt variant="small" style={{ marginBottom: 4 }}>
@@ -238,10 +248,7 @@ export function SetForm({
         <Field label="Weight" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" placeholder="0" style={{ flex: 1 }} />
       </Row>
       <Chips value={unit} onChange={setUnit} options={[{ value: "kg", label: "kg" }, { value: "lb", label: "lb" }]} />
-      <Row>
-        <Field label="RPE 1–10 (optional)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" style={{ flex: 1 }} />
-        <Field label="Rest sec (optional)" value={rest} onChangeText={setRest} keyboardType="number-pad" style={{ flex: 1 }} />
-      </Row>
+      <Field label="RPE 1–10 (optional)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" />
       <Field label="Notes" value={notes} onChangeText={setNotes} placeholder="e.g. seat at 4, felt easy" />
       <ErrorText message={error} />
       <Button title={`Add set ${previous.length + 1}`} onPress={save} style={{ marginTop: 14 }} />
