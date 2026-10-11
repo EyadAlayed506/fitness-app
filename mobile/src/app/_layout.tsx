@@ -21,6 +21,7 @@ export default function RootLayout() {
             <StatusBar style={t.dark ? "light" : "dark"} />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
               <Stack.Screen name="qr-stickers" options={{ headerShown: true, title: "QR stickers" }} />
+              <Stack.Screen name="sleep" options={{ headerShown: true, title: "Sleep" }} />
             </Stack>
           </ToastProvider>
         </AuthProvider>

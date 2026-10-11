@@ -64,7 +64,8 @@ Also useful:
 | Workouts | Start a workout, add exercises by **typing the name** (typos are fine) or **scanning the machine's QR code**, log reps, weight (kg or lb), RPE, rest and notes |
 | QR stickers | Workouts tab → "Print QR stickers" shows a printable code for every machine |
 | Food | Search the built-in list, **USDA FoodData Central** and **Open Food Facts**; units change with the food (g/kg/oz/lb for solids, ml/l/cup/gallon… for drinks, or servings); create custom foods by hand with all macros and sub-macros |
-| Progress | Weight trend, projected weight per diet option, calories vs target, macros, lift progress (estimated 1RM), weekly volume per body region, month-to-month body measurements with body-fat estimate |
+| Progress | Weight trend, projected weight per diet option, calories vs target, macros, lift progress (estimated 1RM), weekly volume per body region, sleep per night (mobile app), month-to-month body measurements with body-fat estimate |
+| Sleep (mobile app) | Log bedtime, wake-up time, quality and notes; last night and the 7-day average on Home; a Sleep screen with history and a chart against the recommended hours for your age. Overlapping entries are refused so a night isn't counted twice |
 | Emails | Opt in/out in the Profile tab; every user has a one-click unsubscribe link (`/api/marketing/unsubscribe/{token}`) |
 
 **Scanning QR codes:** on a PC with a webcam it works at `http://localhost:8000`. To test, open the QR sticker page on your phone and hold it up to the webcam, or type the code printed under the sticker (e.g. `leg-press`).
@@ -100,9 +101,9 @@ fitness-app/
 │   ├── seed/            # starter machine catalogue (48 exercises) and 38 common foods
 │   ├── static/          # web preview (HTML, CSS, JS, Chart.js), served at /
 │   └── demo.py          # demo account
-└── tests/               # 50 tests: formulas, units, routine, every API area
+└── tests/               # 58 tests: formulas, units, routine, sleep, every API area
 ```
 
-Not built yet (see the build phases in ARCHITECTURE.md): image features, sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.
+Not built yet (see the build phases in ARCHITECTURE.md): sleep from trackers (Health Connect, WHOOP, Apple Health), image features, sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.
 
 The calculations are standard estimates (Mifflin–St Jeor, 7,700 kcal per kg, Epley, U.S. Navy body fat), not medical advice.

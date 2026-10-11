@@ -3,13 +3,14 @@ import { useCallback, useState } from "react";
 import { Pressable, View } from "react-native";
 
 import { MacroBars } from "@/components/MacroBars";
-import { Badge, Button, Card, CardHead, Field, LinkButton, Meter, Row, Screen, Section, Stat, Txt, useToast } from "@/components/ui";
+import { SleepForm, qualityLabel, rangeBadge } from "@/components/SleepParts";
+import { Badge, Button, Card, CardHead, Field, LinkButton, Meter, Row, Screen, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth, useProfile } from "@/lib/auth";
-import { cap, fmt, todayISO, units } from "@/lib/format";
+import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, units } from "@/lib/format";
 import { profilePayload } from "@/lib/profile";
 import { useTheme } from "@/lib/theme";
-import type { DietOption, FoodDay, Plan } from "@/lib/types";
+import type { DietOption, FoodDay, Plan, SleepAnalytics, SleepEntry } from "@/lib/types";
 
 const BMI_BADGE = { underweight: "info", normal: "good", overweight: "warn", obese: "bad" } as const;
 const SCALE_MIN = 15;
@@ -21,11 +22,21 @@ export default function Home() {
   const { profile, plan } = useProfile();
   const u = units(profile.unit_system);
   const [day, setDay] = useState<FoodDay | null>(null);
+  const [lastSleep, setLastSleep] = useState<SleepEntry | null>(null);
+  const [sleepStats, setSleepStats] = useState<SleepAnalytics | null>(null);
+  const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setDay(await api<FoodDay>(`/food-logs?date=${todayISO()}`));
+    const [food, sleeps, stats] = await Promise.all([
+      api<FoodDay>(`/food-logs?date=${todayISO()}`),
+      api<SleepEntry[]>("/sleep?limit=1"),
+      api<SleepAnalytics>("/analytics/sleep?days=7"),
+    ]);
+    setDay(food);
+    setLastSleep(sleeps[0] ?? null);
+    setSleepStats(stats);
   }, []);
   useFocusEffect(
     useCallback(() => {
@@ -110,6 +121,47 @@ export default function Home() {
         <Meter value={eaten} max={target} />
         {day ? <MacroBars totals={day.totals} targetKcal={target} /> : null}
       </Card>
+
+      <Card>
+        <CardHead title="Sleep" right={<LinkButton title="Details ›" onPress={() => router.push("/sleep")} />} />
+        {lastSleep ? (
+          <>
+            <Row style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+              <Txt>
+                <Txt variant="big">{hoursMinutes(lastSleep.duration_minutes)}</Txt>
+                <Txt variant="muted"> {lastSleep.date === todayISO() ? "last night" : `night to ${shortDate(lastSleep.date)}`}</Txt>
+              </Txt>
+              {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
+            </Row>
+            <Txt variant="small" style={{ marginTop: 2 }}>
+              {clockOf(lastSleep.bedtime)} → {clockOf(lastSleep.wake_time)}
+            </Txt>
+            {sleepStats?.average_hours_7d != null ? (
+              <Row style={{ justifyContent: "space-between", marginTop: 8 }}>
+                <Txt variant="small">
+                  7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · aim for {sleepStats.recommended_hours[0]}–
+                  {sleepStats.recommended_hours[1]} h
+                </Txt>
+                {rangeBadge(sleepStats.average_hours_7d, sleepStats.recommended_hours)}
+              </Row>
+            ) : null}
+          </>
+        ) : (
+          <Txt variant="small">No sleep logged yet. Log last night to see how sleep fits with your training and weight.</Txt>
+        )}
+        <Button title="Log sleep" icon="moon" kind="soft" onPress={() => setLoggingSleep(true)} style={{ marginTop: 12 }} />
+      </Card>
+      <Sheet visible={loggingSleep} title="Log sleep" onClose={() => setLoggingSleep(false)}>
+        {loggingSleep ? (
+          <SleepForm
+            onSaved={async (message) => {
+              setLoggingSleep(false);
+              toast(message);
+              await load();
+            }}
+          />
+        ) : null}
+      </Sheet>
 
       <Section title="Daily calories" />
       <Card>

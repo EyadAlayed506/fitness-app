@@ -80,3 +80,33 @@ export function duration(a: string, b: string): string {
 }
 export const monthLabel = (m: string) =>
   new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+// ---------- sleep times (local clock times without a timezone) ----------
+
+/** "7 h 05 min" */
+export function hoursMinutes(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return h ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`;
+}
+
+/** "23:30" from "2026-10-10T23:30:00" (the clock time as entered) */
+export const clockOf = (localDateTime: string) => localDateTime.slice(11, 16);
+
+/** Read "23:30", "7:05", "0705", "11:30 pm" or "7am" as minutes after midnight. */
+export function parseClock(text: string): number | null {
+  const m = text.trim().toLowerCase().match(/^(\d{1,2})(?:[:.h]?(\d{2}))?\s*(am|pm)?$/);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = m[2] ? Number(m[2]) : 0;
+  if (m[3]) {
+    if (h < 1 || h > 12) return null;
+    h = (h % 12) + (m[3] === "pm" ? 12 : 0);
+  }
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+export function clockText(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}

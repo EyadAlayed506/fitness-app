@@ -215,3 +215,24 @@ export interface MeasurementCompare {
   available_months: string[];
   rows: { field: string; label: string; first: number | null; second: number | null; difference: number | null }[];
 }
+
+export interface SleepEntry {
+  id: number;
+  date: string;
+  bedtime: string; // local clock time, no timezone: "2026-10-10T23:30:00"
+  wake_time: string;
+  duration_minutes: number;
+  quality: number | null;
+  notes: string;
+  source: "manual";
+}
+
+export interface SleepAnalytics {
+  labels: string[];
+  series: SeriesData[];
+  quality: (number | null)[];
+  average_hours_7d: number | null;
+  average_quality_7d: number | null;
+  nights_logged_7d: number;
+  recommended_hours: [number, number];
+}

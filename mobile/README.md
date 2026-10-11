@@ -2,9 +2,9 @@
 
 The phone app, built with **React Native + Expo** (SDK 57) and **Expo Router**. It talks to the FastAPI backend in the folder above.
 
-| Login | Home | Workouts | Food | Progress |
-|---|---|---|---|---|
-| ![](../docs/screenshots/mobile-login.png) | ![](../docs/screenshots/mobile-home.png) | ![](../docs/screenshots/mobile-workouts.png) | ![](../docs/screenshots/mobile-food.png) | ![](../docs/screenshots/mobile-progress.png) |
+| Login | Home | Workouts | Food | Progress | Sleep |
+|---|---|---|---|---|---|
+| ![](../docs/screenshots/mobile-login.png) | ![](../docs/screenshots/mobile-home.png) | ![](../docs/screenshots/mobile-workouts.png) | ![](../docs/screenshots/mobile-food.png) | ![](../docs/screenshots/mobile-progress.png) | ![](../docs/screenshots/mobile-sleep.png) |
 
 ## What you need
 
@@ -72,7 +72,7 @@ mobile/
 │   ├── app/               # screens (Expo Router: every file is a route)
 │   │   ├── _layout.tsx    # providers: login state, theme, toasts
 │   │   ├── index.tsx      # sends you to login, profile setup or Home
-│   │   ├── login.tsx  signup.tsx  onboarding.tsx  qr-stickers.tsx
+│   │   ├── login.tsx  signup.tsx  onboarding.tsx  qr-stickers.tsx  sleep.tsx
 │   │   └── (tabs)/        # Home, Workouts, Food, Progress, Profile
 │   ├── components/        # UI kit, charts, profile form, workout and food parts
 │   └── lib/               # API client, login state, units/formatting, theme, types

@@ -173,6 +173,15 @@ def project_weight(
     return weights, reached
 
 
+def recommended_sleep_hours(age: int) -> tuple[int, int]:
+    """Nightly sleep range recommended by sleep-health guidelines (CDC / National Sleep Foundation)."""
+    if age < 18:
+        return (8, 10)
+    if age >= 65:
+        return (7, 8)
+    return (7, 9)
+
+
 def estimated_1rm(weight_kg: float, reps: int) -> float:
     """Epley formula."""
     if reps <= 0:

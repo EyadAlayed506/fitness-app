@@ -14,6 +14,7 @@ from app.database import create_db_and_tables, engine
 from app.models.exercise import Exercise
 from app.models.food import Food, FoodLog, FoodSource, Meal
 from app.models.measurement import BodyMeasurement
+from app.models.sleep import SleepEntry
 from app.models.user import Profile, User, WeightEntry
 from app.models.workout import WorkoutSession, WorkoutSet
 from app.security import hash_password
@@ -141,6 +142,22 @@ def main() -> None:
                                 shoulders_cm=shoulders, chest_cm=chest, hips_cm=hips, arm_cm=arm, thigh_cm=thigh)
             m.body_fat_pct = navy_body_fat("male", 180, waist, neck)
             session.add(m)
+        session.commit()
+
+        # Sleep for the last three weeks: later and longer on weekends, the odd short night
+        for i in range(21, -1, -1):
+            wake_day = today - timedelta(days=i)
+            if i and rng.random() < 0.12:
+                continue  # forgot to log
+            weekend = wake_day.weekday() >= 5
+            bed = datetime.combine(wake_day - timedelta(days=1), time(23, 0)) + timedelta(
+                minutes=rng.randint(-40, 50) + (50 if weekend else 0))
+            hours = rng.uniform(7.6, 8.8) if weekend else rng.choice([rng.uniform(6.6, 7.8)] * 5 + [rng.uniform(5.3, 6.2)])
+            wake = (bed + timedelta(hours=hours)).replace(second=0, microsecond=0)
+            minutes = round((wake - bed).total_seconds() / 60)
+            quality = 5 if minutes >= 480 else 4 if minutes >= 435 else 3 if minutes >= 390 else 2
+            session.add(SleepEntry(user_id=user.id, date=wake.date(), bedtime=bed, wake_time=wake,
+                                   duration_minutes=minutes, quality=quality))
         session.commit()
 
     print(f"Demo account ready. Log in with {EMAIL} / {PASSWORD}")

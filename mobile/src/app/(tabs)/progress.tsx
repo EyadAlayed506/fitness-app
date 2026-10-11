@@ -3,12 +3,21 @@ import { useCallback, useState } from "react";
 import { Text, View } from "react-native";
 
 import { Chart, ChartCard, type ChartSeries } from "@/components/charts";
+import { SleepChart } from "@/components/SleepParts";
 import { Button, Card, Chips, ErrorText, Field, Row, Screen, Section, Sheet, Txt, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { fmt, monthLabel, round, shortDate, todayISO, units } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
-import type { CalorieAnalytics, ExerciseProgress, MeasurementCompare, Projection, SeriesData, WeightAnalytics } from "@/lib/types";
+import type {
+  CalorieAnalytics,
+  ExerciseProgress,
+  MeasurementCompare,
+  Projection,
+  SeriesData,
+  SleepAnalytics,
+  WeightAnalytics,
+} from "@/lib/types";
 
 interface Data {
   weight: WeightAnalytics;
@@ -17,6 +26,7 @@ interface Data {
   volume: { labels: string[]; series: SeriesData[] };
   lifts: { id: number; name: string; sets: number }[];
   compare: MeasurementCompare;
+  sleep: SleepAnalytics;
 }
 
 const hasValues = (series: { data: (number | null)[] }[]) => series.some((s) => s.data.some((v) => v != null && v !== 0));
@@ -34,15 +44,16 @@ export default function Progress() {
     api<MeasurementCompare>(`/measurements/compare${months ? `?months=${months.join(",")}` : ""}`);
 
   const load = useCallback(async () => {
-    const [weight, projection, calories, volume, lifts, compare] = await Promise.all([
+    const [weight, projection, calories, volume, lifts, compare, sleep] = await Promise.all([
       api<WeightAnalytics>("/analytics/weight"),
       api<Projection>("/me/plan/projection"),
       api<CalorieAnalytics>("/analytics/calories"),
       api<Data["volume"]>("/analytics/volume?weeks=8"),
       api<Data["lifts"]>("/analytics/exercises"),
       loadCompare(),
+      api<SleepAnalytics>("/analytics/sleep?days=14"),
     ]);
-    setData({ weight, projection, calories, volume, lifts, compare });
+    setData({ weight, projection, calories, volume, lifts, compare, sleep });
     const first = lifts[0]?.id ?? null;
     setLiftId((current) => (current && lifts.some((l) => l.id === current) ? current : first));
   }, []);
@@ -172,6 +183,8 @@ export default function Progress() {
       >
         <Chart labels={vLabels} series={vSeries} stacked digits={0} />
       </ChartCard>
+
+      <SleepChart data={data.sleep} />
 
       <Section title="Body measurements" />
       <Measurements

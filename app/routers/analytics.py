@@ -10,9 +10,10 @@ from app.database import SessionDep
 from app.deps import CurrentUser
 from app.models.exercise import BODY_REGION, Exercise
 from app.models.food import FoodLog
+from app.models.sleep import SleepEntry
 from app.models.user import Profile, WeightEntry
 from app.models.workout import WorkoutSession, WorkoutSet
-from app.services.calculations import estimated_1rm
+from app.services.calculations import age_on, estimated_1rm, recommended_sleep_hours
 from app.services.plan import build_plan
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -141,4 +142,38 @@ def weekly_volume(user: CurrentUser, session: SessionDep, weeks: int = Query(def
     return {
         "labels": [m.isoformat() for m in mondays],
         "series": [{"name": r, "data": [round(volume[m][r]) for m in mondays]} for r in regions],
+    }
+
+
+@router.get("/sleep")
+def sleep_series(user: CurrentUser, session: SessionDep, days: int = Query(default=14, ge=1, le=90)):
+    """Hours slept and sleep quality per night, plus 7-day averages and the recommended range."""
+    end = date.today()
+    start = end - timedelta(days=days - 1)
+    entries = session.exec(
+        select(SleepEntry).where(SleepEntry.user_id == user.id, SleepEntry.date >= start, SleepEntry.date <= end)
+    ).all()
+    nights = [start + timedelta(days=i) for i in range(days)]
+    minutes = {d: 0 for d in nights}
+    qualities: dict[date, list[int]] = {d: [] for d in nights}
+    for e in entries:  # naps on the same day add up
+        minutes[e.date] += e.duration_minutes
+        if e.quality:
+            qualities[e.date].append(e.quality)
+
+    hours = [round(minutes[d] / 60, 2) if minutes[d] else None for d in nights]
+    quality = [round(sum(q) / len(q), 1) if q else None for q in (qualities[d] for d in nights)]
+    last_week = [h for d, h in zip(nights, hours) if h is not None and d > end - timedelta(days=7)]
+    last_week_q = [q for d, q in zip(nights, quality) if q is not None and d > end - timedelta(days=7)]
+
+    profile = session.get(Profile, user.id)
+    low, high = recommended_sleep_hours(age_on(profile.birth_date)) if profile else (7, 9)
+    return {
+        "labels": [d.isoformat() for d in nights],
+        "series": [{"name": "Hours slept", "data": hours}],
+        "quality": quality,
+        "average_hours_7d": round(sum(last_week) / len(last_week), 2) if last_week else None,
+        "average_quality_7d": round(sum(last_week_q) / len(last_week_q), 1) if last_week_q else None,
+        "nights_logged_7d": len(last_week),
+        "recommended_hours": [low, high],
     }
