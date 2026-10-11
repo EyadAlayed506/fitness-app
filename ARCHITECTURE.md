@@ -2,6 +2,8 @@
 
 This document describes the planned design of the fitness app. Nothing here is built yet. It is the base to agree on before writing code.
 
+**Image features are out of scope for now** (exercise machine photo, food photo, Nutrition Facts label scan, plate + hand estimate). They will be designed and added once everything below works.
+
 ## 1. What the app does
 
 | Area | Features |
@@ -9,10 +11,9 @@ This document describes the planned design of the fitness app. Nothing here is b
 | Account | Sign up, log in, profile (age, weight, height, sex, activity level, availability) |
 | Health plan | BMI and category, weight to lose or gain to reach a healthy BMI, daily calories, three diet options (light / normal / extreme) with calorie difference and projected weight change, workout routine based on availability |
 | Marketing | Opt-in checkbox at sign-up to receive ads and discounts at the account email, with one-click unsubscribe |
-| Workout log | Sessions and sets (reps, weight, RPE, rest, notes). Add an exercise by **photo** (image model), **QR code**, or **typed name** |
-| Food log | Add food by **name search** (food API) or **photo** (image model). Units depend on the item: solids in g / kg / oz / lb, liquids in ml / l / fl oz / cup / gallon |
-| Custom food | **Manual** entry of calories, macros and sub-macros, or **photo of the Nutrition Facts label** (OCR fills it in and saves it immediately) |
-| Plate estimate | Photo of a plate next to the user's hand. The model names the food and estimates the portion and macros |
+| Workout log | Sessions and sets (reps, weight, RPE, rest, notes). Add an exercise by **QR code** or **typed name** |
+| Food log | Add food by **name search** (food API). Units depend on the item: solids in g / kg / oz / lb, liquids in ml / l / fl oz / cup / gallon |
+| Custom food | **Manual** entry of calories, macros and sub-macros |
 | Visualisations | Body weight trend, calories vs target, lifting progress (estimated 1RM, volume), body measurements |
 | Measurements (optional) | Waist, shoulders, chest, hips, neck, arms, thighs, with month-to-month comparison |
 
@@ -26,13 +27,9 @@ This document describes the planned design of the fitness app. Nothing here is b
 | Migrations | **Alembic** | Schema changes without dropping data |
 | Auth | **JWT** access tokens (PyJWT) + **Argon2** password hashing (pwdlib) | The approach the FastAPI docs recommend |
 | HTTP client | **httpx** (async) | Calls to food APIs |
-| ML runtime | **Hugging Face `transformers`** models exported to **ONNX Runtime** (CPU), **PaddleOCR**, **OpenCV**, **MediaPipe** | Pretrained models, no training needed to start; ONNX keeps CPU inference fast (no GPU) |
-| Background jobs | FastAPI `BackgroundTasks` at first, **Celery/RQ + Redis** later | Emails and the slow plate estimate should not block requests |
-| Image storage | Local disk in dev, **S3-compatible** bucket in prod | Keep uploaded photos for re-processing and future fine-tuning |
-| Client | **Mobile app** (Flutter or React Native), the only client | Camera, QR scanning and charts all live on the phone; the API just serves JSON |
-| Tests | **pytest** + FastAPI `TestClient` (as in day8) | ML calls are mocked so tests run without model weights |
-
-The ML dependencies are heavy (torch is about 1 GB), so they go in an optional install group (`pip install .[ml]`). Without them the API still runs; the image endpoints return `503 Model not available`.
+| Background jobs | FastAPI `BackgroundTasks` at first, **Celery/RQ + Redis** later | Sending emails should not block requests |
+| Client | **Mobile app** (Flutter or React Native), the only client | QR scanning and charts live on the phone; the API just serves JSON |
+| Tests | **pytest** + FastAPI `TestClient` (as in day8) | Fast tests with no external services |
 
 ## 3. High-level architecture
 
@@ -43,14 +40,10 @@ flowchart LR
     subgraph api["FastAPI application"]
         routers["Routers<br/>(auth, profile, plan, workouts,<br/>exercises, foods, logs,<br/>measurements, analytics, marketing)"]
         services["Services<br/>(calculations, routine generator,<br/>units, food search, analytics)"]
-        vision["Vision layer<br/>(machine classifier, QR decoder,<br/>food classifier, label OCR,<br/>plate estimator)"]
         routers --> services
-        routers --> vision
     end
 
     services --> db[("PostgreSQL")]
-    vision --> models[["Pretrained models<br/>(Hugging Face cache)"]]
-    vision --> storage[("Image storage")]
     services --> usda["USDA FoodData Central API"]
     services --> off["Open Food Facts API"]
     services --> mail["Email provider<br/>(SMTP / SendGrid / Resend)"]
@@ -59,7 +52,6 @@ flowchart LR
 Rules that keep this maintainable:
 - **Routers** only handle HTTP: validation, auth, status codes.
 - **Services** hold the business logic and are plain Python functions, easy to unit-test.
-- The **vision layer** sits behind small interfaces (`classify_machine(image) -> list[Prediction]`), so a model can be swapped (e.g. CLIP → a fine-tuned model) without touching routers.
 
 ## 4. Project layout
 
@@ -67,7 +59,7 @@ Rules that keep this maintainable:
 fitness_app/
 ├── ARCHITECTURE.md
 ├── README.md
-├── pyproject.toml            # core deps + optional [ml] group
+├── pyproject.toml            # dependencies
 ├── alembic/                  # migrations
 ├── app/
 │   ├── main.py               # create FastAPI app, include routers
@@ -87,14 +79,8 @@ fitness_app/
 │   │   ├── routine.py        # workout routine generator
 │   │   ├── units.py          # unit conversion
 │   │   ├── food_search.py    # USDA + Open Food Facts clients, caching
-│   │   ├── label_parser.py   # OCR text → nutrient fields
-│   │   └── analytics.py      # time series for charts
-│   ├── vision/
-│   │   ├── machine_classifier.py
-│   │   ├── qr.py
-│   │   ├── food_classifier.py
-│   │   ├── label_ocr.py
-│   │   └── plate_estimator.py
+│   │   ├── analytics.py      # time series for charts
+│   │   └── qr.py             # generate QR sticker images
 │   └── seed/exercises.json   # starter machine catalogue
 └── tests/
 ```
@@ -169,14 +155,14 @@ erDiagram
         float rpe "optional"
         int rest_seconds "optional"
         string notes
-        enum added_via "name / qr / photo"
+        enum added_via "name / qr"
     }
     FOOD {
         int id PK
         int owner_id FK "null = global"
         string name
         string brand
-        enum source "usda / off / manual / label_scan"
+        enum source "usda / off / manual"
         string external_id
         bool is_liquid
         float serving_size
@@ -207,8 +193,7 @@ erDiagram
         float protein_g "snapshot"
         float carbs_g "snapshot"
         float fat_g "snapshot"
-        enum added_via "search / photo / manual / label / plate"
-        string image_path
+        enum added_via "search / manual"
     }
     BODY_MEASUREMENT {
         int id PK
@@ -321,7 +306,6 @@ All endpoints except sign-up, login and unsubscribe need `Authorization: Bearer 
 |---|---|---|
 | GET | `/exercises?search=lat pull` | Typed name, fuzzy match |
 | GET | `/exercises/qr/{code}` | Look up the machine by QR payload |
-| POST | `/exercises/identify` | Upload a photo; returns top-3 machine predictions with confidence |
 | GET | `/exercises/{id}/qr.png` | QR sticker for a machine (admin only) |
 | POST / GET | `/workouts` | Start a session / list sessions |
 | POST | `/workouts/{id}/sets` | Add a set (reps, weight, unit, RPE, notes) |
@@ -333,9 +317,6 @@ All endpoints except sign-up, login and unsubscribe need `Authorization: Bearer 
 |---|---|---|
 | GET | `/foods/search?q=banana` | Local foods first, then USDA / Open Food Facts |
 | POST | `/foods` | Manual custom food (calories, macros, sub-macros) |
-| POST | `/foods/scan-label` | Nutrition Facts photo → parsed food, saved immediately |
-| POST | `/foods/identify` | Food photo → top-3 food predictions with nutrients |
-| POST | `/foods/estimate-plate` | Plate + hand photo → food, estimated grams, macros |
 | POST / GET | `/food-logs?date=2026-10-10` | Log food / list a day with totals vs target |
 | PATCH / DELETE | `/food-logs/{id}` | Edit / remove |
 
@@ -350,28 +331,22 @@ All endpoints except sign-up, login and unsubscribe need `Authorization: Bearer 
 | GET | `/analytics/exercise/{id}` | Estimated 1RM and volume over time |
 | GET | `/analytics/volume?group=week` | Weekly training volume per muscle group |
 
-## 8. Adding an exercise: three input paths
+## 8. Adding an exercise: two input paths
 
 ```mermaid
 flowchart TD
     A[User wants to log an exercise] --> B{How?}
     B -->|Typed name| C["Fuzzy search on name + aliases<br/>(rapidfuzz, or PostgreSQL pg_trgm)"]
     B -->|QR code| D["Phone camera decodes QR<br/>payload: fitapp://machine/&lt;code&gt;"]
-    B -->|Photo| E["CLIP zero-shot classifier<br/>vs. catalogue names"]
     C --> F[Candidate exercises]
     D --> G["GET /exercises/qr/{code}"] --> F
-    E --> H["Top-3 with confidence"] --> F
     F --> I[User confirms] --> J[POST /workouts/id/sets]
 ```
 
 - **Typed name:** matches `name` and `aliases` with fuzzy matching, so "lat pull down" and "latpulldown" both find *Lat Pulldown*.
 - **QR code:** **every machine has a QR code.** When a machine is added to the catalogue the API generates a unique code, and the gym prints the sticker from `/exercises/{id}/qr.png` (admin only) and sticks it on the machine. The app only has to understand its own format (`fitapp://machine/<code>`). Decoding happens on the phone with the native camera library, so the server only does a database lookup.
-- **Photo:** there is no well-known pretrained model for gym machines, so the first version uses **CLIP zero-shot classification** (`openai/clip-vit-base-patch32`). The image is compared with text prompts built from the catalogue, such as "a photo of a lat pulldown machine in a gym". New machines work by adding them to the catalogue, with no retraining. Upgrade path: the photos users confirm become a labelled dataset for fine-tuning a dedicated classifier.
-- The user always **confirms** the prediction before it is saved. Low confidence (below about 0.4) shows a "not sure, pick one" list.
 
-## 9. Food registry: models and APIs
-
-### 9.1 External food APIs
+## 9. Food registry: external APIs
 
 | API | Use | Key |
 |---|---|---|
@@ -379,54 +354,6 @@ flowchart TD
 | **Open Food Facts** | Branded and packaged products; barcode lookup is an easy later addition | No key; send a descriptive User-Agent |
 
 Search flow: local DB (foods already imported or created) → USDA → Open Food Facts. Results the user picks are **imported into the local `FOOD` table**, which caches them and avoids repeated API calls. Both responses are normalised to per-100 g / per-100 ml values.
-
-### 9.2 Pretrained models
-
-| Task | Model | Output |
-|---|---|---|
-| Food photo | ViT fine-tuned on **Food-101** (e.g. `nateraw/food` on Hugging Face) | Top-3 dish labels + confidence → nutrients via the food APIs |
-| Nutrition Facts label | **PaddleOCR** (pretrained text detection and recognition, light enough for CPU) + rule-based parser | Structured nutrients |
-| Plate + hand portion | Food-101 classifier + **MediaPipe Hands** (hand landmarks) + **MobileSAM** (a small, CPU-friendly version of SAM) for the food region | Dish, estimated grams, macros |
-| Exercise machine | **CLIP** zero-shot (see section 8) | Top-3 machines |
-
-Food-101 covers 101 mostly Western dishes. Anything outside that list falls back to name search. Local cuisine (e.g. Middle Eastern dishes) is planned for a later phase: fine-tune the classifier on photos of those dishes and add their nutrients to the local `FOOD` table.
-
-### 9.3 Running on CPU (no GPU)
-
-The server has no GPU, so the models are chosen and run to keep each request to about 1 second:
-- **Small models only:** CLIP ViT-B/32, a ViT-base Food-101 classifier, PaddleOCR mobile models, MobileSAM.
-- **ONNX Runtime:** models are exported once to ONNX (with int8 quantisation where accuracy allows), which is usually 2–4× faster on CPU than plain PyTorch and avoids installing torch on the server.
-- **Load once:** models load at startup and stay in memory, not per request.
-- **Shrink images on the phone:** the app resizes photos to about 512 px before upload, which cuts upload time and inference time.
-- **Cache CLIP text embeddings** for the machine catalogue; only the image embedding is computed per request.
-- **Plate estimate runs as a background job** (it chains three models): the API returns a job id and the app polls or gets a push notification.
-
-### 9.4 Nutrition label pipeline
-
-```mermaid
-flowchart LR
-    A[Label photo] --> B["Pre-process<br/>(OpenCV: deskew, grayscale, contrast)"]
-    B --> C["OCR<br/>(PaddleOCR)"]
-    C --> D["Parser<br/>regex per field:<br/>Calories, Total Fat, Sat. Fat,<br/>Trans Fat, Cholesterol, Sodium,<br/>Total Carb, Fiber, Sugars, Protein,<br/>Serving size"]
-    D --> E["Normalise to per 100 g / 100 ml<br/>using serving size"]
-    E --> F[(Save FOOD, source = label_scan)]
-    F --> G[Return food + confidence per field]
-```
-
-The food is saved immediately, as requested. The response flags fields the parser was unsure about, so the app can highlight them for a quick edit. The parser handles both US-style labels (per serving) and EU-style labels (per 100 g, kJ + kcal).
-
-### 9.5 Plate + hand estimation
-
-This is the least precise feature, and the app should present it as an **estimate**.
-
-1. **Classify** the dish (Food-101 model).
-2. **Detect the hand** with MediaPipe Hands. Average adult palm width is about 8–9 cm, which gives a pixels-to-cm scale.
-3. **Segment the food** region and measure its area in cm².
-4. **Area → grams**: area × an assumed thickness for the dish class × a density table (`seed/food_density.json`).
-5. **Grams × nutrients per 100 g** → calories and macros.
-6. If no hand is found, fall back to a typical serving size for the dish and return `confidence: low`.
-
-The user can adjust the grams before saving. Upgrade path: a vision-language model can replace steps 1–4 later behind the same `estimate_plate()` interface.
 
 ## 10. Units (`services/units.py`)
 
@@ -478,8 +405,7 @@ The API returns **chart-ready JSON** (`{labels: [...], series: [{name, data}]}`)
 - Every query filters by `current_user.id`. A user can never read another user's logs.
 - The marketing checkbox at sign-up is **unchecked by default**; consent is timestamped, can be turned off in settings, and every email carries an unsubscribe link (needed for GDPR / CAN-SPAM compliance).
 - Health data is sensitive: HTTPS only, secrets in `.env` (never committed), and an account-deletion endpoint that removes all user data.
-- Upload limits: images ≤ 10 MB; content type checked; files stored under random names.
-- Rate limits on login and the ML endpoints.
+- Rate limits on login and the food search endpoint (it calls external APIs).
 
 ## 14. Configuration (`.env`)
 
@@ -489,19 +415,14 @@ JWT_SECRET=change-me
 JWT_EXPIRE_MINUTES=30
 USDA_API_KEY=...
 OFF_USER_AGENT=FitnessApp/0.1 (contact@example.com)
-ML_ENABLED=true
-ONNX_THREADS=4
-MODEL_CACHE_DIR=./models
-UPLOAD_DIR=./uploads
 EMAIL_PROVIDER_API_KEY=...
 ```
 
 ## 15. Testing strategy
 
-- **Unit tests** for `calculations`, `units`, `routine` and `label_parser`, with known inputs and expected outputs (e.g. BMI for 80 kg / 180 cm = 24.7).
+- **Unit tests** for `calculations`, `units` and `routine`, with known inputs and expected outputs (e.g. BMI for 80 kg / 180 cm = 24.7).
 - **API tests** with `TestClient` on an in-memory SQLite database, overriding `get_session` through FastAPI's dependency overrides.
-- **Vision and external APIs mocked** in tests. A separate, opt-in test suite runs the real models on a few sample images.
-- **Label parser fixtures**: OCR text from real labels saved as `.txt` files, so parsing is tested without OCR.
+- **External food APIs mocked** in tests (saved sample responses), so tests run offline.
 
 ## 16. Build phases
 
@@ -509,24 +430,21 @@ EMAIL_PROVIDER_API_KEY=...
 |---|---|
 | 1. Core | Project setup, auth, profile, weigh-ins, BMI / calories / diet options / projection, marketing opt-in |
 | 2. Workouts | Exercise catalogue + seed data, name search, QR lookup, sessions and sets, routine generator |
-| 3. Food (no ML) | USDA + Open Food Facts search, units, manual custom food, food log with daily totals |
+| 3. Food | USDA + Open Food Facts search, units, manual custom food, food log with daily totals |
 | 4. Analytics | Analytics endpoints, measurements + monthly compare |
-| 5. Vision | ONNX export, CLIP machine classifier, Food-101 classifier, label OCR + parser |
-| 6. Plate estimate | Hand detection, segmentation, portion estimation |
-| 7. Production | Alembic migrations, background jobs, S3 storage, rate limiting, deployment (Docker) |
-| 8. Local cuisine | Fine-tune the food classifier on local dishes, add their nutrient data |
+| 5. Production | Alembic migrations, background jobs, rate limiting, deployment (Docker) |
+| Later | Image features, designed once phases 1–5 work |
 
-Each phase is usable on its own. ML comes after the core so the app works end to end before the heavy parts.
+Each phase is usable on its own.
 
 ## 17. Decisions
 
 | Question | Decision |
 |---|---|
-| Client | **Mobile app** only. QR scanning, camera and charts are on the phone. |
+| Client | **Mobile app** only. QR scanning and charts are on the phone. |
 | Marketing email | The **email entered at sign-up** is used, with an opt-in checkbox. |
 | Gym QR codes | **Every machine has a QR code**, generated by the app and printed as a sticker. |
-| Local cuisine | Food-101 to start; local dishes are **phase 8**. |
-| GPU | **None.** CPU-friendly models with ONNX Runtime (section 9.3). |
+| Image features | **Removed for now**; added after the rest works. |
 
 Still open:
 1. **Mobile framework:** Flutter or React Native?
