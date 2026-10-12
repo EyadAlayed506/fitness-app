@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   RefreshControl,
@@ -23,6 +24,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 
+import { setConfirmHandler, type ConfirmRequest } from "@/lib/confirm";
+import { haptics } from "@/lib/haptics";
 import { motion, radius, size, space, type as typeScale, useTheme } from "@/lib/theme";
 
 export type IconName = keyof typeof Ionicons.glyphMap;
@@ -213,7 +216,7 @@ export function ErrorText({ message }: { message: string | null }) {
 
 // ---------- controls ----------
 
-type ButtonKind = "primary" | "ghost" | "soft" | "danger";
+type ButtonKind = "primary" | "ghost" | "soft" | "danger" | "destructive";
 
 export function Button({
   title,
@@ -243,6 +246,7 @@ export function Button({
     ghost: { bg: "transparent", fg: t.text, border: t.border },
     soft: { bg: t.surface2, fg: t.text, border: t.surface2 },
     danger: { bg: "transparent", fg: t.critical, border: t.criticalSoft },
+    destructive: { bg: t.critical, fg: t.criticalText, border: t.critical },
   };
   const c = colors[kind];
   const isLoading = loading || busy;
@@ -340,6 +344,107 @@ export function Field({
   );
 }
 
+/**
+ * A number with big − and + buttons, so the common case needs no keyboard (the number can still be typed).
+ * Holding a button keeps counting.
+ */
+export function Stepper({
+  label,
+  value,
+  onChange,
+  step,
+  min = 0,
+  max = 9999,
+  decimals = 1,
+  suffix,
+  style,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  step: number;
+  min?: number;
+  max?: number;
+  decimals?: number;
+  suffix?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const t = useTheme();
+  const latest = useRef({ value, onChange });
+  useEffect(() => {
+    latest.current = { value, onChange };
+  });
+  const repeat = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stop = useCallback(() => {
+    if (repeat.current) clearInterval(repeat.current);
+    repeat.current = null;
+  }, []);
+  useEffect(() => stop, [stop]);
+
+  const bump = useCallback(
+    (direction: 1 | -1) => {
+      const current = Number(latest.current.value.replace(",", ".")) || 0;
+      const next = Math.min(max, Math.max(min, current + direction * step));
+      const text = String(Number(next.toFixed(decimals)));
+      if (text === latest.current.value) return;
+      latest.current = { ...latest.current, value: text };
+      latest.current.onChange(text);
+      haptics.selection();
+    },
+    [min, max, step, decimals],
+  );
+  const button = (direction: 1 | -1) => (
+    <Pressable
+      onPress={() => bump(direction)}
+      onLongPress={() => {
+        stop();
+        repeat.current = setInterval(() => bump(direction), 90);
+      }}
+      onPressOut={stop}
+      delayLongPress={350}
+      accessibilityRole="button"
+      accessibilityLabel={`${direction > 0 ? "More" : "Less"} ${label.toLowerCase()}, ${direction > 0 ? "+" : "−"}${step}`}
+      hitSlop={4}
+      style={({ pressed }) => [styles.stepButton, { backgroundColor: t.surface }, pressed && styles.pressed]}
+    >
+      <Ionicons name={direction > 0 ? "add" : "remove"} size={22} color={t.text} />
+    </Pressable>
+  );
+  return (
+    <View style={[{ marginTop: space.md, minWidth: 0 }, style]}>
+      <Txt variant="label" style={{ marginBottom: 6 }} numberOfLines={1}>
+        {label}
+      </Txt>
+      <View style={[styles.stepper, { backgroundColor: t.surface2 }]}>
+        {button(-1)}
+        <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "baseline", justifyContent: "center" }}>
+          <TextInput
+            value={value}
+            onChangeText={onChange}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+            accessibilityLabel={label}
+            style={{
+              fontSize: 24,
+              fontWeight: "700",
+              color: t.text,
+              textAlign: "center",
+              width: "100%",
+              maxWidth: 110,
+              minWidth: 0,
+              paddingVertical: 4,
+              outlineWidth: 0,
+              fontVariant: ["tabular-nums"],
+            }}
+          />
+          {suffix ? <Text style={[typeScale.small, { color: t.muted, marginLeft: 2 }]}>{suffix}</Text> : null}
+        </View>
+        {button(1)}
+      </View>
+    </View>
+  );
+}
+
 export interface Choice<T extends string | number> {
   value: T;
   label: string;
@@ -375,7 +480,10 @@ export function Chips<T extends string | number>({
           return (
             <Pressable
               key={String(o.value)}
-              onPress={() => onChange(o.value)}
+              onPress={() => {
+                if (!on) haptics.selection();
+                onChange(o.value);
+              }}
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
               style={({ pressed }) => [
@@ -419,7 +527,10 @@ export function Segmented<T extends string>({
           return (
             <Pressable
               key={o.value}
-              onPress={() => onChange(o.value)}
+              onPress={() => {
+                if (!on) haptics.selection();
+                onChange(o.value);
+              }}
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
               style={({ pressed }) => [
@@ -714,6 +825,7 @@ export function EmptyState({
 
 // ---------- bottom sheet ----------
 
+/** A panel that slides up from the bottom. Drag its top edge down, tap outside, or tap × to close it. */
 export function Sheet({
   visible,
   title,
@@ -727,70 +839,180 @@ export function Sheet({
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
+  const [drag] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (visible) drag.setValue(0);
+  }, [visible, drag]);
+  const pan = useMemo(() => {
+    const settle = () =>
+      Animated.spring(drag, { toValue: 0, useNativeDriver: Platform.OS !== "web", bounciness: 0, speed: 20 }).start();
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => drag.setValue(Math.max(0, g.dy)),
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 110 || (g.dy > 30 && g.vy > 0.9)) onClose();
+        else settle();
+      },
+      onPanResponderTerminate: settle,
+    });
+  }, [drag, onClose]);
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={reduced ? "fade" : "slide"} onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <View style={[styles.backdrop, { backgroundColor: t.overlay }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
-          <View style={[styles.sheet, { backgroundColor: t.surface }]}>
-            <View style={[styles.grabber, { backgroundColor: t.border }]} />
-            <View style={[styles.row, { justifyContent: "space-between", marginBottom: space.sm, gap: space.md }]}>
-              <Txt variant="h2" style={{ flex: 1 }} numberOfLines={2}>
-                {title}
-              </Txt>
-              <IconButton icon="close" label="Close" onPress={onClose} />
+          <Animated.View style={[styles.sheet, { backgroundColor: t.surface, transform: [{ translateY: drag }] }]}>
+            {/* the drag area; in a browser, selecting the title text would cancel the drag */}
+            <View {...pan.panHandlers} testID="sheet-handle" style={noSelect}>
+              <View style={[styles.grabber, { backgroundColor: t.border }]} />
+              <View style={[styles.row, { justifyContent: "space-between", marginBottom: space.sm, gap: space.md }]}>
+                <Txt variant="h2" style={{ flex: 1 }} numberOfLines={2} selectable={false}>
+                  {title}
+                </Txt>
+                <IconButton icon="close" label="Close" onPress={onClose} />
+              </View>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: space.xl + insets.bottom }}>
               {children}
             </ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
+// ---------- dialog ----------
+
+/** Shows the app's own yes/no dialog for every `confirm()` call (see lib/confirm.ts). */
+export function DialogProvider({ children }: { children: ReactNode }) {
+  const t = useTheme();
+  const reduced = useReducedMotion();
+  const [request, setRequest] = useState<(ConfirmRequest & { resolve: (ok: boolean) => void }) | null>(null);
+  useEffect(() => {
+    setConfirmHandler(
+      (r) =>
+        new Promise<boolean>((resolve) => {
+          setRequest((previous) => {
+            previous?.resolve(false); // only one question at a time
+            return { ...r, resolve };
+          });
+        }),
+    );
+    return () => setConfirmHandler(null);
+  }, []);
+  const answer = (ok: boolean) => {
+    request?.resolve(ok);
+    setRequest(null);
+  };
+  return (
+    <>
+      {children}
+      <Modal visible={!!request} transparent animationType={reduced ? "none" : "fade"} onRequestClose={() => answer(false)}>
+        <View style={[styles.dialogBackdrop, { backgroundColor: t.overlay }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => answer(false)} accessibilityLabel="Cancel" />
+          {request ? (
+            <View style={[styles.dialog, { backgroundColor: t.surface }]} accessibilityViewIsModal accessibilityRole="alert">
+              <Txt variant="h2">{request.title}</Txt>
+              <Txt variant="small" style={{ marginTop: space.sm }}>
+                {request.message}
+              </Txt>
+              <View style={[styles.row, { marginTop: space.xl, gap: space.sm }]}>
+                <Button title="Cancel" kind="soft" onPress={() => answer(false)} style={{ flex: 1 }} />
+                <Button
+                  title={request.okLabel}
+                  kind={request.destructive ? "destructive" : "primary"}
+                  onPress={() => answer(true)}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 // ---------- toast ----------
 
-const ToastContext = createContext<(msg: string) => void>(() => {});
+export interface ToastOptions {
+  /** e.g. Undo. The message stays a little longer when it has an action. */
+  action?: { label: string; onPress: () => void };
+}
+type ShowToast = (message: string, options?: ToastOptions) => void;
+
+const ToastContext = createContext<ShowToast>(() => {});
+const ToastInsetContext = createContext<(px: number) => void>(() => {});
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const [message, setMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; action?: ToastOptions["action"] } | null>(null);
+  const [extraInset, setExtraInset] = useState(0);
   const [opacity] = useState(() => new Animated.Value(0));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const show = useCallback(
-    (msg: string) => {
-      setMessage(msg);
+  const hide = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    Animated.timing(opacity, { toValue: 0, duration: motion.base, useNativeDriver: Platform.OS !== "web" }).start(() =>
+      setToast(null),
+    );
+  }, [opacity]);
+  const show = useCallback<ShowToast>(
+    (message, options) => {
+      setToast({ message, action: options?.action });
       Animated.timing(opacity, { toValue: 1, duration: motion.base, useNativeDriver: Platform.OS !== "web" }).start();
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        Animated.timing(opacity, { toValue: 0, duration: motion.base, useNativeDriver: Platform.OS !== "web" }).start(() =>
-          setMessage(null),
-        );
-      }, 2600);
+      timer.current = setTimeout(hide, options?.action ? 5000 : 2600);
     },
-    [opacity],
+    [opacity, hide],
   );
   return (
     <ToastContext.Provider value={show}>
-      {children}
-      {message ? (
-        <View pointerEvents="none" style={[styles.toastWrap, { bottom: size.tabBar + insets.bottom + space.lg }]}>
-          <Animated.View style={[styles.toast, { backgroundColor: t.ink, opacity }]} accessibilityLiveRegion="polite">
-            <Ionicons name="checkmark-circle" size={18} color={t.inkText} />
-            <Text style={[typeScale.small, { color: t.inkText, flexShrink: 1 }]}>{message}</Text>
-          </Animated.View>
-        </View>
-      ) : null}
+      <ToastInsetContext.Provider value={setExtraInset}>
+        {children}
+        {toast ? (
+          <View pointerEvents="box-none" style={[styles.toastWrap, { bottom: size.tabBar + insets.bottom + space.lg + extraInset }]}>
+            <Animated.View style={[styles.toast, { backgroundColor: t.ink, opacity }]} accessibilityLiveRegion="polite">
+              <Ionicons name="checkmark-circle" size={18} color={t.inkText} />
+              <Text style={[typeScale.small, { color: t.inkText, flexShrink: 1 }]}>{toast.message}</Text>
+              {toast.action ? (
+                <Pressable
+                  onPress={() => {
+                    toast.action?.onPress();
+                    hide();
+                  }}
+                  accessibilityRole="button"
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.toastAction, { borderLeftColor: t.muted, opacity: pressed ? 0.6 : 1 }]}
+                >
+                  <Text style={[typeScale.label, { color: t.inkText, textDecorationLine: "underline" }]}>{toast.action.label}</Text>
+                </Pressable>
+              ) : null}
+            </Animated.View>
+          </View>
+        ) : null}
+      </ToastInsetContext.Provider>
     </ToastContext.Provider>
   );
 }
 
 export const useToast = () => useContext(ToastContext);
 
+/** Lift toasts above something pinned to the bottom of the screen (e.g. the workout bar) while it's shown. */
+export function useToastInset(px: number) {
+  const set = useContext(ToastInsetContext);
+  useEffect(() => {
+    set(px);
+    return () => set(0);
+  }, [px, set]);
+}
+
 // ---------- styles ----------
+
+/** Browsers only: text that can't be selected (React Native's types don't list `userSelect` for views). */
+const noSelect = (Platform.OS === "web" ? { userSelect: "none" } : {}) as ViewStyle;
 
 const styles = StyleSheet.create({
   screen: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.xxl, width: "100%", maxWidth: 600, alignSelf: "center" },
@@ -845,6 +1067,11 @@ const styles = StyleSheet.create({
   },
   grabber: { width: 36, height: 4, borderRadius: 4, alignSelf: "center", marginBottom: space.md },
   toastWrap: { position: "absolute", left: space.lg, right: space.lg, alignItems: "center" },
+  toastAction: { marginLeft: space.xs, paddingLeft: space.md, borderLeftWidth: StyleSheet.hairlineWidth },
+  stepper: { flexDirection: "row", alignItems: "center", borderRadius: radius.md, padding: 4, minHeight: 56, gap: 4 },
+  stepButton: { width: 48, height: 48, borderRadius: radius.md - 2, alignItems: "center", justifyContent: "center" },
+  dialogBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl },
+  dialog: { width: "100%", maxWidth: 360, borderRadius: radius.xl, padding: space.xl },
   toast: {
     flexDirection: "row",
     alignItems: "center",

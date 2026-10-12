@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { api, server, setToken, setUnauthorizedHandler } from "./api";
+import { queryClient } from "./query";
 import { storage } from "./storage";
 import type { Plan, Profile, User } from "./types";
 
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<Plan | null>(null);
 
   const clear = useCallback(async () => {
+    queryClient.clear(); // never show one account's cached data to the next
     setToken(null);
     setTokenState(null);
     setUser(null);
@@ -53,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applyToken = useCallback(
     async (value: string) => {
+      queryClient.clear();
       setToken(value);
       await storage.set(TOKEN_KEY, value);
       await refresh();

@@ -18,6 +18,8 @@ export interface RestTimerState {
   exerciseName: string;
   /** Which exercise the current countdown is resting after. */
   countdownFor: string;
+  /** Length of the countdown that's running or paused (s); it can differ from durationSec after moving on. */
+  countdownSec: number;
   /** When running: the moment the rest ends (ms since epoch). */
   endsAt: number | null;
   /** When paused / idle / done: what's left (ms). */
@@ -38,7 +40,16 @@ export const clampRest = (sec: number) => Math.min(MAX_REST, Math.max(MIN_REST, 
 
 export function initialRestTimer(durationSec = 90): RestTimerState {
   const d = clampRest(durationSec);
-  return { status: "idle", durationSec: d, exerciseId: null, exerciseName: "", countdownFor: "", endsAt: null, remainingMs: d * 1000 };
+  return {
+    status: "idle",
+    durationSec: d,
+    exerciseId: null,
+    exerciseName: "",
+    countdownFor: "",
+    countdownSec: d,
+    endsAt: null,
+    remainingMs: d * 1000,
+  };
 }
 
 /** Milliseconds left at `now`. */
@@ -60,7 +71,9 @@ export function restTimerReducer(state: RestTimerState, action: RestTimerAction)
       // A countdown that's already running (rest after the previous set) keeps going.
       const durationSec = clampRest(action.durationSec);
       const next = { ...state, exerciseId: action.exerciseId, exerciseName: action.exerciseName, durationSec };
-      return state.status === "running" || state.status === "paused" ? next : { ...next, status: "idle", endsAt: null, remainingMs: durationSec * 1000 };
+      return state.status === "running" || state.status === "paused"
+        ? next
+        : { ...next, status: "idle", endsAt: null, countdownSec: durationSec, remainingMs: durationSec * 1000 };
     }
     case "start":
     case "restart":
@@ -68,6 +81,7 @@ export function restTimerReducer(state: RestTimerState, action: RestTimerAction)
         ...state,
         status: "running",
         countdownFor: state.exerciseName,
+        countdownSec: state.durationSec,
         endsAt: action.now + state.durationSec * 1000,
         remainingMs: state.durationSec * 1000,
       };
@@ -78,15 +92,16 @@ export function restTimerReducer(state: RestTimerState, action: RestTimerAction)
       if (state.status !== "paused") return state;
       return { ...state, status: "running", endsAt: action.now + state.remainingMs };
     case "skip":
-      return { ...state, status: "idle", endsAt: null, countdownFor: "", remainingMs: state.durationSec * 1000 };
+      return { ...state, status: "idle", endsAt: null, countdownFor: "", countdownSec: state.durationSec, remainingMs: state.durationSec * 1000 };
     case "adjust": {
       const durationSec = clampRest(state.durationSec + action.deltaSec);
       const applied = (durationSec - state.durationSec) * 1000;
+      const countdownSec = Math.max(0, state.countdownSec + applied / 1000);
       if (state.status === "running" && state.endsAt != null) {
-        return { ...state, durationSec, endsAt: Math.max(action.now, state.endsAt + applied) };
+        return { ...state, durationSec, countdownSec, endsAt: Math.max(action.now, state.endsAt + applied) };
       }
-      if (state.status === "paused") return { ...state, durationSec, remainingMs: Math.max(0, state.remainingMs + applied) };
-      return { ...state, durationSec, remainingMs: durationSec * 1000 };
+      if (state.status === "paused") return { ...state, durationSec, countdownSec, remainingMs: Math.max(0, state.remainingMs + applied) };
+      return { ...state, durationSec, countdownSec: durationSec, remainingMs: durationSec * 1000 };
     }
     case "tick":
       if (state.status === "running" && state.endsAt != null && action.now >= state.endsAt) {

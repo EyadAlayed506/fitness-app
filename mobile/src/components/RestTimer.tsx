@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { Platform, Text, Vibration, View } from "react-native";
 
 import { api } from "@/lib/api";
+import { haptics } from "@/lib/haptics";
 import {
   formatRest,
   initialRestTimer,
@@ -26,10 +27,11 @@ export interface RestTimer {
 }
 
 /**
- * One rest timer for the whole workout screen, so two countdowns can never run at once.
- * `onDone` runs once when a countdown reaches zero.
+ * One rest timer for the whole workout (it lives in WorkoutSessionProvider), so two countdowns can never
+ * run at once. `onDone` runs once when a countdown reaches zero; `late` is true when it ended while the
+ * app was in the background (the notification already told the user).
  */
-export function useRestTimer(onDone: (exerciseName: string) => void): RestTimer {
+export function useRestTimer(onDone: (exerciseName: string, late: boolean) => void): RestTimer {
   const [state, dispatch] = useReducer(restTimerReducer, undefined, () => initialRestTimer());
   const [now, setNow] = useState(() => Date.now());
   const doneRef = useRef(onDone);
@@ -50,14 +52,22 @@ export function useRestTimer(onDone: (exerciseName: string) => void): RestTimer 
   }, [state.status]);
 
   const previous = useRef(state.status);
+  const endsAt = useRef<number | null>(null);
   useEffect(() => {
+    if (state.status === "running") endsAt.current = state.endsAt;
     if (previous.current === "running" && state.status === "done") {
-      if (Platform.OS === "web") beep();
-      else Vibration.vibrate([0, 400, 200, 400]);
-      doneRef.current(state.countdownFor);
+      const late = endsAt.current != null && Date.now() - endsAt.current > 3000;
+      if (!late) {
+        if (Platform.OS === "web") beep();
+        else {
+          haptics.alert();
+          Vibration.vibrate([0, 400, 200, 400]);
+        }
+      }
+      doneRef.current(state.countdownFor, late);
     }
     previous.current = state.status;
-  }, [state.status, state.countdownFor]);
+  }, [state.status, state.countdownFor, state.endsAt]);
 
   const loadExercise = useCallback(async (exerciseId: number, exerciseName: string) => {
     const setting = await api<RestSetting>(`/exercises/${exerciseId}/rest`).catch(() => ({ seconds: 90 }));
@@ -119,7 +129,8 @@ export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; c
   const running = state.status === "running";
   const paused = state.status === "paused";
   const done = state.status === "done";
-  const total = state.durationSec * 1000;
+  // the running countdown's own length (moving on to another exercise changes only the next one)
+  const total = (running || paused ? state.countdownSec : state.durationSec) * 1000;
   const label = running || paused ? `Rest after ${state.countdownFor || "your set"}` : done ? "Rest over" : `Rest for ${state.exerciseName}`;
 
   if (compact && state.status === "idle") return null;

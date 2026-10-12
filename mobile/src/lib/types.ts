@@ -478,3 +478,42 @@ export interface ChatReply {
   answer: ChatMessage;
   messages_left_today: number | null;
 }
+
+// ---------- faster logging ----------
+
+export interface ExerciseHistory {
+  exercise_id: number;
+  /** the most recent other workout with this exercise */
+  last: { workout_id: number; started_at: string; sets: { reps: number; weight_kg: number; rpe: number | null }[] } | null;
+  /** best set ever: highest estimated 1RM, or most reps if never with weight */
+  best: { weight_kg: number; reps: number; e1rm_kg: number; started_at: string } | null;
+}
+
+export interface RecentFood {
+  food: Food;
+  quantity: number;
+  unit: string;
+  meal: Meal;
+  times: number;
+  last_date: string;
+}
+
+export interface RecentFoods {
+  recent: RecentFood[];
+  frequent: RecentFood[];
+}
+
+export interface PlanPreview {
+  plan: Plan;
+  routine: Routine;
+}
+
+export interface GettingStarted {
+  signed_up: string;
+  days_since_signup: number;
+  first_weigh_in: string | null;
+  weighed_in: boolean;
+  logged_food: boolean;
+  finished_workout: boolean;
+  sleep_goal_set: boolean;
+}

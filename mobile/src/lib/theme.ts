@@ -1,4 +1,7 @@
+import { useContext } from "react";
 import { useColorScheme } from "react-native";
+
+import { AppearanceContext } from "./appearance";
 
 /**
  * Design tokens. Every screen takes its colours, spacing, radii and type sizes from here,
@@ -33,6 +36,7 @@ const light = {
   warnInk: "#8a5a00",
   warnSoft: "#fbf0d9",
   critical: "#bf2f2f",
+  criticalText: "#ffffff", // text on a solid critical button
   criticalSoft: "#fbe5e5",
   grid: "#ebeae6",
   shadow: "rgba(18, 19, 21, 0.06)",
@@ -61,6 +65,7 @@ const dark: typeof light = {
   warnInk: "#f0c06a",
   warnSoft: "#2e2410",
   critical: "#e5605f",
+  criticalText: "#121315",
   criticalSoft: "#341b1b",
   grid: "#26272b",
   shadow: "rgba(0, 0, 0, 0)",
@@ -70,8 +75,12 @@ const dark: typeof light = {
 
 export type Theme = typeof light;
 
+/** The palette for the current mode: the user's choice in Profile → Appearance, or the phone's setting. */
 export function useTheme(): Theme {
-  return useColorScheme() === "dark" ? dark : light;
+  const { preference } = useContext(AppearanceContext);
+  const system = useColorScheme();
+  const scheme = preference === "system" ? system : preference;
+  return scheme === "dark" ? dark : light;
 }
 
 /** 4-point spacing scale. Screen gutters are `lg`; space between sections is `xl`. */

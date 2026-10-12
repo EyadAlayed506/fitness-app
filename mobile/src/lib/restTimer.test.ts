@@ -62,6 +62,19 @@ test("adjusting changes the running countdown and the next one, within limits", 
   assert.equal(s.durationSec, MAX_REST);
 });
 
+test("the countdown keeps its own length when the next exercise has a different rest", () => {
+  let s = r(configured(120), { type: "start", now: 0 });
+  s = r(s, { type: "configure", exerciseId: 2, exerciseName: "Leg Curl", durationSec: 75 });
+  assert.equal(s.countdownSec, 120);
+  assert.equal(s.durationSec, 75);
+  s = r(s, { type: "adjust", deltaSec: 15, now: 1000 });
+  assert.equal(s.countdownSec, 135);
+  s = r(s, { type: "skip" });
+  assert.equal(s.countdownSec, 90);
+  s = r(s, { type: "start", now: 2000 });
+  assert.equal(s.countdownSec, 90);
+});
+
 test("moving to another exercise updates the next rest but keeps the current countdown", () => {
   let s = r(configured(120, 1, "Leg Press"), { type: "start", now: 0 });
   s = r(s, { type: "configure", exerciseId: 2, exerciseName: "Leg Curl", durationSec: 75 });
