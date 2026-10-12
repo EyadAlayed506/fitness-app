@@ -40,7 +40,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "The microphone is used to send voice messages to your coach."
+          "microphonePermission": "The microphone is used for voice messages to your coach and, when you turn on hands-free mode, to hear your workout commands."
         }
       ],
       [

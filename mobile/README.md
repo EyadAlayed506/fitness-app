@@ -60,6 +60,10 @@ Workouts → **Start workout** → **Scan QR**. The first time, allow the camera
 - **Photos** (machines, gyms, screenshots, weights, menus) are sent to your own backend only. Choose one from the gallery or take one with the camera.
 - **Haptics**: a light tap for choices, a stronger one for a saved set (phones only). They follow the phone's own vibration setting.
 
+## Hands-free workout mode
+
+With a workout in progress, tap **Turn on** under *Hands-free* in the workout card, then talk: "Chat, 12 reps at 25 kilos", "Chat, rest 30 seconds", "Chat, note: my left shoulder feels uncomfortable". The phone listens for speech itself and sends only what you say to Whisper on your PC; the app answers out loud and asks when something is missing. It works with the app open (the screen stays on while it listens); in Expo Go it pauses in the background or with the screen locked. Everything about it, including what a development build would add and a checklist for testing on a phone: [docs/HANDS_FREE.md](../docs/HANDS_FREE.md).
+
 ## Commands
 
 ```bash
@@ -67,7 +71,7 @@ npx expo start          # start the dev server (phone + browser)
 npx expo start --web    # open straight in the browser
 npm run typecheck       # TypeScript check
 npx expo lint           # lint
-npm test                # rest timer, progression (targets, records) and spoken-set parser tests
+npm test                # rest timer, progression, spoken sets, hands-free commands, wake word, speech detection
 npx expo install <pkg>  # add a package (picks the version that matches the Expo SDK)
 ```
 
