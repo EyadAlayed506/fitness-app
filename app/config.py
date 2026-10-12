@@ -45,6 +45,16 @@ class Settings(BaseSettings):
     whisper_device: str = "cpu"  # "cuda" for an NVIDIA GPU (needs the CUDA libraries)
     whisper_compute_type: str = "int8"  # "float16" on cuda
     whisper_language: str = ""  # e.g. "en" or "ar"; empty = detect automatically
+    # Photo matching ("the app learns your machines"): a small image model on the CPU compares a new
+    # photo with the user's earlier confirmed photos before asking the vision model.
+    # CLIP ViT-B/32 image encoder (OpenAI, MIT licence) as ONNX: 351 MB, downloaded once into models_dir.
+    photo_match_model_url: str = (
+        "https://clip-as-service.s3.us-east-2.amazonaws.com/models-436c69702d61732d53657276696365/onnx/ViT-B-32/visual.onnx"
+    )
+    photo_match_model_file: str = "clip-vit-b32-visual.onnx"
+    photo_match_threshold: float = 0.90  # cosine similarity a saved photo must reach to count as the same machine
+    models_dir: str = "models"  # downloaded models (next to the database)
+    photos_dir: str = "data/photos"  # confirmed machine photos; they never leave this server
 
     @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri", "anthropic_api_key")
     @classmethod

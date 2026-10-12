@@ -46,6 +46,7 @@ export default function ProfileTab() {
       <Card style={{ paddingVertical: space.xs }}>
         <ListRow first icon="moon-outline" title="Sleep" subtitle="Log nights, goal, WHOOP" onPress={() => router.push("/sleep")} />
         <ListRow icon="sparkles-outline" title="Wellness points" subtitle="Level, history and achievements" onPress={() => router.push("/points")} />
+        <ListRow icon="location-outline" title="Gyms" subtitle="Machine photos, settings, photograph a gym" onPress={() => router.push("/gyms")} />
         <ListRow icon="qr-code-outline" title="QR stickers" subtitle="Print codes for the gym machines" onPress={() => router.push("/qr-stickers")} />
       </Card>
 

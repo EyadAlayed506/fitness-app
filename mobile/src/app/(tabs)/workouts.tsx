@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { ExerciseInfo } from "@/components/ExerciseInfo";
+import { GymPicker, GymScanFlow, MachineTaken } from "@/components/GymParts";
 import { ExercisePhoto } from "@/components/ExercisePhoto";
 import { RestTimerPanel } from "@/components/RestTimer";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
@@ -33,12 +34,23 @@ import { Elapsed, useWorkoutSession } from "@/components/WorkoutSession";
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
-import { deleteSet, deleteWorkout, finishWorkout, restoreSet, startWorkout, useRoutine, useWorkouts } from "@/lib/data";
+import {
+  deleteSet,
+  deleteWorkout,
+  finishWorkout,
+  restoreSet,
+  setWorkoutGym,
+  startWorkout,
+  useCurrentGym,
+  useGyms,
+  useRoutine,
+  useWorkouts,
+} from "@/lib/data";
 import { WEEKDAYS_SHORT, duration, longDateTime, plural, timeOf, tzOffset, units, weekdayIndex } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { errorMessage, invalidate, qk, queryClient, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
-import type { Points, Routine, RoutineDay, WorkoutSet } from "@/lib/types";
+import type { Gym, Points, Routine, RoutineDay, WorkoutSet } from "@/lib/types";
 
 type Via = "name" | "qr" | "photo";
 type SheetState =
@@ -50,6 +62,9 @@ type SheetState =
   | { kind: "plan" }
   | { kind: "history"; id: number }
   | { kind: "edit-set"; workoutId: number; set: WorkoutSet; back: SheetState }
+  | { kind: "taken"; exercise: PickedExercise }
+  | { kind: "gym-pick" }
+  | { kind: "gym-scan" }
   | null;
 
 export default function Workouts() {
@@ -60,7 +75,8 @@ export default function Workouts() {
   const workouts = useWorkouts();
   const routineQuery = useRoutine();
   useRefreshOnFocus([qk.workouts, qk.routine]);
-  const { timer, planDay, setPlanDay, clearPlanDay } = useWorkoutSession();
+  const { timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay } = useWorkoutSession();
+  const gym = useCurrentGym();
   const params = useLocalSearchParams<{ start?: string }>();
   const [notesDraft, setNotesDraft] = useState<{ workoutId: number; text: string } | null>(null);
   const [openDay, setOpenDay] = useState<number | null>(null); // weekday index; null = today or the next training day
@@ -72,7 +88,24 @@ export default function Workouts() {
   const routine = routineQuery.data ?? null;
   const today = weekdayIndex();
   const todayPlan = routine?.days.find((d) => d.weekday_index === today) ?? null;
-  const followed = planDay != null ? (routine?.days.find((d) => d.weekday_index === planDay) ?? null) : null;
+  // what the workout follows: a one-off session (another gym) or a day of the plan, with "machine taken" swaps
+  const baseDay = plan?.day ?? (planDay != null ? (routine?.days.find((d) => d.weekday_index === planDay) ?? null) : null);
+  const swaps = plan?.swaps ?? {};
+  const swappedFrom: Record<number, string> = {};
+  const followed: RoutineDay | null = baseDay
+    ? {
+        ...baseDay,
+        exercises: baseDay.exercises.map((x) => {
+          const to = swaps[x.exercise_id];
+          if (!to) return x;
+          swappedFrom[to.id] = x.name;
+          return { ...x, exercise_id: to.id, name: to.name };
+        }),
+      }
+    : null;
+  /** the planned exercise an exercise stands in for (itself when it wasn't swapped) */
+  const plannedId = (exerciseId: number) =>
+    Number(Object.entries(swaps).find(([, to]) => to.id === exerciseId)?.[0] ?? exerciseId);
   const notes = notesDraft && notesDraft.workoutId === active?.id ? notesDraft.text : (active?.notes ?? "");
 
   const done = (exerciseId: number) => active?.sets.filter((s) => s.exercise_id === exerciseId).length ?? 0;
@@ -84,6 +117,18 @@ export default function Workouts() {
     const order = i >= 0 ? [...planned.slice(i + 1), ...planned.slice(0, i)] : planned;
     const x = order.find((p) => done(p.exercise_id) < p.sets);
     return x ? { id: x.exercise_id, name: x.name } : null;
+  };
+
+  const startGymSession = async (day: RoutineDay, at: Gym) => {
+    try {
+      const created = await startWorkout();
+      if (created.gym_id !== at.id) await setWorkoutGym(created.id, at.id);
+      setPlan(created.id, { weekday: null, day });
+      setSheet(null);
+      haptics.impact();
+    } catch (e) {
+      toast(errorMessage(e) ?? "Couldn't start the workout");
+    }
   };
 
   const startSession = async (weekday: number | null) => {
@@ -178,12 +223,22 @@ export default function Workouts() {
                 <Stat label="Volume" value={u.weight(active.volume_kg, 0)} />
                 <Stat label="Exercises" value={String(new Set(active.sets.map((x) => x.exercise_id)).size)} />
               </Row>
+              {gym ? (
+                <Row gap={space.sm} style={{ marginTop: space.md }}>
+                  <Ionicons name="location-outline" size={16} color={t.text2} />
+                  <Txt variant="small" style={{ flex: 1 }} numberOfLines={1}>
+                    At {gym.name}
+                  </Txt>
+                  <Button title="Change" kind="ghost" small onPress={() => setSheet({ kind: "gym-pick" })} style={{ borderColor: "transparent" }} accessibilityLabel="Change the gym of this workout" />
+                </Row>
+              ) : null}
 
               {followed ? (
                 <SessionChecklist
                   day={followed}
                   done={done}
                   upNextId={upNext?.exercise_id ?? null}
+                  swappedFrom={swappedFrom}
                   onPick={(x) => logExercise(x, "name")}
                   onChange={() => setPlanDay(active.id, null)}
                 />
@@ -291,6 +346,18 @@ export default function Workouts() {
               ) : (
                 <Button title="Start workout" icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(null)} />
               )}
+              <Pressable
+                onPress={() => setSheet({ kind: "gym-scan" })}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.gymLink, { borderTopColor: t.border, opacity: pressed ? 0.6 : 1 }]}
+              >
+                <Ionicons name="camera-outline" size={18} color={t.text2} />
+                <View style={{ flex: 1 }}>
+                  <Txt style={{ fontWeight: "600" }}>At another gym?</Txt>
+                  <Txt variant="small">Photograph it and get a session with only what&apos;s there.</Txt>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              </Pressable>
             </Card>
           )}
 
@@ -341,7 +408,7 @@ export default function Workouts() {
       </Sheet>
       <Sheet visible={sheet?.kind === "photo"} title="What machine is this?" onClose={() => setSheet(null)}>
         {sheet?.kind === "photo" ? (
-          <ExercisePhoto onPick={(e) => logExercise(e, "photo")} onSearch={() => setSheet({ kind: "search" })} />
+          <ExercisePhoto onPick={(e) => logExercise(e, "photo")} onSearch={() => setSheet({ kind: "search" })} gymId={active?.gym_id ?? gym?.id ?? null} />
         ) : null}
       </Sheet>
       <Sheet visible={sheet?.kind === "set"} title={sheet?.kind === "set" ? sheet.exercise.name : ""} onClose={() => setSheet(null)}>
@@ -362,6 +429,8 @@ export default function Workouts() {
             }}
             onInfo={() => setSheet({ kind: "info", exercise: sheet.exercise })}
             onEditSet={(s) => setSheet({ kind: "edit-set", workoutId: active.id, set: s, back: sheet })}
+            gym={gym}
+            onTaken={() => setSheet({ kind: "taken", exercise: sheet.exercise })}
           />
         ) : null}
       </Sheet>
@@ -393,6 +462,46 @@ export default function Workouts() {
           />
         ) : null}
       </Sheet>
+      <Sheet visible={sheet?.kind === "taken"} title={sheet?.kind === "taken" ? `${sheet.exercise.name} taken?` : ""} onClose={() => setSheet(null)}>
+        {sheet?.kind === "taken" ? (
+          <MachineTaken
+            exercise={sheet.exercise}
+            gym={gym}
+            swapsPlan={!!followed && followed.exercises.some((x) => x.exercise_id === sheet.exercise.id)}
+            onSwap={(to) => {
+              if (active && followed && followed.exercises.some((x) => x.exercise_id === sheet.exercise.id)) {
+                swap(active.id, plannedId(sheet.exercise.id), to);
+              }
+              toast(`${to.name} instead of ${sheet.exercise.name}`);
+              logExercise(to, "name");
+            }}
+          />
+        ) : null}
+      </Sheet>
+      <Sheet visible={sheet?.kind === "gym-pick"} title="Which gym are you at?" onClose={() => setSheet(null)}>
+        {sheet?.kind === "gym-pick" && active ? (
+          <View>
+            <GymPicker
+              value={active.gym_id ?? gym?.id ?? null}
+              onChange={async (g) => {
+                try {
+                  await setWorkoutGym(active.id, g.id);
+                  setSheet(null);
+                  toast(`This workout is at ${g.name}`);
+                } catch (e) {
+                  toast(errorMessage(e) ?? "Couldn't change the gym");
+                }
+              }}
+            />
+            <Txt variant="tiny" style={{ marginTop: space.md }}>
+              Machine settings and saved photos are kept per gym. Add or rename gyms in Profile → Gyms.
+            </Txt>
+          </View>
+        ) : null}
+      </Sheet>
+      <Sheet visible={sheet?.kind === "gym-scan"} title="Photograph a gym" onClose={() => setSheet(null)}>
+        {sheet?.kind === "gym-scan" ? <GymScanStart onStart={startGymSession} /> : null}
+      </Sheet>
       <Sheet visible={sheet?.kind === "edit-set"} title="Edit set" onClose={() => setSheet(sheet?.kind === "edit-set" ? sheet.back : null)}>
         {sheet?.kind === "edit-set" ? (
           <SetEditForm
@@ -413,17 +522,52 @@ export default function Workouts() {
   );
 }
 
+/** Pick (or add) the gym, then photograph it. */
+function GymScanStart({ onStart }: { onStart: (day: RoutineDay, gym: Gym) => void }) {
+  const gyms = useGyms();
+  const [gymId, setGymId] = useState<number | null>(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const chosen = gyms.data?.find((g) => g.id === gymId) ?? null;
+  if (chosen) return <GymScanFlow key={chosen.id} gym={chosen} onStart={onStart} />;
+  const add = async () => {
+    setError(null);
+    try {
+      const created = await api<Gym>("/gyms", { method: "POST", body: { name: name.trim() || "Hotel gym" } });
+      invalidate(qk.gyms);
+      queryClient.setQueryData<Gym[]>(qk.gyms, (old) => [...(old ?? []), created]);
+      setGymId(created.id);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+  return (
+    <View>
+      <Txt variant="small">Which gym is it? Machines and settings are kept per gym.</Txt>
+      {gyms.data?.length ? <GymPicker value={gymId} onChange={(g) => setGymId(g.id)} /> : null}
+      <Row style={{ alignItems: "flex-end", marginTop: space.sm }}>
+        <Field label="Or a new gym" value={name} onChangeText={setName} placeholder="e.g. Hotel gym" style={{ flex: 1 }} maxLength={80} />
+        <Button title="Add" icon="add" kind="soft" onPress={add} />
+      </Row>
+      <ErrorText message={error} />
+    </View>
+  );
+}
+
 /** The plan day being followed, as a checklist: what's done, and what's next. */
 function SessionChecklist({
   day,
   done,
   upNextId,
+  swappedFrom,
   onPick,
   onChange,
 }: {
   day: RoutineDay;
   done: (exerciseId: number) => number;
   upNextId: number | null;
+  /** exercises done instead of a planned one (machine taken): id -> the planned exercise's name */
+  swappedFrom: Record<number, string>;
   onPick: (x: PickedExercise) => void;
   onChange: () => void;
 }) {
@@ -434,7 +578,7 @@ function SessionChecklist({
       <Row style={{ justifyContent: "space-between" }}>
         <View style={{ flex: 1 }}>
           <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-            {WEEKDAYS_SHORT[day.weekday_index].toUpperCase()} · {day.title.toUpperCase()}
+            {day.custom_name && day.title.includes(" at ") ? "TODAY" : WEEKDAYS_SHORT[day.weekday_index].toUpperCase()} · {day.title.toUpperCase()}
           </Txt>
           <Txt variant="small">
             {finished} of {day.exercises.length} exercises done
@@ -472,8 +616,9 @@ function SessionChecklist({
                 >
                   {x.name}
                 </Txt>
-                <Txt variant="tiny">
+                <Txt variant="tiny" numberOfLines={1}>
                   {n} of {x.sets} sets · {x.reps} reps
+                  {swappedFrom[x.exercise_id] ? ` · instead of ${swappedFrom[x.exercise_id]}` : ""}
                 </Txt>
               </View>
               {next ? <Badge label="Up next" tone="info" /> : null}
@@ -540,7 +685,7 @@ function WeekPlan({
               <Pressable
                 onPress={() => onToggleDay(open ? -1 : d.weekday_index)}
                 accessibilityRole="button"
-                accessibilityState={{ expanded: open }}
+                aria-expanded={open}
                 style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 56, opacity: pressed ? 0.6 : 1 })}
               >
                 <View style={{ width: 40 }}>
@@ -657,6 +802,15 @@ function WeekStrip({ routine }: { routine: Routine }) {
 }
 
 const styles = StyleSheet.create({
+  gymLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    marginTop: space.lg,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    minHeight: 52,
+  },
   checkRow: {
     flexDirection: "row",
     alignItems: "center",

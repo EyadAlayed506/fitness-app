@@ -17,6 +17,7 @@ from app.models.workout import (
     WorkoutSetPublic,
     WorkoutSetUpdate,
 )
+from app.routers.gyms import default_gym
 from app.services.units import to_kg
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
@@ -49,12 +50,14 @@ def _session_public(session: Session, workout: WorkoutSession, with_sets: bool) 
         set_count=len(sets),
         volume_kg=round(sum(s.reps * s.weight_kg for s in sets), 1),
         sets=sets if with_sets else [],
+        gym_id=workout.gym_id,
     )
 
 
 @router.post("", response_model=WorkoutSessionPublic, status_code=201)
 def start_workout(data: WorkoutSessionIn, user: CurrentUser, session: SessionDep):
-    workout = WorkoutSession(user_id=user.id, notes=data.notes)
+    # at the default gym unless the user says otherwise (PUT /workouts/{id}/gym)
+    workout = WorkoutSession(user_id=user.id, notes=data.notes, gym_id=default_gym(session, user.id).id)
     if data.started_at:
         workout.started_at = data.started_at
     session.add(workout)

@@ -43,6 +43,42 @@ ANSWER_FORMAT = {
 }
 
 
+GYM_PROMPT = """You look at a photo of a gym (for example a hotel gym) for a workout app and list the training equipment you can see.
+
+Machines: pick the ones you can see from the list below, using their id, with your confidence from 0 to 1. Only list machines that are really in the photo.
+
+Other equipment: for each of these keys, say whether it is in the photo, with your confidence: {equipment_keys}.
+
+In "seen", describe the room in a few words.
+
+Machines (id: name):
+{machines}"""
+
+GYM_FORMAT = {
+    "type": "object",
+    "properties": {
+        "seen": {"type": "string"},
+        "machines": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"exercise_id": {"type": "integer"}, "confidence": {"type": "number"}},
+                "required": ["exercise_id", "confidence"],
+            },
+        },
+        "equipment": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"key": {"type": "string"}, "present": {"type": "boolean"}, "confidence": {"type": "number"}},
+                "required": ["key", "present", "confidence"],
+            },
+        },
+    },
+    "required": ["seen", "machines", "equipment"],
+}
+
+
 class RecognitionError(Exception):
     def __init__(self, status: int, detail: str):
         super().__init__(detail)
@@ -79,6 +115,53 @@ class Recognizer:
         listing = "\n".join(
             f"{e.id}: {e.name} - {e.primary_muscles or e.muscle_group}, {e.category}" for e in catalogue
         )
+        answer = self._ask(image, PROMPT.format(catalogue=listing), ANSWER_FORMAT)
+
+        by_id = {e.id: e for e in catalogue}
+        guesses: list[Guess] = []
+        for g in answer.get("guesses") or []:
+            try:
+                ex = by_id.get(int(g.get("exercise_id")))
+                confidence = max(0.0, min(1.0, float(g.get("confidence", 0))))
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if ex and confidence >= MIN_CONFIDENCE and all(x.exercise.id != ex.id for x in guesses):
+                guesses.append(Guess(ex, round(confidence, 2)))  # ids not in the catalogue are dropped
+        guesses.sort(key=lambda g: -g.confidence)
+        return guesses[:MAX_GUESSES], str(answer.get("seen") or "")[:200]
+
+    def scan_gym(
+        self, image: bytes, machines: list[Exercise], equipment_keys: list[str]
+    ) -> tuple[list[Guess], dict[str, float], str]:
+        """Machines (from the catalogue) and other equipment the vision model sees in a photo of a gym."""
+        listing = "\n".join(f"{e.id}: {e.name}" for e in machines)
+        answer = self._ask(
+            image, GYM_PROMPT.format(machines=listing, equipment_keys=", ".join(equipment_keys)), GYM_FORMAT
+        )
+        by_id = {e.id: e for e in machines}
+        found: list[Guess] = []
+        for g in answer.get("machines") or []:
+            try:
+                ex = by_id.get(int(g.get("exercise_id")))
+                confidence = max(0.0, min(1.0, float(g.get("confidence", 0))))
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if ex and confidence >= MIN_CONFIDENCE and all(x.exercise.id != ex.id for x in found):
+                found.append(Guess(ex, round(confidence, 2)))
+        found.sort(key=lambda g: -g.confidence)
+        equipment: dict[str, float] = {}
+        for item in answer.get("equipment") or []:
+            try:
+                key = str(item.get("key"))
+                confidence = max(0.0, min(1.0, float(item.get("confidence", 0))))
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if key in equipment_keys and item.get("present") and confidence >= MIN_CONFIDENCE:
+                equipment[key] = round(confidence, 2)
+        return found, equipment, str(answer.get("seen") or "")[:200]
+
+    def _ask(self, image: bytes, prompt: str, answer_format: dict) -> dict:
+        """One question about one photo; the answer as a dict (or RecognitionError)."""
         try:
             r = self.http.post(
                 f"{self.url}/api/chat",
@@ -86,10 +169,10 @@ class Recognizer:
                     "model": self.model,
                     "messages": [{
                         "role": "user",
-                        "content": PROMPT.format(catalogue=listing),
+                        "content": prompt,
                         "images": [base64.b64encode(image).decode()],
                     }],
-                    "format": ANSWER_FORMAT,
+                    "format": answer_format,
                     "stream": False,
                     "options": {"temperature": 0},
                 },
@@ -109,16 +192,6 @@ class Recognizer:
             answer = json.loads(r.json()["message"]["content"])
         except (KeyError, TypeError, ValueError):
             raise RecognitionError(502, "The vision model gave an answer the app couldn't read. Try again.")
-
-        by_id = {e.id: e for e in catalogue}
-        guesses: list[Guess] = []
-        for g in answer.get("guesses") or []:
-            try:
-                ex = by_id.get(int(g.get("exercise_id")))
-                confidence = max(0.0, min(1.0, float(g.get("confidence", 0))))
-            except (TypeError, ValueError, AttributeError):
-                continue
-            if ex and confidence >= MIN_CONFIDENCE and all(x.exercise.id != ex.id for x in guesses):
-                guesses.append(Guess(ex, round(confidence, 2)))  # ids not in the catalogue are dropped
-        guesses.sort(key=lambda g: -g.confidence)
-        return guesses[:MAX_GUESSES], str(answer.get("seen") or "")[:200]
+        if not isinstance(answer, dict):
+            raise RecognitionError(502, "The vision model gave an answer the app couldn't read. Try again.")
+        return answer

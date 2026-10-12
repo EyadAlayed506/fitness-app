@@ -13,8 +13,9 @@ import { haptics } from "@/lib/haptics";
 import { betterBest, bestOf, isNewBest, parseRepRange, suggestNext, type Best } from "@/lib/progression";
 import { errorMessage, qk } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
-import type { Exercise, ExerciseHistory, Workout, WorkoutSet } from "@/lib/types";
+import type { Exercise, ExerciseHistory, Gym, Workout, WorkoutSet } from "@/lib/types";
 
+import { MachineSettingsCard } from "./GymParts";
 import { RestTimerPanel } from "./RestTimer";
 import { useWorkoutSession } from "./WorkoutSession";
 import {
@@ -235,6 +236,10 @@ export interface SetFormProps {
   /** open the how-to and alternatives */
   onInfo: () => void;
   onEditSet: (s: WorkoutSet) => void;
+  /** the gym the workout is at (for machine settings) */
+  gym?: Gym | null;
+  /** "machine taken": pick another exercise */
+  onTaken?: () => void;
 }
 
 /** Waits for the exercise's history (usually cached) so the form can start with last time's numbers. */
@@ -261,6 +266,8 @@ function SetFormBody({
   onNext,
   onInfo,
   onEditSet,
+  gym,
+  onTaken,
   history,
   planReps,
 }: SetFormProps & { history: ExerciseHistory | null; planReps: string | null }) {
@@ -334,13 +341,17 @@ function SetFormBody({
   return (
     <View>
       <Row style={{ justifyContent: "space-between", marginBottom: space.md, flexWrap: "wrap" }} gap={space.sm}>
-        <LinkButton title="How to do it · alternatives" onPress={onInfo} />
+        <Row gap={space.lg} style={{ flexWrap: "wrap" }}>
+          <LinkButton title="How to do it" onPress={onInfo} />
+          {onTaken ? <LinkButton title="Machine taken?" onPress={onTaken} /> : null}
+        </Row>
         {target ? (
           <Txt variant="small" style={{ color: targetDone ? t.goodInk : t.text2, fontWeight: "600" }}>
             {targetDone ? `All ${target.sets} sets done` : `Set ${mine.length + 1} of ${target.sets} · ${target.reps} reps`}
           </Txt>
         ) : null}
       </Row>
+      <MachineSettingsCard gym={gym ?? null} exercise={exercise} />
 
       {record ? <RecordBanner key={record.n} text={record.text} /> : null}
 

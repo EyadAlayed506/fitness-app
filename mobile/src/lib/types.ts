@@ -159,6 +159,8 @@ export interface Workout {
   set_count: number;
   volume_kg: number;
   sets: WorkoutSet[];
+  /** where it was done (new workouts start at the default gym) */
+  gym_id?: number | null;
 }
 
 export interface Nutrients {
@@ -516,4 +518,96 @@ export interface GettingStarted {
   logged_food: boolean;
   finished_workout: boolean;
   sleep_goal_set: boolean;
+}
+
+// ---------- gyms and photo memory ----------
+
+export interface Gym {
+  id: number;
+  name: string;
+  is_default: boolean;
+  /** machines seen in "photograph a gym" (exercise ids) */
+  machines: number[];
+  /** other equipment seen there: dumbbells, barbell, cable_station, pull_up_bar */
+  equipment: string[];
+  photos: number;
+  settings: number;
+  workouts: number;
+}
+
+export interface MachineSetting {
+  gym_id: number;
+  exercise_id: number;
+  exercise_name: string;
+  seat: string;
+  pins: string;
+  back_pad: string;
+  handle: string;
+  notes: string;
+  saved: boolean;
+  updated_at: string | null;
+}
+
+export interface GymInventory {
+  gym_id: number;
+  exercise_ids: number[];
+  logged: number[];
+  photographed: number[];
+  with_settings: number[];
+  from_scan: number[];
+}
+
+export interface PhotoMatchStatus {
+  ready: boolean;
+  downloading: boolean;
+  downloaded_mb: number;
+  size_mb: number;
+  model: string;
+  problem: string | null;
+  threshold: number;
+}
+
+export interface SmartRecognition {
+  /** "memory": matched an earlier photo; "model": the vision model's guess; "none": nothing (pick by hand) */
+  source: "memory" | "model" | "none";
+  photo_token: string;
+  match: { exercise: Exercise; similarity: number; photo_id: number; taken_at: string } | null;
+  guesses: { exercise: Exercise; confidence: number }[];
+  seen: string;
+  model: string;
+  problem: string | null;
+  memory_ready: boolean;
+  memory_seconds: number;
+}
+
+export interface MachinePhoto {
+  id: number;
+  exercise_id: number;
+  exercise_name: string;
+  gym_id: number | null;
+  thumbnail: string;
+  corrected: boolean;
+  matchable: boolean;
+  created_at: string;
+}
+
+export interface GymScan {
+  seen: string;
+  machines: { exercise: Exercise; confidence: number }[];
+  equipment: { key: string; label: string; confidence: number }[];
+  model: string;
+  equipment_choices: Record<string, string>;
+}
+
+export interface GymSession {
+  day: RoutineDay;
+  possible_exercises: number;
+  note: string;
+}
+
+export interface Alternative {
+  exercise: Exercise;
+  match: "similar" | "different";
+  reasons: string[];
+  differences: string[];
 }

@@ -6,11 +6,17 @@ import { api } from "./api";
 import { tzOffset } from "./format";
 import { derivedKeys, invalidate, qk, queryClient } from "./query";
 import type {
+  Alternative,
   AssistantStatus,
   ExerciseHistory,
   FoodDay,
   FoodLogEntry,
   GettingStarted,
+  Gym,
+  GymInventory,
+  MachinePhoto,
+  MachineSetting,
+  PhotoMatchStatus,
   Meal,
   Points,
   Recommendations,
@@ -64,6 +70,41 @@ export const useSleepAnalytics = (days: number) =>
 export const useGettingStarted = () =>
   useQuery({ queryKey: qk.gettingStarted, queryFn: () => api<GettingStarted>(`/me/getting-started?tz_offset=${tzOffset()}`) });
 export const useAssistant = () => useQuery({ queryKey: qk.assistant, queryFn: () => api<AssistantStatus>("/assistant") });
+export const useGyms = () => useQuery({ queryKey: qk.gyms, queryFn: () => api<Gym[]>("/gyms") });
+/** The gym the user is at: the workout's gym while one is in progress, else the default gym. */
+export function useCurrentGym(): Gym | null {
+  const gyms = useGyms().data;
+  const active = useWorkouts().data?.active;
+  if (!gyms) return null;
+  return gyms.find((g) => g.id === active?.gym_id) ?? gyms.find((g) => g.is_default) ?? gyms[0] ?? null;
+}
+export const useGymInventory = (gymId: number | null) =>
+  useQuery({
+    queryKey: qk.gymInventory(gymId ?? 0),
+    queryFn: () => api<GymInventory>(`/gyms/${gymId}/inventory`),
+    enabled: gymId != null,
+  });
+export const useMachineSetting = (gymId: number | null, exerciseId: number) =>
+  useQuery({
+    queryKey: qk.machineSetting(gymId ?? 0, exerciseId),
+    queryFn: () => api<MachineSetting>(`/gyms/${gymId}/machines/${exerciseId}`),
+    enabled: gymId != null,
+  });
+export const usePhotoStatus = () =>
+  useQuery({
+    queryKey: qk.photoStatus,
+    queryFn: () => api<PhotoMatchStatus>("/photo-memory/status"),
+    // while the model downloads, show its progress
+    refetchInterval: (q) => (q.state.data?.downloading ? 2000 : false),
+  });
+export const useMachinePhotos = () =>
+  useQuery({ queryKey: qk.machinePhotos, queryFn: () => api<MachinePhoto[]>("/photo-memory/photos") });
+export const useAlternatives = (exerciseId: number) =>
+  useQuery({
+    queryKey: qk.alternatives(exerciseId),
+    queryFn: () => api<{ alternatives: Alternative[] }>(`/exercises/${exerciseId}/alternatives`),
+  });
+
 export const useExerciseHistory = (exerciseId: number | null, excludeWorkoutId: number | null) =>
   useQuery({
     queryKey: qk.exerciseHistory(exerciseId ?? 0, excludeWorkoutId),
@@ -337,6 +378,16 @@ export async function deleteFoods(entries: FoodLogEntry[]): Promise<void> {
     },
   );
   afterFoodChange(date);
+}
+
+// ---------- gyms ----------
+
+export async function setWorkoutGym(workoutId: number, gymId: number): Promise<void> {
+  await api(`/workouts/${workoutId}/gym`, { method: "PUT", body: { gym_id: gymId } });
+  queryClient.setQueryData<WorkoutsData>(qk.workouts, (old) =>
+    old?.active?.id === workoutId ? { ...old, active: { ...old.active, gym_id: gymId } } : old,
+  );
+  invalidate(qk.gyms);
 }
 
 // ---------- coach ----------

@@ -49,6 +49,12 @@ export const qk = {
   lift: (exerciseId: number) => ["progress", "lift", exerciseId] as const,
   weekly: (week: string | null) => ["weekly", week ?? "current"] as const,
   assistant: ["assistant"] as const,
+  gyms: ["gyms"] as const,
+  gymInventory: (gymId: number) => ["gyms", "inventory", gymId] as const,
+  machineSetting: (gymId: number, exerciseId: number) => ["gyms", "machine", gymId, exerciseId] as const,
+  machinePhotos: ["photo-memory", "photos"] as const,
+  photoStatus: ["photo-memory", "status"] as const,
+  alternatives: (exerciseId: number) => ["alternatives", exerciseId] as const,
 };
 
 /** Everything that depends on logged workouts, food, sleep or weight (recommendations, points, charts). */

@@ -18,6 +18,9 @@ dependencies = [
     "anthropic>=1.13.0",
     "faster-whisper>=1.2.1",
     "av<17",  # faster-whisper 1.2 passes an option newer PyAV versions removed
+    "onnxruntime>=1.20",
+    "numpy>=2",
+    "pillow>=11",
 ]
 
 [dependency-groups]

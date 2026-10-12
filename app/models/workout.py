@@ -19,6 +19,7 @@ class WorkoutSession(SQLModel, table=True):
     started_at: datetime = Field(default_factory=utcnow)
     ended_at: datetime | None = None
     notes: str = ""
+    gym_id: int | None = Field(default=None, foreign_key="gym.id", index=True)  # where it was done
 
 
 class WorkoutSessionIn(SQLModel):
@@ -86,6 +87,7 @@ class WorkoutSessionPublic(SQLModel):
     set_count: int = 0
     volume_kg: float = 0
     sets: list[WorkoutSetPublic] = []
+    gym_id: int | None = None
 
     @field_validator("started_at", "ended_at")
     @classmethod

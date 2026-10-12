@@ -50,6 +50,7 @@ function AppShell() {
             <Stack.Screen name="qr-stickers" options={{ headerShown: true, title: "QR stickers" }} />
             <Stack.Screen name="sleep" options={{ headerShown: true, title: "Sleep" }} />
             <Stack.Screen name="points" options={{ headerShown: true, title: "Wellness points" }} />
+            <Stack.Screen name="gyms" options={{ headerShown: true, title: "Gyms" }} />
           </Stack>
         </DialogProvider>
       </ToastProvider>

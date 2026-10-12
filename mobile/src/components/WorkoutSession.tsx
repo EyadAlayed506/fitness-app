@@ -8,16 +8,32 @@ import { cancelRestEnd, scheduleRestEnd } from "@/lib/restNotifications";
 import { formatRest, remainingMs, type RestTimerState } from "@/lib/restTimer";
 import { storage } from "@/lib/storage";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
+import type { RoutineDay } from "@/lib/types";
 
 import { useRestTimer, type RestTimer } from "./RestTimer";
+import type { PickedExercise } from "./WorkoutParts";
 import { useToast, useToastInset } from "./ui";
+
+/** What the workout in progress follows: a day of the user's plan, or a session built for another gym. */
+export interface GuidedPlan {
+  weekday: number | null;
+  /** a one-off session (e.g. from "photograph a gym"); used instead of the plan's day */
+  day?: RoutineDay | null;
+  /** "machine taken": exercises swapped for this workout only (planned exercise id -> replacement) */
+  swaps?: Record<number, PickedExercise>;
+}
 
 interface WorkoutSessionValue {
   /** the one rest timer, shared by every screen */
   timer: RestTimer;
   /** weekday (0 = Monday) of the plan day the workout in progress follows, or null for a free workout */
   planDay: number | null;
+  /** everything the workout in progress follows (plan day, one-off session, swaps) */
+  plan: GuidedPlan | null;
   setPlanDay: (workoutId: number, weekday: number | null) => void;
+  setPlan: (workoutId: number, plan: GuidedPlan | null) => void;
+  /** use another exercise instead of a planned one, for this workout only */
+  swap: (workoutId: number, fromId: number, to: PickedExercise) => void;
   /** forget the plan day of a workout that was finished or discarded */
   clearPlanDay: (workoutId: number) => void;
 }
@@ -36,33 +52,61 @@ export function WorkoutSessionProvider({ children }: { children: ReactNode }) {
   );
   useRestNotification(timer.state);
 
-  // The plan day is remembered on this device per workout (e.g. after the app restarts)
-  const [plan, setPlan] = useState<{ workoutId: number; weekday: number | null } | null>(null);
+  // What the workout follows is remembered on this device per workout (e.g. after the app restarts)
+  const [stored, setStored] = useState<{ workoutId: number; plan: GuidedPlan | null } | null>(null);
   useEffect(() => {
     if (activeId == null) return;
     let cancelled = false;
     storage
       .get(planKey(activeId))
       .then((saved) => {
-        if (!cancelled) setPlan({ workoutId: activeId, weekday: saved ? Number(saved) : null });
+        if (!cancelled) setStored({ workoutId: activeId, plan: parsePlan(saved) });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [activeId]);
-  const setPlanDay = useCallback((workoutId: number, weekday: number | null) => {
-    setPlan({ workoutId, weekday });
-    if (weekday == null) storage.remove(planKey(workoutId)).catch(() => {});
-    else storage.set(planKey(workoutId), String(weekday)).catch(() => {});
+  const setPlan = useCallback((workoutId: number, next: GuidedPlan | null) => {
+    setStored({ workoutId, plan: next });
+    if (next == null) storage.remove(planKey(workoutId)).catch(() => {});
+    else storage.set(planKey(workoutId), JSON.stringify(next)).catch(() => {});
   }, []);
+  const setPlanDay = useCallback(
+    (workoutId: number, weekday: number | null) => setPlan(workoutId, weekday == null ? null : { weekday }),
+    [setPlan],
+  );
+  const plan = stored && stored.workoutId === activeId ? stored.plan : null;
+  const swap = useCallback(
+    (workoutId: number, fromId: number, to: PickedExercise) => {
+      const base = stored && stored.workoutId === workoutId ? stored.plan : null;
+      if (!base) return;
+      setPlan(workoutId, { ...base, swaps: { ...base.swaps, [fromId]: to } });
+    },
+    [stored, setPlan],
+  );
   const clearPlanDay = useCallback((workoutId: number) => {
     storage.remove(planKey(workoutId)).catch(() => {});
   }, []);
 
-  const planDay = plan && plan.workoutId === activeId ? plan.weekday : null;
-  const value = useMemo(() => ({ timer, planDay, setPlanDay, clearPlanDay }), [timer, planDay, setPlanDay, clearPlanDay]);
+  const planDay = plan?.weekday ?? null;
+  const value = useMemo(
+    () => ({ timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay }),
+    [timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay],
+  );
   return <WorkoutSessionContext.Provider value={value}>{children}</WorkoutSessionContext.Provider>;
+}
+
+/** Older versions stored just the weekday number. */
+function parsePlan(saved: string | null): GuidedPlan | null {
+  if (!saved) return null;
+  if (/^\d+$/.test(saved)) return { weekday: Number(saved) };
+  try {
+    const p = JSON.parse(saved) as GuidedPlan;
+    return p && typeof p === "object" ? p : null;
+  } catch {
+    return null;
+  }
 }
 
 export function useWorkoutSession(): WorkoutSessionValue {
