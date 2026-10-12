@@ -111,7 +111,7 @@ The app imports the last 30 days, then syncs again when you open Home or the Sle
 
 The **Coach** tab is a chat assistant for training, sleep and food. It answers from your own logged data (profile and calorie plan, training plan, today's suggestions, workouts, lift history, the exercise library, sleep, food, weekly summary, points) and **logs things for you**: say "add a banana to breakfast" and it's in the Food tab straight away. It can log food, workout sets, a weigh-in and a night of sleep; every change shows under its answer with **Open** and **Undo**. You can also **talk to it**: tap the microphone, speak, tap again; the words appear in the box to check and send.
 
-In **Workouts**, the **Photo** button recognises a machine from a photo and suggests up to 3 exercises from the library; you tap the right one.
+In **Workouts**, the **Photo** button recognises a machine from a picture (choose one from your files or gallery, or use the camera) and suggests up to 3 exercises from the library; you tap the right one.
 
 It can run on two kinds of AI. `ASSISTANT_PROVIDER=auto` (the default) uses Claude when `ANTHROPIC_API_KEY` is set, otherwise Ollama. Voice and photos always run on your PC.
 

@@ -42,6 +42,14 @@
         {
           "microphonePermission": "The microphone is used to send voice messages to your coach."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app uses a photo you choose to recognise gym machines.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "scheme": "fitnessapp",

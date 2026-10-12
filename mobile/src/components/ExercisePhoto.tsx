@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, View } from "react-native";
 
@@ -20,14 +21,12 @@ const likelihood = (c: number) =>
   c >= 0.7 ? { label: "Very likely", tone: "good" as const } : c >= 0.4 ? { label: "Likely", tone: "info" as const } : { label: "Maybe", tone: "neutral" as const };
 
 /**
- * Take a photo of a machine; the vision model on the PC suggests up to three exercises from the app's library.
- * The user always picks the right one (or searches by name). The photo isn't saved.
+ * Choose or take a photo of a machine; the vision model on the PC suggests up to three exercises from the app's
+ * library. The user always picks the right one (or searches by name). The photo isn't saved.
  */
 export function ExercisePhoto({ onPick, onSearch }: { onPick: (e: PickedExercise) => void; onSearch: () => void }) {
   const t = useTheme();
-  const [permission, requestPermission] = useCameraPermissions();
-  const camera = useRef<CameraView>(null);
-  const [ready, setReady] = useState(false);
+  const [usingCamera, setUsingCamera] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [result, setResult] = useState<Recognition | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,19 +35,17 @@ export function ExercisePhoto({ onPick, onSearch }: { onPick: (e: PickedExercise
     setPhoto(null);
     setResult(null);
     setError(null);
-    setReady(false);
   };
 
-  const shoot = async () => {
+  const recognize = async (uri: string, type = "image/jpeg") => {
     setError(null);
+    setPhoto(uri);
     try {
-      const picture = await camera.current?.takePictureAsync({ quality: 0.6 });
-      if (!picture?.uri) return;
-      setPhoto(picture.uri);
+      const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
       setResult(
         await api<Recognition>("/exercises/recognize", {
           method: "POST",
-          upload: { field: "image", uri: picture.uri, name: "photo.jpg", type: "image/jpeg" },
+          upload: { field: "image", uri, name: `photo.${ext}`, type },
         }),
       );
     } catch (e) {
@@ -56,31 +53,29 @@ export function ExercisePhoto({ onPick, onSearch }: { onPick: (e: PickedExercise
     }
   };
 
-  if (!permission?.granted) {
-    return (
-      <View style={{ padding: 16, borderRadius: 12, backgroundColor: t.surface2, gap: 10 }}>
-        <Txt variant="small">
-          {permission && !permission.canAskAgain
-            ? "Camera access is turned off for this app. Allow it in your phone's settings, or search by name."
-            : "Allow the camera to take a photo of the machine."}
-        </Txt>
-        {!permission || permission.canAskAgain ? <Button title="Allow camera" icon="camera" onPress={async () => { await requestPermission(); }} /> : null}
-        <LinkButton title="Search by name instead" onPress={onSearch} />
-      </View>
-    );
+  // a picture from the computer's files or the phone's gallery: no camera needed
+  const choose = async () => {
+    setError(null);
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+    if (picked.canceled || !picked.assets?.length) return;
+    const asset = picked.assets[0];
+    await recognize(asset.uri, asset.mimeType ?? "image/jpeg");
+  };
+
+  if (!photo && usingCamera) {
+    return <CameraCapture onPhoto={(uri) => recognize(uri)} onCancel={() => setUsingCamera(false)} />;
   }
 
   if (!photo) {
     return (
-      <View>
-        <View style={{ height: 320, borderRadius: 12, overflow: "hidden", backgroundColor: "#000" }}>
-          <CameraView ref={camera} style={{ flex: 1 }} facing="back" onCameraReady={() => setReady(true)} />
-        </View>
-        <Txt variant="small" style={{ marginTop: 10 }}>
-          Fit the whole machine in the photo. If it has a name sticker, include it.
+      <View style={{ gap: 10 }}>
+        <Txt variant="small">
+          Choose or take a photo of the machine. Fit the whole machine in, and its name sticker if it has one.
         </Txt>
-        <Button title="Take photo" icon="camera" onPress={shoot} disabled={!ready} style={{ marginTop: 10 }} />
+        <Button title="Choose a photo" icon="image-outline" onPress={() => choose().catch((e) => setError((e as Error).message))} />
+        <Button title="Use the camera" icon="camera-outline" kind="soft" onPress={() => setUsingCamera(true)} />
         <ErrorText message={error} />
+        <LinkButton title="Search by name instead" onPress={onSearch} />
       </View>
     );
   }
@@ -130,13 +125,64 @@ export function ExercisePhoto({ onPick, onSearch }: { onPick: (e: PickedExercise
 
       {result || error ? (
         <Row style={{ marginTop: 14, justifyContent: "space-between" }}>
-          <LinkButton title="Take another photo" onPress={reset} />
+          <LinkButton title="Try another photo" onPress={reset} />
           <LinkButton title="None of these: search" onPress={onSearch} />
         </Row>
       ) : null}
       <Txt variant="tiny" style={{ marginTop: 10 }}>
         Guesses come from an AI on your PC and can be wrong: tap the right one. The photo isn&apos;t saved.
       </Txt>
+    </View>
+  );
+}
+
+/** Live camera with a shutter button (phones, or a computer with a webcam). */
+function CameraCapture({ onPhoto, onCancel }: { onPhoto: (uri: string) => void; onCancel: () => void }) {
+  const t = useTheme();
+  const [permission, requestPermission] = useCameraPermissions();
+  const camera = useRef<CameraView>(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const shoot = async () => {
+    try {
+      const picture = await camera.current?.takePictureAsync({ quality: 0.6 });
+      if (picture?.uri) onPhoto(picture.uri);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  if (!permission?.granted) {
+    return (
+      <View style={{ padding: 16, borderRadius: 12, backgroundColor: t.surface2, gap: 10 }}>
+        <Txt variant="small">
+          {permission && !permission.canAskAgain
+            ? "Camera access is turned off for this app. Allow it in your settings, or choose a photo instead."
+            : "Allow the camera to take a photo of the machine."}
+        </Txt>
+        {!permission || permission.canAskAgain ? <Button title="Allow camera" icon="camera" onPress={async () => { await requestPermission(); }} /> : null}
+        <LinkButton title="Choose a photo instead" onPress={onCancel} />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <View style={{ height: 320, borderRadius: 12, overflow: "hidden", backgroundColor: "#000" }}>
+        <CameraView
+          ref={camera}
+          style={{ flex: 1 }}
+          facing="back"
+          onCameraReady={() => setReady(true)}
+          onMountError={() => setError("No camera found. Choose a photo instead.")}
+        />
+      </View>
+      <Button title="Take photo" icon="camera" onPress={shoot} disabled={!ready} style={{ marginTop: 10 }} />
+      <ErrorText message={error} />
+      <View style={{ marginTop: 8 }}>
+        <LinkButton title="Choose a photo instead" onPress={onCancel} />
+      </View>
     </View>
   );
 }
