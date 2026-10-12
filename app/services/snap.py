@@ -134,7 +134,7 @@ def read_weight(recognizer: Recognizer, image: bytes) -> dict:
 
 MENU_PROMPT = """This is a photo of a restaurant menu.
 
-List every dish you can read (up to 25), with a short description if the menu has one. For each, estimate the calories, and the protein, carbs and fat in grams, of one normal restaurant portion, from its name and description. These are rough estimates; never leave a number out. In "seen", describe the menu in a few words."""
+List every dish you can read (up to 25), with a short description if the menu has one. For each, estimate the weight in grams of one normal restaurant portion, and its calories, protein, carbs and fat in grams, from its name and description. These are rough estimates; never leave a number out. In "seen", describe the menu in a few words."""
 
 MENU_FORMAT = {
     "type": "object",
@@ -147,12 +147,13 @@ MENU_FORMAT = {
                 "properties": {
                     "name": {"type": "string"},
                     "description": {"type": "string"},
+                    "portion_g": {"type": "number"},
                     "calories": {"type": "number"},
                     "protein_g": {"type": "number"},
                     "carbs_g": {"type": "number"},
                     "fat_g": {"type": "number"},
                 },
-                "required": ["name", "description", "calories", "protein_g", "carbs_g", "fat_g"],
+                "required": ["name", "description", "portion_g", "calories", "protein_g", "carbs_g", "fat_g"],
             },
         },
     },
@@ -180,9 +181,11 @@ def read_menu(recognizer: Recognizer, image: bytes) -> tuple[list[dict], str]:
                   (("calories", 5000), ("protein_g", 500), ("carbs_g", 1000), ("fat_g", 500))}
         if values["calories"] is None:
             continue  # without calories it can't be ranked or logged
+        portion = _num(raw.get("portion_g"), 2000)
         dishes.append({
             "name": str(raw["name"]).strip()[:120],
             "description": str(raw.get("description") or "").strip()[:200],
+            "portion_g": portion if portion and portion >= 20 else None,  # None: the app assumes a usual plate
             **{k: (v if v is not None else 0.0) for k, v in values.items()},
         })
     return dishes, str(answer.get("seen") or "")[:200]

@@ -151,6 +151,19 @@ def test_menu_scanner_ranks_and_logs_a_dish(client, auth, session, vision):
     # what's left today goes down
     assert upload(client, auth, "/api/snap/menu").json()["remaining_calories"] == round(target - 480)
 
+    # half of a dish the AI weighed at 400 g, logged to another day; that day's "left" goes down by half
+    vision.answer["dishes"][0]["portion_g"] = 400
+    yesterday = (dt.date.today() - dt.timedelta(days=1)).isoformat()
+    scanned = upload(client, auth, "/api/snap/menu", date=yesterday).json()
+    assert scanned["remaining_calories"] == round(target)
+    assert next(d for d in scanned["dishes"] if d["name"] == "Lasagne")["portion_g"] == 400
+    half = client.post("/api/snap/menu/log", json={"name": "Lasagne", "calories": 950, "protein_g": 40, "carbs_g": 80,
+                                                   "fat_g": 45, "meal": "dinner", "date": yesterday, "servings": 0.5,
+                                                   "portion_g": 400}, headers=auth).json()
+    assert (half["quantity"], round(half["calories"]), half["date"]) == (0.5, 475, yesterday)
+    assert session.get(Food, half["food_id"]).serving_size == 400
+    assert upload(client, auth, "/api/snap/menu", date=yesterday).json()["remaining_calories"] == round(target - 475)
+
 
 def test_snap_without_ollama(client, auth, vision):
     vision.down = True

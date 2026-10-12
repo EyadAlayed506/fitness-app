@@ -176,3 +176,16 @@ def test_getting_started(client, auth, session):
 
     g = client.get("/api/me/getting-started", headers=auth).json()
     assert all(g[k] for k in ("weighed_in", "logged_food", "finished_workout", "sleep_goal_set"))
+
+
+# ---------- set numbers stay 1, 2, 3 after a delete ----------
+
+def test_deleting_a_set_renumbers_the_rest(client, auth):
+    w = client.post("/api/workouts", json={}, headers=auth).json()
+    add = lambda ex, reps: client.post(f"/api/workouts/{w['id']}/sets", json={"exercise_id": ex, "reps": reps, "weight": 50}, headers=auth).json()
+    a1, a2, b1, a3 = add(1, 10), add(1, 9), add(2, 12), add(1, 8)
+    assert [s["set_number"] for s in (a1, a2, b1, a3)] == [1, 2, 1, 3]
+    assert client.delete(f"/api/workouts/{w['id']}/sets/{a1['id']}", headers=auth).status_code == 204
+    numbers = {s["id"]: s["set_number"] for s in client.get(f"/api/workouts/{w['id']}", headers=auth).json()["sets"]}
+    assert numbers == {a2["id"]: 1, a3["id"]: 2, b1["id"]: 1}  # the other exercise is untouched
+    assert add(1, 7)["set_number"] == 3  # not a second "3"

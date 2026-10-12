@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from sqlmodel import SQLModel, func, select
 
 from app.database import SessionDep
@@ -96,15 +96,16 @@ def scan_menu(
     recognizer: RecognizerDep,
     image: UploadFile = File(...),
     tz_offset: TzOffset = None,
+    day: date | None = Query(default=None, alias="date", description="The day to fit the dishes to (default: today)"),
 ):
-    """Dishes on a menu with estimated calories and macros, best fit for what's left of today first."""
+    """Dishes on a menu with estimated calories and macros, best fit for what's left of the day first."""
     data = _photo(image)
     _ready(recognizer)
     try:
         dishes, seen = snap.read_menu(recognizer, data)
     except RecognitionError as e:
         raise HTTPException(status_code=e.status, detail=e.detail)
-    remaining, protein_left, target = _remaining_today(session, user.id, profile, local_today(tz_offset))
+    remaining, protein_left, target = _remaining_today(session, user.id, profile, day or local_today(tz_offset))
     ranked = snap.rank_dishes(dishes, remaining, protein_left, target)
     return MenuOut(
         dishes=[MenuDish(**d) for d in ranked],
@@ -116,18 +117,19 @@ def scan_menu(
     )
 
 
-MENU_PORTION_G = 350  # what one "serving" of a menu dish is stored as
+MENU_PORTION_G = 350  # one portion, when the AI didn't estimate its weight
 
 
 @router.post("/snap/menu/log", response_model=FoodLogPublic, status_code=201)
-def log_menu_dish(data: MenuLogIn, user: CurrentUser, session: SessionDep):
-    """Log a dish from the menu scanner: saved as the user's own food ("Menu estimate"), one serving."""
-    per_100 = 100 / MENU_PORTION_G
+def log_menu_dish(data: MenuLogIn, user: CurrentUser, session: SessionDep, tz_offset: TzOffset = None):
+    """Log a dish from the menu scanner: saved as the user's own food ("Menu estimate"); `servings` portions."""
+    portion = data.portion_g or MENU_PORTION_G
+    per_100 = 100 / portion
     food = Food(
         name=data.name.strip(),
         brand="Menu estimate",
         is_liquid=False,
-        serving_size=MENU_PORTION_G,
+        serving_size=portion,
         serving_unit="g",
         calories=round(data.calories * per_100, 2),
         protein_g=round(data.protein_g * per_100, 2),
@@ -142,10 +144,10 @@ def log_menu_dish(data: MenuLogIn, user: CurrentUser, session: SessionDep):
     entry = FoodLog(
         user_id=user.id,
         food_id=food.id,
-        date=data.date or date.today(),
+        date=data.date or local_today(tz_offset),
         meal=data.meal,
         added_via=FoodAddedVia.manual,
-        **_compute_entry(food, 1, "serving"),
+        **_compute_entry(food, data.servings, "serving"),
     )
     session.add(entry)
     session.commit()

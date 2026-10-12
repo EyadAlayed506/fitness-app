@@ -156,5 +156,17 @@ def update_set(workout_id: int, set_id: int, data: WorkoutSetUpdate, user: Curre
 
 @router.delete("/{workout_id}/sets/{set_id}", status_code=204)
 def delete_set(workout_id: int, set_id: int, user: CurrentUser, session: SessionDep):
-    session.delete(_get_owned_set(session, workout_id, set_id, user))
+    workout_set = _get_owned_set(session, workout_id, set_id, user)
+    session.delete(workout_set)
+    session.flush()
+    # The exercise's other sets keep counting 1, 2, 3… (otherwise the next set would repeat a number)
+    rest = session.exec(
+        select(WorkoutSet)
+        .where(WorkoutSet.session_id == workout_id, WorkoutSet.exercise_id == workout_set.exercise_id)
+        .order_by(WorkoutSet.id)
+    ).all()
+    for number, s in enumerate(rest, start=1):
+        if s.set_number != number:
+            s.set_number = number
+            session.add(s)
     session.commit()
