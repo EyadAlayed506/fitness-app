@@ -381,7 +381,7 @@ def test_log_food_units_meals_and_unknown_foods(client, auth, session, monkeypat
     assert not err and json.loads(content)["logged"]["amount_base"] == 250
     # nothing local or online, and no estimate: the model is told to estimate it; nothing logged
     monkeypatch.setattr(assistant, "_search_online", lambda q: [])
-    content, err = assistant.run_tool(ctx, "log_food", {"food": "zzqx unicorn steak"})
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "zzqx unicorn steak", "meal": "dinner"})
     assert err and "nothing was logged" in content and "calories_per_100" in content
     assert len(ctx.actions) == 2
 
@@ -401,7 +401,7 @@ def test_log_food_the_ai_estimates_saves_it_as_the_users_food(client, auth, sess
     food = session.get(Food, result["logged"]["food_id"])
     assert (food.brand, food.owner_id, food.serving_size, food.serving_unit) == ("AI estimate", ctx.user.id, 50, "g")
     # next time it's found straight away (no estimate needed), and it's in the user's food search
-    content, err = assistant.run_tool(ctx, "log_food", {"food": "boiled eggs", "quantity": 2})
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "boiled eggs", "quantity": 2, "meal": "dinner"})
     assert not err and json.loads(content)["logged"]["food_id"] == food.id  # the same food, not a second copy
     assert ctx.actions[1].summary.startswith("Boiled eggs, 2 servings (155 kcal, AI estimate)")
     found = client.get("/api/foods/search", params={"q": "boiled eggs"}, headers=auth).json()["local"]
@@ -419,7 +419,7 @@ def test_log_food_the_ai_estimates_saves_it_as_the_users_food(client, auth, sess
     assert session.exec(select(Food).where(Food.name == "Mystery bar")).first() is None
     # a drink in ml, with alcohol (more calories than the macros alone)
     beer = {"food": "craft beer", "quantity": 330, "unit": "ml", "calories_per_100": 43, "protein_per_100": 0.5,
-            "carbs_per_100": 3.6, "fat_per_100": 0, "serving_size": 330, "is_liquid": True}
+            "carbs_per_100": 3.6, "fat_per_100": 0, "serving_size": 330, "is_liquid": True, "meal": "snack"}
     content, err = assistant.run_tool(ctx, "log_food", beer)
     assert not err, content
     assert round(json.loads(content)["logged"]["calories"]) == 142
@@ -490,15 +490,52 @@ def test_actions_are_kept_when_the_answer_fails(client, auth, session, claude):
         reply(tool_use("log_food", {"food": "banana", "meal": "breakfast"}), stop="tool_use"),
         anthropic.APIConnectionError(request=request),
     ]
-    r = ask(client, auth, "add a banana")
+    r = ask(client, auth, "add a banana to breakfast")
     assert r.status_code == 200
     answer = r.json()["answer"]
     assert answer["text"].startswith("I added: Banana") and answer["actions"][0]["undo"]
 
 
-def test_default_meal_follows_the_time_of_day(session, client, auth):
+def test_meal_is_never_guessed(session, client, auth):
+    """Only a meal the user named in their message; otherwise the model must ask (nothing is saved)."""
+    assert assistant.meals_named("Add three boiled eggs and milk for breakfast") == {"breakfast"}
+    assert assistant.meals_named("log my supper: pasta") == {"dinner"}
+    assert assistant.meals_named("أضف بيضتين على الفطور") == {"breakfast"}
+    assert assistant.meals_named("add a banana") == set()
+    assert assistant.meals_named("eggs for breakfast and an apple as a snack") == {"breakfast", "snack"}
+    assert assistant.meals_named("I snacked") == set()  # "snacked" isn't "snack"
+
     ctx = tool_ctx(session)
-    for hour, meal in ((7, "breakfast"), (13, "lunch"), (19, "dinner"), (23, "snack")):
-        ctx_now = dt.datetime(2026, 10, 12, hour)
-        assert assistant._meal_for(type("C", (), {"now": ctx_now})(), None) == meal
-    assert assistant._meal_for(ctx, "dinner") == "dinner"
+    ctx.question = "add a banana"
+    for meal in (None, "breakfast"):  # nothing named: even the model's own pick is refused
+        content, err = assistant.run_tool(ctx, "log_food", {"food": "banana", "meal": meal})
+        assert err and "Ask the user which meal" in content
+    ctx.question = "breakfast"  # the answer to "which meal?"
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "banana"})
+    assert not err and json.loads(content)["logged"]["meal"] == "breakfast"
+    ctx.question = "a banana for lunch please"  # the model picked another meal than the one named: the named one wins
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "banana", "meal": "dinner"})
+    assert not err and json.loads(content)["logged"]["meal"] == "lunch"
+    ctx.question = "eggs for breakfast and an apple as a snack"
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "apple", "meal": "snack"})
+    assert not err and json.loads(content)["logged"]["meal"] == "snack"
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "apple"})  # two named, none picked: ask
+    assert err
+
+
+def test_coach_asks_which_meal_then_logs(client, auth, session, claude):
+    """"Add a banana": the model guesses a meal, is refused, asks; the user answers; then it's logged."""
+    claude.replies = [
+        reply(tool_use("log_food", {"food": "banana", "meal": "snack"}), stop="tool_use"),
+        reply(text("Which meal is the banana for: breakfast, lunch, dinner or a snack?")),
+    ]
+    first = ask(client, auth, "add a banana").json()
+    assert first["answer"]["actions"] == []
+    assert client.get(f"/api/food-logs?date={TODAY}", headers=auth).json()["entries"] == []
+    claude.replies = [
+        reply(tool_use("log_food", {"food": "banana", "meal": "breakfast"}), stop="tool_use"),
+        reply(text("Added 1 banana to breakfast.")),
+    ]
+    second = ask(client, auth, "breakfast").json()
+    assert second["answer"]["actions"][0]["summary"].endswith("for breakfast")
+    assert [e["meal"] for e in client.get(f"/api/food-logs?date={TODAY}", headers=auth).json()["entries"]] == ["breakfast"]

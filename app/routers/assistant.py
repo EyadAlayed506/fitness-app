@@ -111,7 +111,7 @@ def send_message(
         (m.role, m.text)
         for m in session.exec(select(ChatMessage).where(ChatMessage.user_id == user.id).order_by(ChatMessage.id)).all()
     ]
-    ctx = assistant.ToolContext(session=session, user=user, profile=profile, tz_offset=tz_offset)
+    ctx = assistant.ToolContext(session=session, user=user, profile=profile, tz_offset=tz_offset, question=data.text.strip())
     try:
         answer = backend.ask(ctx, history, data.text.strip())
     except assistant.AssistantError as e:

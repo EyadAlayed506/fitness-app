@@ -49,7 +49,8 @@ SYSTEM_PROMPT = """You are the coach inside a fitness app. You help one person w
 How to work:
 - Before answering anything about the user's own data, look it up with the tools. Quote the numbers and dates you used. If something isn't logged, say so plainly and suggest how to log it in the app; never invent values or fill gaps with guesses.
 - The app's own plan and rules come first: their training days and session types, the recommended calories, the sleep goal. Explain them and help the user follow them; if they want to change the plan, tell them where (Workouts > Edit plan, Profile, Sleep > Change goal). You can't change the plan or settings yourself.
-- You can log things for the user: food (log_food), workout sets (log_workout_sets), a weigh-in (log_weight) and a night of sleep (log_sleep), and remove a food entry (remove_food_entry). When the user asks you to add or log something, do it straight away with the right tool, without asking first. If they don't say how much, use one normal serving and say so. Log only what they asked for, one log_food call per food. Afterwards say exactly what was added (name, amount, meal or day); the app shows it with an Undo button.
+- You can log things for the user: food (log_food), workout sets (log_workout_sets), a weigh-in (log_weight) and a night of sleep (log_sleep), and remove a food entry (remove_food_entry). When the user asks you to add or log something, do it straight away with the right tool, without asking first. If they don't say how much, use one normal serving and say so. Log only what they asked for, one log_food call per food.
+- Food goes to a meal: breakfast, lunch, dinner or snack. If the user didn't say which meal in their message, don't log it yet: ask which one in one short question, then log it when they answer. Never guess the meal from the time of day or from earlier messages. Afterwards say exactly what was added (name, amount, meal or day); the app shows it with an Undo button.
 - If a food isn't in the database, log_food says so: call it again with your best estimate of its nutrition per 100 g (or 100 ml) from your own knowledge. It's saved as one of the user's own foods, marked "AI estimate", and logged; tell them the numbers are your estimate.
 - Only say something was added or logged when the tool's result says it was. If a tool returns an error, nothing was saved: say so, and never make up the result.
 - General fitness knowledge is fine (technique, how progressive overload works, protein needs, sleep habits). Keep it practical and mainstream.
@@ -77,6 +78,7 @@ class ToolContext:
     profile: Profile
     tz_offset: int | None
     actions: list[Action] = field(default_factory=list)  # filled by the logging tools
+    question: str | None = None  # the user's message being answered (None: a tool run outside a chat)
 
     @property
     def today(self) -> dt.date:
@@ -230,13 +232,45 @@ def _points(ctx: ToolContext, _: dict) -> Any:
 # ---------- logging tools (write, current user only) ----------
 
 
+# Words that name a meal in the user's message (English and Arabic)
+MEAL_WORDS = {
+    "breakfast": ("breakfast", "brekkie", "morning meal", "فطور", "الفطور", "إفطار", "الإفطار", "فطار"),
+    "lunch": ("lunch", "midday meal", "غداء", "الغداء", "غدا"),
+    "dinner": ("dinner", "supper", "evening meal", "عشاء", "العشاء", "عشا"),
+    "snack": ("snack", "snacks", "سناك", "وجبة خفيفة"),
+}
+
+
+def meals_named(text: str) -> set[str]:
+    """The meals a message names, e.g. "add eggs for breakfast" -> {"breakfast"}."""
+    lowered = f" {text.lower()} "
+    found = set()
+    for meal, words in MEAL_WORDS.items():
+        for w in words:
+            if w.isascii():
+                if re.search(rf"\b{re.escape(w)}\b", lowered):
+                    found.add(meal)
+            elif w in lowered:
+                found.add(meal)
+    return found
+
+
 def _meal_for(ctx: ToolContext, meal: Any) -> str:
+    """The meal to log to: only one the user named. Never a guess (from the time of day or earlier messages)."""
     from app.models.food import Meal
 
-    if meal in {m.value for m in Meal}:
+    asked = "Nothing was logged. Ask the user which meal it's for (breakfast, lunch, dinner or snack), then log it."
+    valid = {m.value for m in Meal}
+    if ctx.question is None:  # not from a chat message (e.g. tests): the meal must still be given
+        if meal in valid:
+            return str(meal)
+        raise ToolError(asked)
+    named = meals_named(ctx.question)
+    if meal in named:
         return str(meal)
-    hour = ctx.now.hour  # not given: go by the time of day
-    return "breakfast" if hour < 11 else "lunch" if hour < 16 else "dinner" if hour < 22 else "snack"
+    if len(named) == 1:  # the user named one meal; the model passed none or another
+        return next(iter(named))
+    raise ToolError(asked)
 
 
 def _search_online(query: str) -> list:
@@ -328,6 +362,7 @@ def _log_food(ctx: ToolContext, args: dict) -> Any:
     name = str(args.get("food", "")).strip()
     if not name:
         raise ToolError("Say which food to log.")
+    meal = _meal_for(ctx, args.get("meal"))  # before anything is saved: ask first if the meal isn't known
     food = _find_food(ctx, name, args)
     estimated = food.brand == "AI estimate"
     allowed = units_for(food.is_liquid, bool(food.serving_size))
@@ -343,7 +378,7 @@ def _log_food(ctx: ToolContext, args: dict) -> Any:
     if not 0 < quantity <= 5000:
         raise ToolError("The amount must be more than 0.")
     entry = log_food(
-        FoodLogIn(food_id=food.id, date=_date(args.get("date"), ctx), meal=_meal_for(ctx, args.get("meal")),
+        FoodLogIn(food_id=food.id, date=_date(args.get("date"), ctx), meal=meal,
                   quantity=quantity, unit=unit, added_via=FoodAddedVia.search),
         ctx.user, ctx.session,
     )
@@ -499,7 +534,8 @@ TOOLS = [
          {"food": {"type": "string", "description": "A plain food name, e.g. 'banana', 'boiled egg', 'greek yogurt'"},
           "quantity": {"type": "number", "description": "How many units; default 1."},
           "unit": {"type": "string", "description": "serving, g, kg, oz, lb, ml, l, cup...; default serving."},
-          "meal": {"type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"]},
+          "meal": {"type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"],
+                   "description": "The meal the user named. If they didn't name one, ask them first."},
           "date": {"type": "string", "description": "YYYY-MM-DD; default today."},
           "calories_per_100": {"type": "number", "description": "Only for a food that wasn't found: kcal per 100 g (or 100 ml)."},
           "protein_per_100": {"type": "number", "description": "Only for a food that wasn't found: grams per 100 g/ml."},
