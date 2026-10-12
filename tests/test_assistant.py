@@ -12,6 +12,7 @@ from sqlmodel import select
 from app.config import get_settings
 from app.main import app
 from app.models.assistant import ChatMessage
+from app.models.food import Food
 from app.models.user import Profile, User
 from app.routers.assistant import chosen_provider, get_assistant_backend
 from app.services import assistant
@@ -346,6 +347,29 @@ def test_add_banana_to_breakfast(client, auth, session, claude):
     assert client.get(f"/api/food-logs?date={TODAY}", headers=auth).json()["entries"] == []
 
 
+def test_coach_estimates_a_food_that_isnt_anywhere(client, auth, session, claude, monkeypatch):
+    """Three boiled eggs and milk: the eggs aren't found, so the AI estimates them on its second try."""
+    monkeypatch.setattr(assistant, "_search_online", lambda q: [])
+    claude.replies = [
+        reply(tool_use("log_food", {"food": "boiled eggs", "quantity": 3, "meal": "breakfast"}),
+              tool_use("log_food", {"food": "milk", "quantity": 200, "unit": "ml", "meal": "breakfast"}), stop="tool_use"),
+        reply(tool_use("log_food", {"food": "boiled eggs", "quantity": 3, "meal": "breakfast", "calories_per_100": 155,
+                                    "protein_per_100": 12.6, "carbs_per_100": 1.1, "fat_per_100": 10.6,
+                                    "serving_size": 50}), stop="tool_use"),
+        reply(text("Added 3 boiled eggs (about 232 kcal, my estimate) and 200 ml milk to breakfast.")),
+    ]
+    body = ask(client, auth, "Add three boiled eggs and two hundred milliliters of milk for breakfast").json()
+    # the model was told the eggs weren't found and how to estimate them
+    first_results = claude.requests[1]["messages"][-1]["content"]
+    eggs_result = next(r for r in first_results if r.get("is_error"))
+    assert "nothing was logged" in str(eggs_result["content"])
+    summaries = [a["summary"] for a in body["answer"]["actions"]]
+    assert any(x.startswith("Boiled eggs, 3 servings (232 kcal, AI estimate) for breakfast") for x in summaries)
+    assert any(x.startswith("Milk") for x in summaries)
+    names = [e["food_name"] for e in client.get(f"/api/food-logs?date={TODAY}", headers=auth).json()["entries"]]
+    assert "Boiled eggs" in names and any(n.startswith("Milk") for n in names)
+
+
 def test_log_food_units_meals_and_unknown_foods(client, auth, session, monkeypatch):
     ctx = tool_ctx(session)
     content, err = assistant.run_tool(ctx, "log_food", {"food": "white rice", "quantity": 200, "unit": "g", "meal": "lunch"})
@@ -355,11 +379,50 @@ def test_log_food_units_meals_and_unknown_foods(client, auth, session, monkeypat
     # a drink in ml
     content, err = assistant.run_tool(ctx, "log_food", {"food": "orange juice", "quantity": 250, "unit": "ml", "meal": "snack"})
     assert not err and json.loads(content)["logged"]["amount_base"] == 250
-    # nothing local or online: a clear error for the model, nothing logged
+    # nothing local or online, and no estimate: the model is told to estimate it; nothing logged
     monkeypatch.setattr(assistant, "_search_online", lambda q: [])
     content, err = assistant.run_tool(ctx, "log_food", {"food": "zzqx unicorn steak"})
-    assert err and "Couldn't find" in content
+    assert err and "nothing was logged" in content and "calories_per_100" in content
     assert len(ctx.actions) == 2
+
+
+def test_log_food_the_ai_estimates_saves_it_as_the_users_food(client, auth, session, monkeypatch):
+    """The example from the request: three boiled eggs, not in any database."""
+    monkeypatch.setattr(assistant, "_search_online", lambda q: [])
+    ctx = tool_ctx(session)
+    eggs = {"food": "boiled eggs", "quantity": 3, "unit": "serving", "meal": "breakfast", "calories_per_100": 155,
+            "protein_per_100": 12.6, "carbs_per_100": 1.1, "fat_per_100": 10.6, "serving_size": 50}
+    content, err = assistant.run_tool(ctx, "log_food", eggs)
+    assert not err, content
+    result = json.loads(content)
+    assert result["food"] == "Boiled eggs" and "AI estimate" in result["note"]
+    assert (result["logged"]["quantity"], result["logged"]["unit"], round(result["logged"]["calories"])) == (3, "serving", 232)
+    assert ctx.actions[0].summary == "Boiled eggs, 3 servings (232 kcal, AI estimate) for breakfast"
+    food = session.get(Food, result["logged"]["food_id"])
+    assert (food.brand, food.owner_id, food.serving_size, food.serving_unit) == ("AI estimate", ctx.user.id, 50, "g")
+    # next time it's found straight away (no estimate needed), and it's in the user's food search
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "boiled eggs", "quantity": 2})
+    assert not err and json.loads(content)["logged"]["food_id"] == food.id  # the same food, not a second copy
+    assert ctx.actions[1].summary.startswith("Boiled eggs, 2 servings (155 kcal, AI estimate)")
+    found = client.get("/api/foods/search", params={"q": "boiled eggs"}, headers=auth).json()["local"]
+    assert found[0]["name"] == "Boiled eggs"
+    # another user doesn't get this user's estimate
+    other = signup_and_login(client, email="other@example.com")
+    assert all(f["name"] != "Boiled eggs" for f in client.get("/api/foods/search", params={"q": "boiled eggs"}, headers=other).json()["local"])
+
+    # impossible or inconsistent numbers are refused, nothing saved
+    bad = {**eggs, "food": "mystery bar", "calories_per_100": 50, "protein_per_100": 30, "fat_per_100": 30}
+    content, err = assistant.run_tool(ctx, "log_food", bad)
+    assert err and "doesn't match the macros" in content
+    content, err = assistant.run_tool(ctx, "log_food", {**bad, "calories_per_100": 2000})
+    assert err and "aren't possible" in content
+    assert session.exec(select(Food).where(Food.name == "Mystery bar")).first() is None
+    # a drink in ml, with alcohol (more calories than the macros alone)
+    beer = {"food": "craft beer", "quantity": 330, "unit": "ml", "calories_per_100": 43, "protein_per_100": 0.5,
+            "carbs_per_100": 3.6, "fat_per_100": 0, "serving_size": 330, "is_liquid": True}
+    content, err = assistant.run_tool(ctx, "log_food", beer)
+    assert not err, content
+    assert round(json.loads(content)["logged"]["calories"]) == 142
 
 
 def test_log_food_from_online_search(client, auth, session, monkeypatch):

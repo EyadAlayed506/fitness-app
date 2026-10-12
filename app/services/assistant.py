@@ -49,7 +49,9 @@ SYSTEM_PROMPT = """You are the coach inside a fitness app. You help one person w
 How to work:
 - Before answering anything about the user's own data, look it up with the tools. Quote the numbers and dates you used. If something isn't logged, say so plainly and suggest how to log it in the app; never invent values or fill gaps with guesses.
 - The app's own plan and rules come first: their training days and session types, the recommended calories, the sleep goal. Explain them and help the user follow them; if they want to change the plan, tell them where (Workouts > Edit plan, Profile, Sleep > Change goal). You can't change the plan or settings yourself.
-- You can log things for the user: food (log_food), workout sets (log_workout_sets), a weigh-in (log_weight) and a night of sleep (log_sleep), and remove a food entry (remove_food_entry). When the user asks you to add or log something, do it straight away with the right tool, without asking first. If they don't say how much, use one normal serving and say so. Log only what they asked for. Afterwards say exactly what was added (name, amount, meal or day); the app shows it with an Undo button.
+- You can log things for the user: food (log_food), workout sets (log_workout_sets), a weigh-in (log_weight) and a night of sleep (log_sleep), and remove a food entry (remove_food_entry). When the user asks you to add or log something, do it straight away with the right tool, without asking first. If they don't say how much, use one normal serving and say so. Log only what they asked for, one log_food call per food. Afterwards say exactly what was added (name, amount, meal or day); the app shows it with an Undo button.
+- If a food isn't in the database, log_food says so: call it again with your best estimate of its nutrition per 100 g (or 100 ml) from your own knowledge. It's saved as one of the user's own foods, marked "AI estimate", and logged; tell them the numbers are your estimate.
+- Only say something was added or logged when the tool's result says it was. If a tool returns an error, nothing was saved: say so, and never make up the result.
 - General fitness knowledge is fine (technique, how progressive overload works, protein needs, sleep habits). Keep it practical and mainstream.
 - Rest days are part of training. Don't push extra sessions to make up missed ones, very low calories, or training through pain.
 - You are not a doctor. Don't diagnose, and don't advise on medication, injuries, eating disorders or medical conditions; for pain, injury, chest pain, dizziness, or anything that worries them, tell them to see a professional. In an emergency, tell them to contact emergency services.
@@ -252,8 +254,56 @@ def _search_online(query: str) -> list:
     return asyncio.run(run())
 
 
-def _find_food(ctx: ToolContext, name: str):
-    """The best match for a food name: the user's foods and the built-in list first, then online."""
+ESTIMATE_FIELDS = ("calories_per_100", "protein_per_100", "carbs_per_100", "fat_per_100")
+
+
+def _estimated_food(ctx: ToolContext, name: str, args: dict):
+    """A food nobody has data for: saved as the user's own food from the AI's own estimate (per 100 g or ml)."""
+    from app.models.food import Food, FoodSource
+
+    try:
+        kcal, protein, carbs, fat = (float(args[k]) for k in ESTIMATE_FIELDS)
+    except (KeyError, TypeError, ValueError):
+        raise ToolError(
+            f"'{name}' isn't in the food database or online, so nothing was logged. Call log_food again with your "
+            "best estimate of its nutrition from your own knowledge: calories_per_100, protein_per_100, "
+            "carbs_per_100 and fat_per_100 (per 100 g, or per 100 ml for a drink), serving_size (grams or ml in one "
+            "normal serving, e.g. 50 for one egg) and is_liquid."
+        )
+    if not (0 <= kcal <= 900 and all(0 <= x <= 100 for x in (protein, carbs, fat)) and protein + carbs + fat <= 100.5):
+        raise ToolError("Those numbers aren't possible per 100 g (at most 900 kcal and 100 g of protein, carbs and fat "
+                        "together). Nothing was logged; check them and call log_food again.")
+    is_liquid = bool(args.get("is_liquid"))
+    from_macros = 4 * protein + 4 * carbs + 9 * fat
+    if kcal < 0.6 * from_macros - 20 or (kcal > 1.5 * from_macros + 30 and not is_liquid):  # drinks may have alcohol
+        raise ToolError(f"{kcal:g} kcal doesn't match the macros (they add up to about {from_macros:.0f} kcal). "
+                        "Nothing was logged; check the numbers and call log_food again.")
+    try:
+        serving = float(args.get("serving_size") or 0)
+    except (TypeError, ValueError):
+        serving = 0.0
+    food = Food(
+        name=name[:1].upper() + name[1:120],
+        brand="AI estimate",
+        is_liquid=is_liquid,
+        serving_size=serving if 1 <= serving <= 2000 else None,
+        serving_unit=("ml" if is_liquid else "g") if 1 <= serving <= 2000 else None,
+        calories=round(kcal, 1),
+        protein_g=round(protein, 1),
+        carbs_g=round(carbs, 1),
+        fat_g=round(fat, 1),
+        source=FoodSource.manual,
+        owner_id=ctx.user.id,
+    )
+    ctx.session.add(food)
+    ctx.session.commit()
+    ctx.session.refresh(food)
+    return food
+
+
+def _find_food(ctx: ToolContext, name: str, args: dict | None = None):
+    """The best match for a food name: the user's foods and the built-in list first, then online, and last the
+    AI's own estimate (saved as the user's food, so it's found straight away next time)."""
     from sqlmodel import or_, select
 
     from app.models.food import Food
@@ -266,7 +316,7 @@ def _find_food(ctx: ToolContext, name: str):
         return local[0]
     online = _search_online(name)
     if not online:
-        raise ToolError(f"Couldn't find '{name}' in the food database or online. Ask the user to add it in the Food tab.")
+        return _estimated_food(ctx, name, args or {})
     return import_food(online[0], ctx.user, ctx.session)
 
 
@@ -278,7 +328,8 @@ def _log_food(ctx: ToolContext, args: dict) -> Any:
     name = str(args.get("food", "")).strip()
     if not name:
         raise ToolError("Say which food to log.")
-    food = _find_food(ctx, name)
+    food = _find_food(ctx, name, args)
+    estimated = food.brand == "AI estimate"
     allowed = units_for(food.is_liquid, bool(food.serving_size))
     unit = str(args.get("unit") or "").strip().lower()
     try:
@@ -299,10 +350,14 @@ def _log_food(ctx: ToolContext, args: dict) -> Any:
     amount = f"{quantity:g} {unit}{'s' if unit == SERVING and quantity != 1 else ''}"
     when = "" if entry.date == ctx.today else f" on {entry.date.strftime('%a %d %b')}"
     ctx.actions.append(Action(
-        "food", f"{food.name}, {amount} ({round(entry.calories)} kcal) for {entry.meal}{when}", "/food",
-        [f"/food-logs/{entry.id}"],
+        "food", f"{food.name}, {amount} ({round(entry.calories)} kcal{', AI estimate' if estimated else ''}) for {entry.meal}{when}",
+        "/food", [f"/food-logs/{entry.id}"],
     ))
-    return {"logged": entry, "food": food.name, "serving_size": food.serving_size, "serving_unit": food.serving_unit}
+    result = {"logged": entry, "food": food.name, "serving_size": food.serving_size, "serving_unit": food.serving_unit}
+    if estimated:
+        result["note"] = ("This food isn't in any database: its numbers are an AI estimate, saved as the user's own "
+                          "food. Tell them it's an estimate.")
+    return result
 
 
 def _remove_food(ctx: ToolContext, args: dict) -> Any:
@@ -438,13 +493,20 @@ TOOLS = [
          {}, _points),
     Tool("log_food",
          "Add a food to the user's food log right away. Finds the food by name (their foods, the built-in list, then "
-         "online databases). Units: 'serving' (one normal portion, e.g. one banana), or g/kg/oz/lb for solids, "
-         "ml/l/cup/fl_oz for drinks.",
-         {"food": {"type": "string", "description": "e.g. 'banana', 'greek yogurt'"},
+         "online databases). Units: 'serving' (one normal portion, e.g. one banana or one egg), or g/kg/oz/lb for "
+         "solids, ml/l/cup/fl_oz for drinks. If the food isn't found, the result says so and nothing is logged: call "
+         "again with the *_per_100 estimates, serving_size and is_liquid filled in from your own knowledge.",
+         {"food": {"type": "string", "description": "A plain food name, e.g. 'banana', 'boiled egg', 'greek yogurt'"},
           "quantity": {"type": "number", "description": "How many units; default 1."},
           "unit": {"type": "string", "description": "serving, g, kg, oz, lb, ml, l, cup...; default serving."},
           "meal": {"type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"]},
-          "date": {"type": "string", "description": "YYYY-MM-DD; default today."}},
+          "date": {"type": "string", "description": "YYYY-MM-DD; default today."},
+          "calories_per_100": {"type": "number", "description": "Only for a food that wasn't found: kcal per 100 g (or 100 ml)."},
+          "protein_per_100": {"type": "number", "description": "Only for a food that wasn't found: grams per 100 g/ml."},
+          "carbs_per_100": {"type": "number", "description": "Only for a food that wasn't found: grams per 100 g/ml."},
+          "fat_per_100": {"type": "number", "description": "Only for a food that wasn't found: grams per 100 g/ml."},
+          "serving_size": {"type": "number", "description": "Only for a food that wasn't found: grams (or ml) in one normal serving."},
+          "is_liquid": {"type": "boolean", "description": "Only for a food that wasn't found: true for a drink."}},
          _log_food, required=["food"]),
     Tool("remove_food_entry",
          "Remove one entry from the food log, by its id from get_food_day. Only when the user asks.",
