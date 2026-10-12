@@ -8,6 +8,7 @@ import { GymPicker, GymScanFlow, MachineTaken } from "@/components/GymParts";
 import { ExercisePhoto } from "@/components/ExercisePhoto";
 import { RestTimerPanel } from "@/components/RestTimer";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
+import { ScreenshotImport } from "@/components/SnapParts";
 import {
   Badge,
   Button,
@@ -18,6 +19,7 @@ import {
   FadeIn,
   Field,
   IconButton,
+  LinkButton,
   ListRow,
   Row,
   Screen,
@@ -38,6 +40,7 @@ import {
   deleteSet,
   deleteWorkout,
   finishWorkout,
+  removeCustomDay,
   restoreSet,
   setWorkoutGym,
   startWorkout,
@@ -65,6 +68,7 @@ type SheetState =
   | { kind: "taken"; exercise: PickedExercise }
   | { kind: "gym-pick" }
   | { kind: "gym-scan" }
+  | { kind: "screenshot" }
   | null;
 
 export default function Workouts() {
@@ -123,6 +127,18 @@ export default function Workouts() {
     try {
       const created = await startWorkout();
       if (created.gym_id !== at.id) await setWorkoutGym(created.id, at.id);
+      setPlan(created.id, { weekday: null, day });
+      setSheet(null);
+      haptics.impact();
+    } catch (e) {
+      toast(errorMessage(e) ?? "Couldn't start the workout");
+    }
+  };
+
+  /** a workout imported from a screenshot, started straight away */
+  const startImported = async (day: RoutineDay) => {
+    try {
+      const created = await startWorkout();
       setPlan(created.id, { weekday: null, day });
       setSheet(null);
       haptics.impact();
@@ -358,6 +374,18 @@ export default function Workouts() {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={t.muted} />
               </Pressable>
+              <Pressable
+                onPress={() => setSheet({ kind: "screenshot" })}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.gymLink, { borderTopColor: t.border, marginTop: 0, opacity: pressed ? 0.6 : 1 }]}
+              >
+                <Ionicons name="phone-portrait-outline" size={18} color={t.text2} />
+                <View style={{ flex: 1 }}>
+                  <Txt style={{ fontWeight: "600" }}>Workout from a screenshot</Txt>
+                  <Txt variant="small">Saw one on Instagram or TikTok? Turn it into a session.</Txt>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              </Pressable>
             </Card>
           )}
 
@@ -501,6 +529,18 @@ export default function Workouts() {
       </Sheet>
       <Sheet visible={sheet?.kind === "gym-scan"} title="Photograph a gym" onClose={() => setSheet(null)}>
         {sheet?.kind === "gym-scan" ? <GymScanStart onStart={startGymSession} /> : null}
+      </Sheet>
+      <Sheet visible={sheet?.kind === "screenshot"} title="Workout from a screenshot" onClose={() => setSheet(null)}>
+        {sheet?.kind === "screenshot" && routine ? (
+          <ScreenshotImport
+            routine={routine}
+            onStart={startImported}
+            onSaved={(weekday) => {
+              setSheet(null);
+              setOpenDay(weekday);
+            }}
+          />
+        ) : null}
       </Sheet>
       <Sheet visible={sheet?.kind === "edit-set"} title="Edit set" onClose={() => setSheet(sheet?.kind === "edit-set" ? sheet.back : null)}>
         {sheet?.kind === "edit-set" ? (
@@ -698,7 +738,7 @@ function WeekPlan({
                     {d.title}
                   </Txt>
                   <Txt variant="tiny" numberOfLines={1}>
-                    {d.custom_name ? `${d.focus_label} · ` : ""}
+                    {d.custom_exercises ? "Your own exercises · " : d.custom_name ? `${d.focus_label} · ` : ""}
                     {plural(d.exercises.length, "exercise")}
                     {d.cardio_minutes ? ` · ${d.cardio_minutes} min cardio` : ""}
                   </Txt>
@@ -730,6 +770,7 @@ function WeekPlan({
                       />
                     </Row>
                   ))}
+                  {d.custom_exercises ? <CustomDayNote day={d} /> : null}
                 </View>
               ) : null}
             </View>
@@ -750,6 +791,32 @@ function WeekPlan({
         ))}
       </View>
     </>
+  );
+}
+
+/** A day with the user's own exercises (e.g. from a screenshot): switch back to the suggested ones. */
+function CustomDayNote({ day }: { day: RoutineDay }) {
+  const toast = useToast();
+  const restore = async () => {
+    const ok = await confirm(
+      `Use the suggested exercises on ${day.weekday}?`,
+      `“${day.title}” is replaced by the exercises the app picks for your plan.`,
+      "Use suggested",
+      false,
+    );
+    if (!ok) return;
+    try {
+      await removeCustomDay(day.weekday_index);
+      toast(`${day.weekday} uses the suggested exercises again`);
+    } catch (e) {
+      toast(errorMessage(e) ?? "Couldn't change the day");
+    }
+  };
+  return (
+    <View style={{ marginTop: space.sm, gap: space.xs }}>
+      <Txt variant="tiny">You chose these exercises (e.g. from a screenshot).</Txt>
+      <LinkButton title="Use the suggested exercises instead" onPress={restore} />
+    </View>
   );
 }
 

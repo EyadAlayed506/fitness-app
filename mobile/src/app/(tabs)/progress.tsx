@@ -3,6 +3,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Chart, ChartCard, type ChartSeries } from "@/components/charts";
+import { InsightsView } from "@/components/Insights";
 import { SleepChart } from "@/components/SleepParts";
 import { WeeklySummaryCard } from "@/components/WeeklySummary";
 import {
@@ -47,13 +48,14 @@ interface Data {
   sleep: SleepAnalytics;
 }
 
-type View_ = "week" | "body" | "food" | "strength" | "sleep";
+type View_ = "week" | "body" | "food" | "strength" | "sleep" | "insights";
 const VIEWS: { value: View_; label: string }[] = [
   { value: "week", label: "Week" },
   { value: "body", label: "Body" },
   { value: "food", label: "Food" },
   { value: "strength", label: "Strength" },
   { value: "sleep", label: "Sleep" },
+  { value: "insights", label: "Insights" },
 ];
 
 const hasValues = (series: { data: (number | null)[] }[]) => series.some((s) => s.data.some((v) => v != null && v !== 0));
@@ -173,6 +175,7 @@ export default function Progress() {
       <ErrorText message={error} />
 
       {view === "week" ? <WeeklySummaryCard /> : null}
+      {view === "insights" ? <InsightsView /> : null}
 
       {view === "body" ? (
         <FadeIn key="body">

@@ -14,6 +14,7 @@ import type {
   GettingStarted,
   Gym,
   GymInventory,
+  Insights,
   MachinePhoto,
   MachineSetting,
   PhotoMatchStatus,
@@ -69,6 +70,8 @@ export const useSleepAnalytics = (days: number) =>
   });
 export const useGettingStarted = () =>
   useQuery({ queryKey: qk.gettingStarted, queryFn: () => api<GettingStarted>(`/me/getting-started?tz_offset=${tzOffset()}`) });
+export const useInsights = () =>
+  useQuery({ queryKey: qk.insights, queryFn: () => api<Insights>(`/analytics/insights?tz_offset=${tzOffset()}`) });
 export const useAssistant = () => useQuery({ queryKey: qk.assistant, queryFn: () => api<AssistantStatus>("/assistant") });
 export const useGyms = () => useQuery({ queryKey: qk.gyms, queryFn: () => api<Gym[]>("/gyms") });
 /** The gym the user is at: the workout's gym while one is in progress, else the default gym. */
@@ -296,6 +299,21 @@ function afterFoodChange(date: string) {
   invalidate(qk.foodDay(date), qk.foodRecent, ...derivedKeys);
 }
 
+/** Log a dish from the menu scanner (saved as the user's own food, marked as an estimate). */
+export async function logMenuDish(body: {
+  name: string;
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  meal: Meal;
+  date: string;
+}): Promise<FoodLogEntry> {
+  const entry = await api<FoodLogEntry>("/snap/menu/log", { method: "POST", body });
+  afterFoodChange(body.date);
+  return entry;
+}
+
 /** Log a food. `preview` (calories etc. worked out on the phone) shows in the day until the server answers. */
 export async function addFood(
   body: { food_id: number; quantity: number; unit: string; meal: Meal; date: string },
@@ -400,4 +418,25 @@ export function afterCoachActions(kinds: string[]) {
   if (kinds.some((k) => k === "sets" || k === "removed")) keys.push(qk.workouts, ["exercise-history"], ["workout"]);
   if (kinds.includes("sleep")) keys.push(qk.sleep);
   invalidate(...keys);
+}
+
+// ---------- plan days with the user's own exercises ----------
+
+/** Use these exercises on a training day instead of the generated ones (e.g. imported from a screenshot). */
+export async function saveCustomDay(
+  weekday: number,
+  body: { title: string; exercises: { exercise_id: number; sets: number; reps: string }[] },
+): Promise<Routine> {
+  const routine = await api<Routine>(`/me/schedule/days/${weekday}`, { method: "PUT", body });
+  queryClient.setQueryData(qk.routine, routine);
+  invalidate(...derivedKeys);
+  return routine;
+}
+
+/** Back to the generated exercises for a training day. */
+export async function removeCustomDay(weekday: number): Promise<Routine> {
+  const routine = await api<Routine>(`/me/schedule/days/${weekday}`, { method: "DELETE" });
+  queryClient.setQueryData(qk.routine, routine);
+  invalidate(...derivedKeys);
+  return routine;
 }

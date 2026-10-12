@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useWorkouts } from "@/lib/data";
 import { cancelRestEnd, scheduleRestEnd } from "@/lib/restNotifications";
 import { formatRest, remainingMs, type RestTimerState } from "@/lib/restTimer";
+import { speak } from "@/lib/speech";
 import { storage } from "@/lib/storage";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { RoutineDay } from "@/lib/types";
@@ -36,6 +37,8 @@ interface WorkoutSessionValue {
   swap: (workoutId: number, fromId: number, to: PickedExercise) => void;
   /** forget the plan day of a workout that was finished or discarded */
   clearPlanDay: (workoutId: number) => void;
+  /** hands-free: say this out loud when the rest is over (null: say nothing) */
+  announceAfterRest: (text: string | null) => void;
 }
 
 const WorkoutSessionContext = createContext<WorkoutSessionValue | null>(null);
@@ -47,9 +50,17 @@ export function WorkoutSessionProvider({ children }: { children: ReactNode }) {
   const toast = useToast();
   const { data } = useWorkouts();
   const activeId = data?.active?.id ?? null;
-  const timer = useRestTimer((name) =>
-    toast(name ? `Rest is over. Time for your next set of ${name}` : "Rest is over. Time for your next set"),
-  );
+  // hands-free sets: what to say when the rest is over (through headphones if they're connected)
+  const announcement = useRef<string | null>(null);
+  const announceAfterRest = useCallback((text: string | null) => {
+    announcement.current = text;
+  }, []);
+  const timer = useRestTimer((name, late) => {
+    toast(name ? `Rest is over. Time for your next set of ${name}` : "Rest is over. Time for your next set");
+    const text = announcement.current;
+    announcement.current = null;
+    if (text && !late) void speak(`Rest is over. ${text}`);
+  });
   useRestNotification(timer.state);
 
   // What the workout follows is remembered on this device per workout (e.g. after the app restarts)
@@ -91,8 +102,8 @@ export function WorkoutSessionProvider({ children }: { children: ReactNode }) {
 
   const planDay = plan?.weekday ?? null;
   const value = useMemo(
-    () => ({ timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay }),
-    [timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay],
+    () => ({ timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay, announceAfterRest }),
+    [timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay, announceAfterRest],
   );
   return <WorkoutSessionContext.Provider value={value}>{children}</WorkoutSessionContext.Provider>;
 }

@@ -5,6 +5,7 @@ import { View } from "react-native";
 
 import { CustomFoodForm, FoodDetail, FoodSearch, MEALS } from "@/components/FoodParts";
 import { MacroBars } from "@/components/MacroBars";
+import { MenuScanner } from "@/components/SnapParts";
 import {
   Button,
   Card,
@@ -35,6 +36,7 @@ type SheetState =
   | { kind: "detail"; food: Food; meal: Meal; portion?: { quantity: number; unit: string } }
   | { kind: "custom"; meal: Meal }
   | { kind: "edit"; entry: FoodLogEntry }
+  | { kind: "menu" }
   | null;
 
 export default function FoodLog() {
@@ -185,6 +187,18 @@ export default function FoodLog() {
               </Card>
             );
           })}
+          {isToday ? (
+            <Card onPress={() => setSheet({ kind: "menu" })}>
+              <Row gap={space.md}>
+                <Ionicons name="restaurant-outline" size={20} color={t.text2} />
+                <View style={{ flex: 1 }}>
+                  <Txt>Eating out? Scan the menu</Txt>
+                  <Txt variant="tiny">See which dishes fit what&apos;s left today (estimates)</Txt>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              </Row>
+            </Card>
+          ) : null}
           <Card onPress={() => setSheet({ kind: "custom", meal: "snack" })}>
             <Row gap={space.md}>
               <Ionicons name="create-outline" size={20} color={t.text2} />
@@ -217,6 +231,16 @@ export default function FoodLog() {
             onAdded={(saved) => {
               setSheet(null);
               undoable(`${sheet.food.name} added`, () => deleteFood(saved));
+            }}
+          />
+        ) : null}
+      </Sheet>
+      <Sheet visible={sheet?.kind === "menu"} title="Scan a menu" onClose={() => setSheet(null)}>
+        {sheet?.kind === "menu" ? (
+          <MenuScanner
+            onLogged={(entry) => {
+              setSheet(null);
+              undoable(`${entry.food_name} logged to ${entry.meal} (estimate)`, () => deleteFood(entry));
             }}
           />
         ) : null}

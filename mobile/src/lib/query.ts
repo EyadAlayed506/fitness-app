@@ -55,6 +55,7 @@ export const qk = {
   machinePhotos: ["photo-memory", "photos"] as const,
   photoStatus: ["photo-memory", "status"] as const,
   alternatives: (exerciseId: number) => ["alternatives", exerciseId] as const,
+  insights: ["insights"] as const,
 };
 
 /** Everything that depends on logged workouts, food, sleep or weight (recommendations, points, charts). */
@@ -63,6 +64,7 @@ export const derivedKeys: QueryKey[] = [
   qk.points,
   qk.gettingStarted,
   qk.progress,
+  qk.insights,
   ["weekly"],
 ];
 

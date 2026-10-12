@@ -98,6 +98,8 @@ export interface RoutineDay {
   custom_name: boolean;
   exercises: RoutineExercise[];
   cardio_minutes: number;
+  /** the user's own exercises (e.g. imported from a screenshot) instead of the generated ones */
+  custom_exercises?: boolean;
 }
 
 export interface Exercise {
@@ -610,4 +612,78 @@ export interface Alternative {
   match: "similar" | "different";
   reasons: string[];
   differences: string[];
+}
+
+// ---------- snap and say ----------
+
+export interface ScreenshotItem {
+  /** as written in the screenshot */
+  text: string;
+  /** the catalogue match; null when the user must pick one */
+  exercise: Exercise | null;
+  sets: number;
+  reps: string;
+  confidence: number;
+}
+
+export interface ScreenshotRoutine {
+  title: string;
+  items: ScreenshotItem[];
+  model: string;
+}
+
+export interface WeightReading {
+  kind: "pin_stack" | "barbell" | "dumbbell" | "other";
+  /** null when it couldn't be read */
+  weight: number | null;
+  unit: "kg" | "lb" | null;
+  details: string;
+  confidence: number;
+  model: string;
+}
+
+export interface MenuDish {
+  name: string;
+  description: string;
+  /** estimates for one restaurant portion */
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  /** 0 to 1: how well it fits what's left of today */
+  fit: number;
+  verdict: string;
+}
+
+export interface MenuScan {
+  dishes: MenuDish[];
+  remaining_calories: number;
+  remaining_protein_g: number;
+  seen: string;
+  model: string;
+  note: string;
+}
+
+export interface InsightGroup {
+  label: string;
+  n: number;
+  value: number;
+  unit: string;
+}
+
+export interface Insight {
+  id: string;
+  title: string;
+  text: string;
+  groups: InsightGroup[];
+  /** "clear", "could be chance", or "count" (a plain count, no comparison) */
+  strength: string;
+  caution: string;
+}
+
+export interface Insights {
+  insights: Insight[];
+  /** findings that need more data, and how much */
+  not_enough: string[];
+  note: string;
 }
