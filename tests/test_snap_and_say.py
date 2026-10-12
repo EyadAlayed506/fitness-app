@@ -115,6 +115,12 @@ def test_rank_dishes():
     assert [d["name"] for d in ranked] == ["Chicken salad", "Soup", "Burger"]
     assert "more than the 800 left" in ranked[-1]["verdict"]
     assert all(0 <= d["fit"] <= 1 for d in ranked)
+    # plenty left, but one dish is more than a usual meal: it scores lower and says so
+    big = rank_dishes(dishes[1:] + [{"name": "Lasagne", "calories": 950, "protein_g": 42, "carbs_g": 80, "fat_g": 48}],
+                      remaining_kcal=1314, remaining_protein=98, daily_target=2400)
+    lasagne = next(d for d in big if d["name"] == "Lasagne")
+    assert lasagne["fit"] < 0.7 and "a big meal, 72% of the 1314 left" in lasagne["verdict"]
+    assert big[0]["name"] == "Chicken salad"
     # nothing left today: the lightest fits best
     done = rank_dishes(dishes, remaining_kcal=-100, remaining_protein=0, daily_target=2400)
     assert done[0]["name"] == "Soup" and "at today's target" in done[0]["verdict"]

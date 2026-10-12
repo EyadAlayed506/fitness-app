@@ -192,7 +192,7 @@ def rank_dishes(dishes: list[dict], remaining_kcal: float, remaining_protein: fl
     """How well each dish fits what's left of today. Best fit first.
 
     - Calories: a meal budget of about 35% of the day (or what's left, if less). Within it is fine; over it
-      scores lower, and over what's left today scores much lower.
+      scores lower the further over it is, and over what's left today scores much lower.
     - Protein: more protein per calorie, and enough of it for this meal, score higher.
     - Already at today's target: the smaller the dish, the better.
     """
@@ -207,15 +207,18 @@ def rank_dishes(dishes: list[dict], remaining_kcal: float, remaining_protein: fl
             fit = 0.8 * max(0.0, 1 - kcal / 1000) + 0.2 * density
             verdict = f"You're at today's target; about {round(kcal)} kcal"
         else:
-            calorie_fit = 1.0 if kcal <= budget else max(0.0, 1 - (kcal - budget) / budget)
+            calorie_fit = 1.0 if kcal <= budget else max(0.0, 1 - 2 * (kcal - budget) / budget)
             if kcal > remaining_kcal:
                 calorie_fit *= 0.4
             fit = 0.5 * calorie_fit + 0.25 * density + 0.25 * amount
-            verdict = (
-                f"About {round(kcal)} kcal: more than the {round(remaining_kcal)} left today"
-                if kcal > remaining_kcal
-                else f"About {round(kcal)} of your {round(remaining_kcal)} kcal left, {round(protein)} g protein"
-            )
+            if kcal > budget:
+                fit = min(fit, 0.65)  # more than a usual meal is never a "good fit", however much protein it has
+            if kcal > remaining_kcal:
+                verdict = f"About {round(kcal)} kcal: more than the {round(remaining_kcal)} left today"
+            elif kcal > budget:
+                verdict = f"About {round(kcal)} kcal: a big meal, {round(kcal / remaining_kcal * 100)}% of the {round(remaining_kcal)} left today"
+            else:
+                verdict = f"About {round(kcal)} of your {round(remaining_kcal)} kcal left, {round(protein)} g protein"
         ranked.append({**d, "fit": round(fit, 2), "verdict": verdict})
     ranked.sort(key=lambda d: -d["fit"])
     return ranked
