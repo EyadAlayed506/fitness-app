@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,10 +29,16 @@ class Settings(BaseSettings):
     whoop_client_secret: str = ""
     whoop_redirect_uri: str = "http://localhost:8000/api/whoop/callback"
     whoop_base_url: str = "https://api.prod.whoop.com"  # only changed for testing against a fake WHOOP
-    # Assistant (optional): an API key from https://console.anthropic.com. Every question costs money.
+    # Coach assistant. "auto": Claude when anthropic_api_key is set, otherwise Ollama on this PC.
+    assistant_provider: Literal["auto", "claude", "ollama"] = "auto"
+    # Claude (paid): an API key from https://console.anthropic.com
     anthropic_api_key: str = ""
     assistant_model: str = "claude-opus-5-5"
-    assistant_daily_limit: int = 50  # questions per user per 24 hours, to keep the bill predictable
+    assistant_daily_limit: int = 50  # Claude questions per user per 24 hours, to keep the bill predictable
+    # Ollama (free, runs on this PC): https://ollama.com, then `ollama pull <model>`
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen3:8b"
+    ollama_num_ctx: int = 16384  # context size; more fits more data but needs more GPU memory
 
     @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri", "anthropic_api_key")
     @classmethod

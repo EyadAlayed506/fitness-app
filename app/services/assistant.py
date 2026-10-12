@@ -1,18 +1,22 @@
-"""The fitness assistant: a chat with Claude that can look at the user's own data through read-only tools.
+"""The fitness assistant: a chat with an AI that can look at the user's own data through read-only tools.
 
 Each tool calls the same code as the app's API (so answers match what the screens show) and only ever
 reads the logged-in user's data. Nothing is written except the conversation itself. The model is told
 to say when data is missing instead of guessing, and not to give medical advice.
 
-Needs an Anthropic API key (ANTHROPIC_API_KEY in .env). Every message costs money; see the README.
+Two backends answer the same way, with the same tools and rules:
+- ClaudeBackend: Claude through Anthropic's API (needs ANTHROPIC_API_KEY; every question costs money).
+- OllamaBackend: a free model running on the user's own PC through Ollama (weaker answers, data stays local).
 """
 
 import datetime as dt
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlmodel import Session
@@ -248,7 +252,7 @@ TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 TOOL_SCHEMAS = [t.schema() for t in TOOLS]
 
 
-def run_tool(ctx: ToolContext, name: str, args: dict) -> tuple[str, bool]:
+def run_tool(ctx: ToolContext, name: str, args: dict, max_chars: int = MAX_TOOL_RESULT_CHARS) -> tuple[str, bool]:
     """Run a tool and return (JSON text, is_error)."""
     tool = TOOLS_BY_NAME.get(name)
     if tool is None:
@@ -260,8 +264,8 @@ def run_tool(ctx: ToolContext, name: str, args: dict) -> tuple[str, bool]:
     except HTTPException as e:  # e.g. "Exercise not found" from the API code
         return str(e.detail), True
     text = json.dumps(jsonable_encoder(data), separators=(",", ":"), ensure_ascii=False)
-    if len(text) > MAX_TOOL_RESULT_CHARS:
-        text = text[:MAX_TOOL_RESULT_CHARS] + " ... [cut short: ask for fewer days]"
+    if len(text) > max_chars:
+        text = text[:max_chars] + " ... [cut short: ask for fewer days]"
     return text, False
 
 
@@ -274,49 +278,186 @@ class Answer:
     tools_used: list[str]
 
 
+class AssistantError(Exception):
+    """The AI service couldn't answer; `detail` says why in words the user can act on."""
+
+    def __init__(self, status: int, detail: str):
+        super().__init__(detail)
+        self.status = status
+        self.detail = detail
+
+
 def _context_note(ctx: ToolContext) -> str:
     units = "imperial (lb, in)" if ctx.profile.unit_system == "imperial" else "metric (kg, cm)"
     return f"(App note: today is {ctx.today.strftime('%A')} {ctx.today.isoformat()} for the user; their units are {units}.)"
 
 
-def ask(client: Any, model: str, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
-    """Answer one question. `history` is earlier (role, text) pairs, oldest first. Calls Claude with tools
-    until it gives a final answer (at most MAX_TOOL_ROUNDS model calls)."""
-    messages: list[dict] = [{"role": role, "content": text} for role, text in history[-HISTORY_MESSAGES:]]
-    messages.append({"role": "user", "content": [
-        {"type": "text", "text": question},
-        {"type": "text", "text": _context_note(ctx)},
-    ]})
-    used: list[str] = []
-    for _ in range(MAX_TOOL_ROUNDS):
-        response = client.beta.messages.create(
-            model=model,
-            max_tokens=MAX_TOKENS,
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            tools=TOOL_SCHEMAS,
-            messages=messages,
-            output_config={"effort": "medium"},
-            cache_control={"type": "ephemeral"},  # also cache the growing conversation within this question
-            # if Claude declines for safety reasons, the API retries on another model in the same call
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-        )
-        if response.stop_reason == "refusal":
-            return Answer("Sorry, I can't help with that one. For health worries, please talk to a professional.", used)
-        if response.stop_reason in ("tool_use", "pause_turn"):
-            # keep the whole reply (including any thinking blocks) unchanged, then add the tool results
-            messages.append({"role": "assistant", "content": response.content})
-            results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    used.append(block.name)
-                    text, is_error = run_tool(ctx, block.name, block.input)
-                    results.append({"type": "tool_result", "tool_use_id": block.id, "content": text, "is_error": is_error})
-            if results:
-                messages.append({"role": "user", "content": results})
-            continue
-        text = "\n\n".join(b.text for b in response.content if b.type == "text").strip()
-        if response.stop_reason == "max_tokens":
-            text += "\n\n(My answer got cut off. Ask me to continue or to keep it shorter.)"
-        return Answer(text or "Sorry, I don't have an answer for that.", used)
-    return Answer("Sorry, that took too many steps. Could you ask in a simpler way?", used)
+CUT_OFF = "\n\n(My answer got cut off. Ask me to continue or to keep it shorter.)"
+TOO_MANY_STEPS = "Sorry, that took too many steps. Could you ask in a simpler way?"
+NO_ANSWER = "Sorry, I don't have an answer for that."
+
+
+class ClaudeBackend:
+    """Claude through Anthropic's API: the strongest answers; costs money per question."""
+
+    provider = "claude"
+    metered = True  # questions count toward ASSISTANT_DAILY_LIMIT
+
+    def __init__(self, client: Any, model: str):
+        self.client = client  # None when there is no API key
+        self.model = model
+
+    def problem(self) -> str | None:
+        if self.client is None:
+            return (
+                "The assistant isn't set up on this server yet. For Claude: get an API key at console.anthropic.com, "
+                "put it in the backend's .env file as ANTHROPIC_API_KEY and restart the backend."
+            )
+        return None
+
+    def ask(self, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
+        import anthropic
+
+        try:
+            return self._ask(ctx, history, question)
+        except anthropic.AuthenticationError:
+            raise AssistantError(502, "The Anthropic API key was refused. Check ANTHROPIC_API_KEY in .env.")
+        except anthropic.RateLimitError:
+            raise AssistantError(429, "The assistant is busy right now. Try again in a minute.")
+        except anthropic.APIStatusError as e:
+            raise AssistantError(502, f"The assistant couldn't answer ({e.status_code}): {e.message}")
+        except anthropic.APIConnectionError:
+            raise AssistantError(502, "Couldn't reach the assistant service. Check the internet connection.")
+
+    def _ask(self, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
+        """Calls Claude with tools until it gives a final answer (at most MAX_TOOL_ROUNDS model calls)."""
+        messages: list[dict] = [{"role": role, "content": text} for role, text in history[-HISTORY_MESSAGES:]]
+        messages.append({"role": "user", "content": [
+            {"type": "text", "text": question},
+            {"type": "text", "text": _context_note(ctx)},
+        ]})
+        used: list[str] = []
+        for _ in range(MAX_TOOL_ROUNDS):
+            response = self.client.beta.messages.create(
+                model=self.model,
+                max_tokens=MAX_TOKENS,
+                system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+                tools=TOOL_SCHEMAS,
+                messages=messages,
+                output_config={"effort": "medium"},
+                cache_control={"type": "ephemeral"},  # also cache the growing conversation within this question
+                # if Claude declines for safety reasons, the API retries on another model in the same call
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+            )
+            if response.stop_reason == "refusal":
+                return Answer("Sorry, I can't help with that one. For health worries, please talk to a professional.", used)
+            if response.stop_reason in ("tool_use", "pause_turn"):
+                # keep the whole reply (including any thinking blocks) unchanged, then add the tool results
+                messages.append({"role": "assistant", "content": response.content})
+                results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        used.append(block.name)
+                        text, is_error = run_tool(ctx, block.name, block.input)
+                        results.append({"type": "tool_result", "tool_use_id": block.id, "content": text, "is_error": is_error})
+                if results:
+                    messages.append({"role": "user", "content": results})
+                continue
+            text = "\n\n".join(b.text for b in response.content if b.type == "text").strip()
+            if response.stop_reason == "max_tokens":
+                text += CUT_OFF
+            return Answer(text or NO_ANSWER, used)
+        return Answer(TOO_MANY_STEPS, used)
+
+
+# Small local models have less room: shorter history and tool results
+OLLAMA_HISTORY_MESSAGES = 10
+OLLAMA_TOOL_RESULT_CHARS = 8_000
+OLLAMA_TOOLS = [{"type": "function", "function": {
+    "name": t["name"], "description": t["description"], "parameters": t["input_schema"],
+}} for t in TOOL_SCHEMAS]
+_THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
+
+
+class OllamaBackend:
+    """A model running on this PC through Ollama (https://ollama.com): free and private, weaker than Claude."""
+
+    provider = "ollama"
+    metered = False  # free: no daily limit
+
+    def __init__(self, http: httpx.Client, url: str, model: str, num_ctx: int):
+        self.http = http
+        self.url = url.rstrip("/")
+        self.model = model
+        self.num_ctx = num_ctx
+
+    def problem(self) -> str | None:
+        try:
+            r = self.http.get(f"{self.url}/api/tags", timeout=3)
+            r.raise_for_status()
+            names = {m.get("name") for m in r.json().get("models", [])}
+        except (httpx.HTTPError, ValueError):
+            return (
+                f"Ollama isn't running on this PC (nothing answered at {self.url}). Start the Ollama app, "
+                "or install it from ollama.com, then try again."
+            )
+        if self.model not in names and f"{self.model}:latest" not in names:
+            return f"The model {self.model} isn't downloaded yet. Open a terminal and run: ollama pull {self.model}"
+        return None
+
+    def ask(self, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
+        messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages += [{"role": role, "content": text} for role, text in history[-OLLAMA_HISTORY_MESSAGES:]]
+        messages.append({"role": "user", "content": f"{question}\n\n{_context_note(ctx)}"})
+        used: list[str] = []
+        for _ in range(MAX_TOOL_ROUNDS):
+            reply = self._chat(messages)
+            message = reply.get("message") or {}
+            calls = message.get("tool_calls") or []
+            if calls:
+                messages.append({"role": "assistant", "content": message.get("content", ""), "tool_calls": calls})
+                for call in calls:
+                    fn = call.get("function") or {}
+                    name, args = fn.get("name", ""), fn.get("arguments") or {}
+                    if isinstance(args, str):  # some models send the arguments as a JSON string
+                        try:
+                            args = json.loads(args)
+                        except ValueError:
+                            args = {}
+                    used.append(name)
+                    text, is_error = run_tool(ctx, name, args, OLLAMA_TOOL_RESULT_CHARS)
+                    messages.append({"role": "tool", "tool_name": name, "content": f"Error: {text}" if is_error else text})
+                continue
+            text = _THINK.sub("", message.get("content") or "").strip()
+            if reply.get("done_reason") == "length":
+                text += CUT_OFF
+            return Answer(text or NO_ANSWER, used)
+        return Answer(TOO_MANY_STEPS, used)
+
+    def _chat(self, messages: list[dict]) -> dict:
+        try:
+            r = self.http.post(
+                f"{self.url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "tools": OLLAMA_TOOLS,
+                    "stream": False,
+                    "options": {"num_ctx": self.num_ctx},  # room for the tools, the history and the data
+                },
+                timeout=300,  # a local model can take a while, especially the first time it loads
+            )
+        except httpx.TimeoutException:
+            raise AssistantError(504, "The local AI took too long to answer. Try a shorter question or a smaller model.")
+        except httpx.HTTPError:
+            raise AssistantError(502, f"Couldn't reach Ollama at {self.url}. Is the Ollama app running?")
+        if r.status_code == 404:
+            raise AssistantError(502, f"The model {self.model} isn't downloaded. Run: ollama pull {self.model}")
+        if r.status_code >= 400:
+            try:
+                detail = r.json().get("error", r.text)
+            except ValueError:
+                detail = r.text
+            raise AssistantError(502, f"The local AI couldn't answer: {detail}")
+        return r.json()

@@ -1,7 +1,9 @@
 import datetime as dt
-from typing import Annotated, Any
+from collections.abc import Iterator
+from typing import Annotated
 
 import anthropic
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, delete, func, select
 
@@ -20,19 +22,29 @@ from app.services.activity import TzOffset
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
-NOT_SET_UP = (
-    "The assistant isn't set up on this server yet: get an API key at console.anthropic.com, put it in the "
-    "backend's .env file as ANTHROPIC_API_KEY and restart the backend."
-)
+Backend = assistant.ClaudeBackend | assistant.OllamaBackend
 
 
-def get_assistant_client() -> Any:
-    """The Claude API client, or None when no API key is set. Tests replace this with a fake."""
-    key = get_settings().anthropic_api_key
-    return anthropic.Anthropic(api_key=key, timeout=90.0, max_retries=2) if key else None
+def chosen_provider() -> str:
+    """ASSISTANT_PROVIDER, where "auto" means Claude when an API key is set and Ollama otherwise."""
+    s = get_settings()
+    if s.assistant_provider != "auto":
+        return s.assistant_provider
+    return "claude" if s.anthropic_api_key else "ollama"
 
 
-AssistantClient = Annotated[Any, Depends(get_assistant_client)]
+def get_assistant_backend() -> Iterator[Backend]:
+    """The AI that answers: Claude (online) or Ollama (on this PC). Tests replace this with a fake."""
+    s = get_settings()
+    if chosen_provider() == "claude":
+        client = anthropic.Anthropic(api_key=s.anthropic_api_key, timeout=90.0, max_retries=2) if s.anthropic_api_key else None
+        yield assistant.ClaudeBackend(client, s.assistant_model)
+        return
+    with httpx.Client() as http:
+        yield assistant.OllamaBackend(http, s.ollama_url, s.ollama_model, s.ollama_num_ctx)
+
+
+AssistantBackend = Annotated[Backend, Depends(get_assistant_backend)]
 
 
 def _public(m: ChatMessage) -> ChatMessagePublic:
@@ -42,7 +54,10 @@ def _public(m: ChatMessage) -> ChatMessagePublic:
     )
 
 
-def _left_today(session: Session, user_id: int) -> int:
+def _left_today(session: Session, user_id: int, backend: Backend) -> int | None:
+    """Questions left in the last 24 hours, or None when there's no limit (a free local model)."""
+    if not backend.metered:
+        return None
     since = dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
     asked = session.exec(
         select(func.count()).select_from(ChatMessage).where(
@@ -53,14 +68,17 @@ def _left_today(session: Session, user_id: int) -> int:
 
 
 @router.get("", response_model=AssistantStatus)
-def read_conversation(user: CurrentUser, session: SessionDep, client: AssistantClient):
+def read_conversation(user: CurrentUser, session: SessionDep, backend: AssistantBackend):
     messages = session.exec(
         select(ChatMessage).where(ChatMessage.user_id == user.id).order_by(ChatMessage.id)
     ).all()
+    problem = backend.problem()
     return AssistantStatus(
-        configured=client is not None,
-        model=get_settings().assistant_model,
-        messages_left_today=_left_today(session, user.id),
+        configured=problem is None,
+        problem=problem,
+        provider=backend.provider,
+        model=backend.model,
+        messages_left_today=_left_today(session, user.id, backend),
         messages=[_public(m) for m in messages],
         disclaimer=assistant.DISCLAIMER,
     )
@@ -72,13 +90,15 @@ def send_message(
     user: CurrentUser,
     profile: CurrentProfile,
     session: SessionDep,
-    client: AssistantClient,
+    backend: AssistantBackend,
     tz_offset: TzOffset = None,
 ):
     """Ask the assistant something. It can read (never change) this user's data to answer."""
-    if client is None:
-        raise HTTPException(status_code=503, detail=NOT_SET_UP)
-    if _left_today(session, user.id) <= 0:
+    problem = backend.problem()
+    if problem:
+        raise HTTPException(status_code=503, detail=problem)
+    left = _left_today(session, user.id, backend)
+    if left is not None and left <= 0:
         raise HTTPException(
             status_code=429,
             detail=f"You've asked {get_settings().assistant_daily_limit} questions in the last 24 hours. Try again later.",
@@ -89,15 +109,9 @@ def send_message(
     ]
     ctx = assistant.ToolContext(session=session, user=user, profile=profile, tz_offset=tz_offset)
     try:
-        answer = assistant.ask(client, get_settings().assistant_model, ctx, history, data.text.strip())
-    except anthropic.AuthenticationError:
-        raise HTTPException(status_code=502, detail="The Anthropic API key was refused. Check ANTHROPIC_API_KEY in .env.")
-    except anthropic.RateLimitError:
-        raise HTTPException(status_code=429, detail="The assistant is busy right now. Try again in a minute.")
-    except anthropic.APIStatusError as e:
-        raise HTTPException(status_code=502, detail=f"The assistant couldn't answer ({e.status_code}): {e.message}")
-    except anthropic.APIConnectionError:
-        raise HTTPException(status_code=502, detail="Couldn't reach the assistant service. Check the internet connection.")
+        answer = backend.ask(ctx, history, data.text.strip())
+    except assistant.AssistantError as e:
+        raise HTTPException(status_code=e.status, detail=e.detail)
 
     # saved only once there's an answer, so a failed request leaves no half conversation
     question = ChatMessage(user_id=user.id, role="user", text=data.text.strip())
@@ -107,7 +121,9 @@ def send_message(
     session.commit()
     session.refresh(question)
     session.refresh(reply)
-    return ChatReply(question=_public(question), answer=_public(reply), messages_left_today=_left_today(session, user.id))
+    return ChatReply(
+        question=_public(question), answer=_public(reply), messages_left_today=_left_today(session, user.id, backend)
+    )
 
 
 @router.delete("/messages", status_code=204)

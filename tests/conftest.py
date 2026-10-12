@@ -12,9 +12,10 @@ from app.database import get_session
 from app.main import app
 from app.models.sleep import SleepEntry
 from app.models.workout import WorkoutSession, WorkoutSet
-from app.routers.assistant import get_assistant_client
+from app.routers.assistant import get_assistant_backend
 from app.routers.foods import get_http_client
 from app.seed import seed_catalogue
+from app.services.assistant import ClaudeBackend
 
 USDA_RESPONSE = {
     "foods": [
@@ -88,7 +89,8 @@ def client(session):
 
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_http_client] = mock_http_client
-    app.dependency_overrides[get_assistant_client] = lambda: None  # never call the real Claude API in tests
+    # never call a real AI in tests: by default the assistant is "not set up"
+    app.dependency_overrides[get_assistant_backend] = lambda: ClaudeBackend(None, "claude-opus-5-5")
     yield TestClient(app)
     app.dependency_overrides.clear()
 

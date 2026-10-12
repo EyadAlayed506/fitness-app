@@ -109,18 +109,22 @@ The app imports the last 30 days, then syncs again when you open Home or the Sle
 
 ### Coach (AI chatbot)
 
-The **Coach** tab is a chat assistant for training, sleep and food. It runs on Claude (Anthropic's AI) and answers from your own logged data: it can read your profile and calorie plan, training plan, today's suggestions, workouts, lift history, the exercise library, sleep, food logs, weekly summary and points. It can't change anything in the app.
+The **Coach** tab is a chat assistant for training, sleep and food. It answers from your own logged data: it can read your profile and calorie plan, training plan, today's suggestions, workouts, lift history, the exercise library, sleep, food logs, weekly summary and points. It can't change anything in the app.
 
-To turn it on:
-1. Create an API key at https://console.anthropic.com (add a payment method; the API is pay-as-you-go).
-2. Put it in `.env` as `ANTHROPIC_API_KEY=...` and restart the backend. Its console says `Assistant: on`.
+It can run on two kinds of AI. `ASSISTANT_PROVIDER=auto` (the default) uses Claude when `ANTHROPIC_API_KEY` is set, otherwise Ollama.
 
-Settings: `ASSISTANT_MODEL` (default `claude-opus-5-5`) and `ASSISTANT_DAILY_LIMIT` (default 50 questions per user per 24 hours).
+**Free, on your PC (Ollama)**, the default:
+1. Install Ollama from https://ollama.com and leave it running.
+2. Download a model once: `ollama pull qwen3:8b` (about 5 GB; fits a 12 GB graphics card such as an RTX 4070 Super).
+3. Start the backend. Its console says `Coach: Ollama on this PC (qwen3:8b ...)`.
 
-Good to know:
-- **Cost:** every question is billed by Anthropic. With the default model a question usually costs a few US cents (more when it reads a lot of data). The daily limit keeps the bill predictable.
-- **Privacy:** to answer, the parts of your data the assistant looks at (sleep, food, workouts, profile) are sent to Anthropic's API. Don't turn it on for other people without telling them.
-- **It can be wrong.** It's told to quote your numbers, say when data is missing and not give medical advice, but it's still an AI.
+To try another model: `ollama pull <name>`, then set `OLLAMA_MODEL=<name>` in `.env` and restart. It needs a model that supports tools (e.g. `qwen3:8b`, `llama3.1:8b`). `OLLAMA_NUM_CTX` (default 16384) is how much text the model can look at once; lower it if your graphics card runs out of memory.
+
+Good to know: free, no daily limit, and your data stays on your PC. Answers are weaker than Claude's (it can misread numbers), and the first answer after starting is slow while the model loads. The backend and Ollama must be running for the phone app's Coach to work.
+
+**Paid, online (Claude):** create an API key at https://console.anthropic.com, put `ANTHROPIC_API_KEY=...` in `.env` and restart. Better answers; a question usually costs a few US cents and `ASSISTANT_DAILY_LIMIT` (default 50 per user per 24 hours) keeps the bill predictable. The data the assistant reads is sent to Anthropic. `ASSISTANT_MODEL` defaults to `claude-opus-5-5`.
+
+Either way it's an AI: it's told to quote your numbers, say when data is missing and not give medical advice, but it can still be wrong.
 
 ## Project layout
 

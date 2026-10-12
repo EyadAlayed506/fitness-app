@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Card, ErrorText, IconButton, Row, Txt } from "@/components/ui";
+import { Card, ErrorText, IconButton, LinkButton, Row, Txt } from "@/components/ui";
 import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
 import { tzOffset } from "@/lib/format";
@@ -84,7 +84,10 @@ export default function Coach() {
               <Text style={{ fontSize: 26, fontWeight: "800", letterSpacing: -0.5, color: t.text }} accessibilityRole="header">
                 Coach
               </Text>
-              <Txt variant="tiny">Ask about your training, sleep and food. It reads your logged data.</Txt>
+              <Txt variant="tiny">
+                Ask about your training, sleep and food. It reads your logged data.
+                {status ? (status.provider === "ollama" ? ` Runs on your PC (${status.model}).` : " Runs on Claude.") : ""}
+              </Txt>
             </View>
             {messages.length ? <IconButton icon="trash-outline" label="Clear conversation" onPress={clear} /> : null}
           </Row>
@@ -98,12 +101,13 @@ export default function Coach() {
           >
             {status && !status.configured ? (
               <Card>
-                <Txt variant="h3">The assistant isn&apos;t set up yet</Txt>
-                <Txt variant="small" style={{ marginTop: 6 }}>
-                  It runs on Claude (Anthropic&apos;s AI), which needs an API key. Whoever runs the backend: create a key at
-                  console.anthropic.com, put it in the backend&apos;s .env file as ANTHROPIC_API_KEY and restart the backend. Each
-                  question is billed by Anthropic.
+                <Txt variant="h3">The coach isn&apos;t ready yet</Txt>
+                <Txt variant="small" style={{ marginTop: 6 }} selectable>
+                  {status.problem}
                 </Txt>
+                <View style={{ marginTop: 10 }}>
+                  <LinkButton title="Check again" onPress={() => load().catch((e) => setError((e as Error).message))} />
+                </View>
               </Card>
             ) : null}
             {status?.configured && !messages.length && !pending ? (
@@ -129,7 +133,9 @@ export default function Coach() {
                 <Bubble message={{ id: -1, role: "user", text: pending, tools_used: [], created_at: "" }} />
                 <Row gap={8} style={{ paddingHorizontal: 4 }}>
                   <ActivityIndicator size="small" color={t.accent} />
-                  <Txt variant="small">Looking at your data…</Txt>
+                  <Txt variant="small">
+                    Looking at your data…{status?.provider === "ollama" ? " (a model on your PC can take up to a minute)" : ""}
+                  </Txt>
                 </Row>
               </>
             ) : null}
@@ -180,7 +186,8 @@ export default function Coach() {
                 </Pressable>
               </Row>
               <Txt variant="tiny" style={{ marginTop: 6 }}>
-                {status.disclaimer} {status.messages_left_today} questions left in the last 24 hours.
+                {status.disclaimer}
+                {status.messages_left_today != null ? ` ${status.messages_left_today} questions left in the last 24 hours.` : ""}
               </Txt>
             </View>
           ) : null}

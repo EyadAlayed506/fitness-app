@@ -30,9 +30,11 @@ class ChatMessagePublic(SQLModel):
 
 
 class AssistantStatus(SQLModel):
-    configured: bool  # the server has an Anthropic API key
+    configured: bool  # the AI is ready to answer
+    problem: str | None  # why not, and how to fix it
+    provider: Literal["claude", "ollama"]
     model: str
-    messages_left_today: int
+    messages_left_today: int | None  # None: no limit (a free local model)
     messages: list[ChatMessagePublic]
     disclaimer: str
 
@@ -40,4 +42,4 @@ class AssistantStatus(SQLModel):
 class ChatReply(SQLModel):
     question: ChatMessagePublic
     answer: ChatMessagePublic
-    messages_left_today: int
+    messages_left_today: int | None

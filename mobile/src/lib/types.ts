@@ -451,8 +451,13 @@ export interface ChatMessage {
 
 export interface AssistantStatus {
   configured: boolean;
+  /** why the assistant can't answer yet, and how to fix it */
+  problem: string | null;
+  /** "ollama": a free model on the user's PC; "claude": Anthropic's API (paid) */
+  provider: "claude" | "ollama";
   model: string;
-  messages_left_today: number;
+  /** null: no limit (local model) */
+  messages_left_today: number | null;
   messages: ChatMessage[];
   disclaimer: string;
 }
@@ -460,5 +465,5 @@ export interface AssistantStatus {
 export interface ChatReply {
   question: ChatMessage;
   answer: ChatMessage;
-  messages_left_today: number;
+  messages_left_today: number | null;
 }

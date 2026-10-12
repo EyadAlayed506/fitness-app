@@ -24,6 +24,7 @@ from app.routers import (
     whoop,
     workouts,
 )
+from app.routers.assistant import chosen_provider
 from app.seed import seed_catalogue
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -40,10 +41,10 @@ async def lifespan(app: FastAPI):
         log.info("WHOOP: on (redirect URL %s)", s.whoop_redirect_uri)
     else:
         log.warning("WHOOP: off. To turn it on, put WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET in %s and restart", PROJECT_ENV)
-    if s.anthropic_api_key:
-        log.info("Assistant: on (%s)", s.assistant_model)
+    if chosen_provider() == "claude":
+        log.info("Coach: Claude (%s)%s", s.assistant_model, "" if s.anthropic_api_key else ", but ANTHROPIC_API_KEY is missing")
     else:
-        log.warning("Assistant: off. To turn it on, put ANTHROPIC_API_KEY in %s and restart", PROJECT_ENV)
+        log.info("Coach: Ollama on this PC (%s at %s)", s.ollama_model, s.ollama_url)
     yield
 
 
