@@ -30,7 +30,8 @@ export function DayPicker({ value, onChange }: { value: number[]; onChange: (day
               onPress={() => toggle(d)}
               accessibilityRole="checkbox"
               accessibilityLabel={WEEKDAYS[d]}
-              accessibilityState={{ checked: on, disabled }}
+              aria-checked={on}
+              aria-disabled={disabled}
               style={{
                 flex: 1,
                 minHeight: 44,

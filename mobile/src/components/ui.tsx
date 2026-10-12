@@ -268,7 +268,8 @@ export function Button({
       disabled={disabled || isLoading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
-      accessibilityState={{ disabled: disabled || isLoading, busy: isLoading }}
+      aria-disabled={disabled || isLoading}
+      aria-busy={isLoading}
       style={({ pressed }) => [
         styles.button,
         small && styles.buttonSmall,
@@ -485,7 +486,7 @@ export function Chips<T extends string | number>({
                 onChange(o.value);
               }}
               accessibilityRole="radio"
-              accessibilityState={{ selected: on }}
+              aria-checked={on}
               style={({ pressed }) => [
                 styles.chip,
                 { backgroundColor: on ? t.ink : t.surface2 },
@@ -532,7 +533,7 @@ export function Segmented<T extends string>({
                 onChange(o.value);
               }}
               accessibilityRole="tab"
-              accessibilityState={{ selected: on }}
+              aria-selected={on}
               style={({ pressed }) => [
                 {
                   flexGrow: 1,
@@ -567,7 +568,7 @@ export function Checkbox({ checked, onChange, label }: { checked: boolean; onCha
     <Pressable
       onPress={() => onChange(!checked)}
       accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
+      aria-checked={checked}
       style={[styles.row, { gap: space.md, marginTop: space.md, alignItems: "flex-start", minHeight: 24 }]}
     >
       <View style={[styles.checkbox, { borderColor: checked ? t.ink : t.muted, backgroundColor: checked ? t.ink : "transparent" }]}>

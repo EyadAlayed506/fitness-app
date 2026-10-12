@@ -11,14 +11,18 @@ import { radius, space, useTheme } from "@/lib/theme";
 import type { Points } from "@/lib/types";
 
 export default function PointsScreen() {
-  const t = useTheme();
   const { ready, token } = useAuth();
-  const points = usePoints();
-  useRefreshOnFocus([qk.points]);
-  const data = token ? (points.data ?? null) : null;
-
   if (!ready) return <Loading />;
   if (!token) return <Redirect href="/login" />;
+  return <PointsContent />;
+}
+
+/** The screen itself, once the login has been restored (so its data loads with it). */
+function PointsContent() {
+  const t = useTheme();
+  const points = usePoints();
+  useRefreshOnFocus([qk.points]);
+  const data = points.data ?? null;
 
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl, width: "100%", maxWidth: 600, alignSelf: "center" }}>

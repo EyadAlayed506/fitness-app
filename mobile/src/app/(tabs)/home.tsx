@@ -450,7 +450,7 @@ function DietOptionRow({ option: o, plan, onPress }: { option: DietOption; plan:
       onPress={onPress}
       disabled={o.option === "maintain"}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      aria-checked={selected}
       style={({ pressed }) => ({
         flexDirection: "row",
         alignItems: "flex-start",

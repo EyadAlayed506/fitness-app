@@ -18,13 +18,19 @@ import type { SleepAnalytics, SleepEntry } from "@/lib/types";
 type SheetState = { kind: "new" } | { kind: "edit"; entry: SleepEntry } | { kind: "goal" } | null;
 
 export default function Sleep() {
+  const { ready, token } = useAuth();
+  if (!ready) return <Loading />;
+  if (!token) return <Redirect href="/login" />;
+  return <SleepScreen />;
+}
+
+/** The screen itself, once the login has been restored (so its data loads with it). */
+function SleepScreen() {
   const t = useTheme();
   const toast = useToast();
-  const { ready, token } = useAuth();
   const [sheet, setSheet] = useState<SheetState>(null);
   const screen = useQuery({
     queryKey: [...qk.sleep, "screen"],
-    enabled: !!token,
     queryFn: async () => {
       // give any sleep-goal points first, so the nights that earned them are marked
       await api(`/points?tz_offset=${tzOffset()}`).catch(() => null);
@@ -47,9 +53,6 @@ export default function Sleep() {
   const load = async () => {
     invalidate(qk.sleep, qk.whoop, ...derivedKeys);
   };
-
-  if (!ready) return <Loading />;
-  if (!token) return <Redirect href="/login" />;
 
   const saved = async (message: string) => {
     setSheet(null);

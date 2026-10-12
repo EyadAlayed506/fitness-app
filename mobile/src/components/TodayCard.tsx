@@ -74,7 +74,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
         <Pressable
           onPress={() => setWhy((w) => !w)}
           accessibilityRole="button"
-          accessibilityState={{ expanded: why }}
+          aria-expanded={why}
           accessibilityLabel="Why these suggestions"
           style={({ pressed }) => ({
             minHeight: 50,

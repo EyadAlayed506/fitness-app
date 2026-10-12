@@ -290,7 +290,7 @@ export default function Coach() {
                   disabled={!canSend}
                   accessibilityRole="button"
                   accessibilityLabel="Send"
-                  accessibilityState={{ disabled: !canSend }}
+                  aria-disabled={!canSend}
                   style={({ pressed }) => ({
                     width: 44,
                     height: 44,
