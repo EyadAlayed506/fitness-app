@@ -31,12 +31,18 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "The camera is used to scan the QR code on gym machines.",
+          "cameraPermission": "The camera is used to scan the QR code on gym machines and to recognise machines from a photo.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "The microphone is used to send voice messages to your coach."
+        }
+      ]
     ],
     "scheme": "fitnessapp",
     "experiments": {

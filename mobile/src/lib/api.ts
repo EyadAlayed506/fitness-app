@@ -62,14 +62,29 @@ interface Options {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   form?: Record<string, string>;
+  /** a local file (photo or recording) to send as multipart form data */
+  upload?: { field: string; uri: string; name: string; type: string };
 }
 
-export async function api<T>(path: string, { method = "GET", body, form }: Options = {}): Promise<T> {
+/** Multipart body for a local file: phones send the file by its uri, the browser needs the bytes. */
+async function uploadBody(file: NonNullable<Options["upload"]>): Promise<FormData> {
+  const data = new FormData();
+  if (Platform.OS === "web") {
+    data.append(file.field, await (await fetch(file.uri)).blob(), file.name);
+  } else {
+    data.append(file.field, { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  }
+  return data;
+}
+
+export async function api<T>(path: string, { method = "GET", body, form, upload }: Options = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const sentToken = token;
   if (sentToken) headers.Authorization = `Bearer ${sentToken}`;
-  let payload: string | undefined;
-  if (form) {
+  let payload: string | FormData | undefined;
+  if (upload) {
+    payload = await uploadBody(upload); // fetch sets the multipart Content-Type itself
+  } else if (form) {
     headers["Content-Type"] = "application/x-www-form-urlencoded";
     payload = new URLSearchParams(form).toString();
   } else if (body !== undefined) {

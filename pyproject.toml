@@ -16,6 +16,8 @@ dependencies = [
     "rapidfuzz>=3.10",
     "segno>=1.6",
     "anthropic>=1.13.0",
+    "faster-whisper>=1.2.1",
+    "av<17",  # faster-whisper 1.2 passes an option newer PyAV versions removed
 ]
 
 [dependency-groups]

@@ -8,6 +8,7 @@ import { Card, ErrorText, IconButton, LinkButton, Row, Txt } from "@/components/
 import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
 import { tzOffset } from "@/lib/format";
+import { useVoiceMessage } from "@/lib/voice";
 import { useTheme } from "@/lib/theme";
 import type { AssistantAction, AssistantStatus, ChatMessage, ChatReply } from "@/lib/types";
 
@@ -46,6 +47,10 @@ export default function Coach() {
   const [pending, setPending] = useState<string | null>(null); // the question being answered
   const [error, setError] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
+  const voice = useVoiceMessage(
+    (text) => setDraft((d) => (d.trim() ? `${d.trim()} ${text}` : text)),
+    (message) => setError(message),
+  );
 
   const load = useCallback(async () => {
     setStatus(await api<AssistantStatus>("/assistant"));
@@ -174,6 +179,29 @@ export default function Coach() {
                   }}
                 />
                 <Pressable
+                  onPress={() => {
+                    setError(null);
+                    voice.toggle();
+                  }}
+                  disabled={!!pending || voice.state === "transcribing"}
+                  accessibilityRole="button"
+                  accessibilityLabel={voice.state === "recording" ? "Stop recording" : "Record a voice message"}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 21,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: voice.state === "recording" ? t.critical : t.surface2,
+                  }}
+                >
+                  {voice.state === "transcribing" ? (
+                    <ActivityIndicator size="small" color={t.accent} />
+                  ) : (
+                    <Ionicons name={voice.state === "recording" ? "stop" : "mic-outline"} size={20} color={voice.state === "recording" ? "#fff" : t.text2} />
+                  )}
+                </Pressable>
+                <Pressable
                   onPress={() => send(draft)}
                   disabled={!draft.trim() || !!pending}
                   accessibilityRole="button"
@@ -190,6 +218,13 @@ export default function Coach() {
                   <Ionicons name="arrow-up" size={20} color={draft.trim() && !pending ? t.accentInk : t.muted} />
                 </Pressable>
               </Row>
+              {voice.state !== "idle" ? (
+                <Txt variant="small" style={{ marginTop: 6, color: voice.state === "recording" ? t.critical : t.text2 }}>
+                  {voice.state === "recording"
+                    ? `Recording… ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")}  Tap ■ to stop.`
+                    : "Turning your voice into text…"}
+                </Txt>
+              ) : null}
               <Txt variant="tiny" style={{ marginTop: 6 }}>
                 {status.disclaimer}
                 {status.messages_left_today != null ? ` ${status.messages_left_today} questions left in the last 24 hours.` : ""}

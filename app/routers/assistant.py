@@ -6,7 +6,7 @@ from typing import Annotated
 
 import anthropic
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlmodel import Session, delete, func, select
 
 from app.config import get_settings
@@ -19,7 +19,7 @@ from app.models.assistant import (
     ChatMessagePublic,
     ChatReply,
 )
-from app.services import assistant
+from app.services import assistant, speech
 from app.services.activity import TzOffset
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
@@ -47,6 +47,7 @@ def get_assistant_backend() -> Iterator[Backend]:
 
 
 AssistantBackend = Annotated[Backend, Depends(get_assistant_backend)]
+SpeechToText = Annotated[speech.Transcriber, Depends(speech.get_transcriber)]
 
 
 def _public(m: ChatMessage) -> ChatMessagePublic:
@@ -134,6 +135,26 @@ def send_message(
     return ChatReply(
         question=_public(question), answer=_public(reply), messages_left_today=_left_today(session, user.id, backend)
     )
+
+
+MAX_AUDIO_BYTES = 10 * 1024 * 1024  # about 10 minutes of compressed speech
+
+
+@router.post("/transcribe")
+def transcribe(user: CurrentUser, transcriber: SpeechToText, audio: UploadFile = File(...)):
+    """Turn a voice recording into text (on this PC). The app puts the text in the message box to check and send."""
+    data = audio.file.read(MAX_AUDIO_BYTES + 1)
+    if not data:
+        raise HTTPException(status_code=422, detail="The recording is empty.")
+    if len(data) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="The recording is too long. Keep voice messages under a few minutes.")
+    try:
+        text = transcriber.transcribe(data)
+    except speech.SpeechError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    if not text:
+        raise HTTPException(status_code=422, detail="I didn't catch any words. Try again a bit closer to the microphone.")
+    return {"text": text}
 
 
 @router.delete("/messages", status_code=204)
