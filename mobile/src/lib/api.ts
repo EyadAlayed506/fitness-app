@@ -63,12 +63,13 @@ interface Options {
   body?: unknown;
   form?: Record<string, string>;
   /** a local file (photo or recording) to send as multipart form data */
-  upload?: { field: string; uri: string; name: string; type: string };
+  upload?: { field: string; uri: string; name: string; type: string; fields?: Record<string, string> };
 }
 
 /** Multipart body for a local file: phones send the file by its uri, the browser needs the bytes. */
 async function uploadBody(file: NonNullable<Options["upload"]>): Promise<FormData> {
   const data = new FormData();
+  for (const [k, v] of Object.entries(file.fields ?? {})) data.append(k, v);
   if (Platform.OS === "web") {
     data.append(file.field, await (await fetch(file.uri)).blob(), file.name);
   } else {

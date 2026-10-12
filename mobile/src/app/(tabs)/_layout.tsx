@@ -3,6 +3,7 @@ import { Redirect } from "expo-router";
 import { BottomTabBar, Tabs } from "expo-router/js-tabs";
 import { StyleSheet, View } from "react-native";
 
+import { HandsFreeBadge, HandsFreeProvider } from "@/components/HandsFree";
 import { Loading, type IconName } from "@/components/ui";
 import { WorkoutMiniBar, WorkoutSessionProvider } from "@/components/WorkoutSession";
 import { useAuth } from "@/lib/auth";
@@ -26,41 +27,43 @@ export default function TabsLayout() {
   if (!profile) return <Redirect href="/onboarding" />;
   return (
     <WorkoutSessionProvider>
-      <Tabs
-        // the "workout in progress" bar sits on top of the tab bar, so screens never hide behind it
-        tabBar={(props) => (
-          <View>
-            <WorkoutMiniBar />
-            <BottomTabBar {...props} />
-          </View>
-        )}
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: t.text,
-          tabBarInactiveTintColor: t.muted,
-          tabBarLabelStyle: { fontSize: 11, fontWeight: "600", letterSpacing: 0.1 },
-          tabBarStyle: {
-            backgroundColor: t.surface,
-            borderTopColor: t.border,
-            borderTopWidth: StyleSheet.hairlineWidth,
-            elevation: 0,
-            shadowOpacity: 0,
-          },
-          sceneStyle: { backgroundColor: t.bg },
-        }}
-      >
-        {TABS.map((tab) => (
-          <Tabs.Screen
-            key={tab.name}
-            name={tab.name}
-            options={{
-              title: tab.title,
-              tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? tab.active : tab.icon} color={color} size={23} />,
-            }}
-          />
-        ))}
-        <Tabs.Screen name="profile" options={{ title: "Profile", href: null }} />
-      </Tabs>
+      <HandsFreeProvider>
+        <Tabs
+          // the "workout in progress" bar sits on top of the tab bar, so screens never hide behind it
+          tabBar={(props) => (
+            <View>
+              <WorkoutMiniBar extra={<HandsFreeBadge />} />
+              <BottomTabBar {...props} />
+            </View>
+          )}
+          screenOptions={{
+            headerShown: false,
+            tabBarActiveTintColor: t.text,
+            tabBarInactiveTintColor: t.muted,
+            tabBarLabelStyle: { fontSize: 11, fontWeight: "600", letterSpacing: 0.1 },
+            tabBarStyle: {
+              backgroundColor: t.surface,
+              borderTopColor: t.border,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              elevation: 0,
+              shadowOpacity: 0,
+            },
+            sceneStyle: { backgroundColor: t.bg },
+          }}
+        >
+          {TABS.map((tab) => (
+            <Tabs.Screen
+              key={tab.name}
+              name={tab.name}
+              options={{
+                title: tab.title,
+                tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? tab.active : tab.icon} color={color} size={23} />,
+              }}
+            />
+          ))}
+          <Tabs.Screen name="profile" options={{ title: "Profile", href: null }} />
+        </Tabs>
+      </HandsFreeProvider>
     </WorkoutSessionProvider>
   );
 }

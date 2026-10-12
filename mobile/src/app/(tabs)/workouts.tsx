@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ExerciseInfo } from "@/components/ExerciseInfo";
 import { GymPicker, GymScanFlow, MachineTaken } from "@/components/GymParts";
 import { ExercisePhoto } from "@/components/ExercisePhoto";
+import { HandsFreePanel, useHandsFree } from "@/components/HandsFree";
 import { RestTimerPanel } from "@/components/RestTimer";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { ScreenshotImport } from "@/components/SnapParts";
@@ -81,8 +82,10 @@ export default function Workouts() {
   useRefreshOnFocus([qk.workouts, qk.routine]);
   const { timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay } = useWorkoutSession();
   const gym = useCurrentGym();
+  const handsFree = useHandsFree();
   const params = useLocalSearchParams<{ start?: string }>();
-  const [notesDraft, setNotesDraft] = useState<{ workoutId: number; text: string } | null>(null);
+  // typed notes; `base` is what the saved notes were when typing started (hands-free can add to them meanwhile)
+  const [notesDraft, setNotesDraft] = useState<{ workoutId: number; text: string; base: string } | null>(null);
   const [openDay, setOpenDay] = useState<number | null>(null); // weekday index; null = today or the next training day
   const [sheet, setSheet] = useState<SheetState>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -110,7 +113,13 @@ export default function Workouts() {
   /** the planned exercise an exercise stands in for (itself when it wasn't swapped) */
   const plannedId = (exerciseId: number) =>
     Number(Object.entries(swaps).find(([, to]) => to.id === exerciseId)?.[0] ?? exerciseId);
-  const notes = notesDraft && notesDraft.workoutId === active?.id ? notesDraft.text : (active?.notes ?? "");
+  const saved = active?.notes ?? "";
+  const notes =
+    notesDraft && notesDraft.workoutId === active?.id
+      ? saved !== notesDraft.base && saved.startsWith(notesDraft.base)
+        ? notesDraft.text + saved.slice(notesDraft.base.length) // keep voice notes added while typing
+        : notesDraft.text
+      : saved;
 
   const done = (exerciseId: number) => active?.sets.filter((s) => s.exercise_id === exerciseId).length ?? 0;
   const planned = followed?.exercises ?? [];
@@ -176,6 +185,7 @@ export default function Workouts() {
       return;
     }
     timer.loadExercise(exercise.id, exercise.name).catch(() => {});
+    handsFree?.setCurrent(exercise); // short voice commands are for the exercise on screen
     setSheet({ kind: "set", exercise, via });
   };
 
@@ -239,6 +249,7 @@ export default function Workouts() {
                 <Stat label="Volume" value={u.weight(active.volume_kg, 0)} />
                 <Stat label="Exercises" value={String(new Set(active.sets.map((x) => x.exercise_id)).size)} />
               </Row>
+              <HandsFreePanel />
               {gym ? (
                 <Row gap={space.sm} style={{ marginTop: space.md }}>
                   <Ionicons name="location-outline" size={16} color={t.text2} />
@@ -296,7 +307,7 @@ export default function Workouts() {
               <Field
                 label="Notes"
                 value={notes}
-                onChangeText={(text) => setNotesDraft({ workoutId: active.id, text })}
+                onChangeText={(text) => setNotesDraft({ workoutId: active.id, text, base: active.notes ?? "" })}
                 placeholder="How did it go?"
                 multiline
               />

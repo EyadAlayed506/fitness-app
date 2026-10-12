@@ -153,7 +153,7 @@ function useRestNotification(state: RestTimerState, nextSet: string | null) {
 const BAR_HEIGHT = 48;
 
 /** "Workout · 23:14 · Rest 1:12": shown above the tab bar on every tab except Workouts. Tap to go back. */
-export function WorkoutMiniBar() {
+export function WorkoutMiniBar({ extra }: { extra?: ReactNode }) {
   const t = useTheme();
   const pathname = usePathname();
   const { data } = useWorkouts();
@@ -177,6 +177,7 @@ export function WorkoutMiniBar() {
       <View style={[styles.dot, { backgroundColor: t.good }]} />
       <Text style={[typeScale.label, { color: t.text }]}>Workout</Text>
       <Elapsed since={active.started_at} />
+      {extra}
       <View style={{ flex: 1 }} />
       {resting ? (
         <View style={[styles.pill, { backgroundColor: t.accentSoft }]}>

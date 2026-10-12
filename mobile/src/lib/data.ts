@@ -271,6 +271,15 @@ export const restoreSet = (workoutId: number, set: WorkoutSet) =>
     added_via: set.added_via,
   });
 
+/** Save the workout's notes now (hands-free notes), and show them at once. */
+export async function saveWorkoutNotes(workoutId: number, notes: string): Promise<void> {
+  await optimistic<WorkoutsData, unknown>(
+    qk.workouts,
+    updateActive(workoutId, (a) => ({ ...a, notes })),
+    () => api(`/workouts/${workoutId}`, { method: "PATCH", body: { notes } }),
+  );
+}
+
 export async function finishWorkout(workoutId: number, notes: string): Promise<void> {
   await api(`/workouts/${workoutId}`, { method: "PATCH", body: { finish: true, notes } });
   invalidate(qk.workouts, ["exercise-history"], ...derivedKeys);

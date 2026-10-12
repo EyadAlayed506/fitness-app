@@ -11,6 +11,7 @@ import type { WeightReading } from "@/lib/types";
 import { useHoldToTalk } from "@/lib/voice";
 import { parseSpokenSet, type SpokenSet } from "@/lib/voiceSet";
 
+import { useHandsFree } from "./HandsFree";
 import { Badge, Button, ErrorText, LinkButton, Row, Txt } from "./ui";
 
 /** Helpers in the set form: say the set out loud (hands-free), or read the weight from a photo. */
@@ -57,6 +58,13 @@ export function HandsFreeMic({
   );
   const listening = talk.state === "recording";
   const busy = talk.state === "transcribing";
+  const handsFree = useHandsFree();
+  if (handsFree?.on)
+    return (
+      <Txt variant="tiny" style={{ marginTop: space.sm }}>
+        Hands-free is listening: say “{handsFree.wakeWord}, 12 reps at 25 kilos”.
+      </Txt>
+    );
   return (
     <View style={{ marginTop: space.sm }}>
       <Pressable

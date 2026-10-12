@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button, Card, ErrorText, FadeIn, IconButton, Row, Skeleton, Txt, type IconName } from "@/components/ui";
+import { useHandsFree } from "@/components/HandsFree";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
@@ -64,6 +65,7 @@ export default function Coach() {
   const [pending, setPending] = useState<string | null>(null); // the question being answered
   const [sendError, setError] = useState<string | null>(null);
   const error = sendError ?? (status ? null : errorMessage(assistant.error));
+  const handsFree = useHandsFree(); // its microphone is in use while hands-free listens
   const voice = useVoiceMessage(
     (text) => setDraft((d) => (d.trim() ? `${d.trim()} ${text}` : text)),
     (message) => setError(message),
@@ -266,7 +268,7 @@ export default function Coach() {
                     setError(null);
                     voice.toggle();
                   }}
-                  disabled={!!pending || voice.state === "transcribing"}
+                  disabled={!!pending || voice.state === "transcribing" || !!handsFree?.on}
                   accessibilityRole="button"
                   accessibilityLabel={recording ? "Stop recording" : "Record a voice message"}
                   style={({ pressed }) => ({
