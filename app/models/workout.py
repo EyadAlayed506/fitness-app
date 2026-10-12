@@ -11,6 +11,7 @@ class AddedVia(StrEnum):
     name = "name"
     qr = "qr"
     photo = "photo"
+    voice = "voice"  # hands-free
 
 
 class WorkoutSession(SQLModel, table=True):

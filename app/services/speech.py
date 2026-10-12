@@ -39,10 +39,13 @@ class Transcriber:
                     ) from e
         return self._model
 
-    def transcribe(self, audio: bytes) -> str:
+    def transcribe(self, audio: bytes, prompt: str | None = None) -> str:
+        """`prompt`: words likely to be said (e.g. the wake word and exercise names); Whisper spells them right."""
         model = self._load()
         try:
-            segments, _ = model.transcribe(io.BytesIO(audio), language=self.language, beam_size=5, vad_filter=True)
+            segments, _ = model.transcribe(
+                io.BytesIO(audio), language=self.language, beam_size=5, vad_filter=True, initial_prompt=prompt or None
+            )
             return " ".join(s.text.strip() for s in segments).strip()
         except Exception as e:
             raise SpeechError(f"Couldn't read that recording ({e}). Try recording again.") from e

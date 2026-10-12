@@ -691,6 +691,25 @@ class ClaudeBackend:
             return Answer(text or NO_ANSWER, used)
         return Answer(TOO_MANY_STEPS, used)
 
+    def interpret(self, prompt: str, schema: dict) -> dict:
+        """One structured answer (hands-free commands): Claude must fill in the schema."""
+        import anthropic
+
+        try:
+            response = self.client.beta.messages.create(
+                model=self.model,
+                max_tokens=400,
+                tools=[{"name": "command", "description": "The workout command", "input_schema": schema}],
+                tool_choice={"type": "tool", "name": "command"},
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except anthropic.APIError as e:
+            raise AssistantError(502, f"The assistant couldn't read that ({type(e).__name__}).")
+        for block in response.content:
+            if block.type == "tool_use":
+                return dict(block.input)
+        return {}
+
 
 # Small local models have less room: shorter history and tool results
 OLLAMA_HISTORY_MESSAGES = 10
@@ -761,18 +780,33 @@ class OllamaBackend:
             return Answer(text or NO_ANSWER, used)
         return Answer(TOO_MANY_STEPS, used)
 
-    def _chat(self, messages: list[dict]) -> dict:
+    def interpret(self, prompt: str, schema: dict) -> dict:
+        """One structured answer (hands-free commands), with Ollama's JSON-schema output."""
+        reply = self._chat([{"role": "user", "content": prompt}], tools=False, answer_format=schema, timeout=60)
+        content = _THINK.sub("", (reply.get("message") or {}).get("content") or "").strip()
+        try:
+            data = json.loads(content)
+        except ValueError:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _chat(self, messages: list[dict], tools: bool = True, answer_format: dict | None = None, timeout: float = 300) -> dict:
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": {"num_ctx": self.num_ctx},  # room for the tools, the history and the data
+        }
+        if tools:
+            body["tools"] = OLLAMA_TOOLS
+        if answer_format:
+            body["format"] = answer_format
+            body["think"] = False  # a short structured answer: no need for the model to think first
         try:
             r = self.http.post(
                 f"{self.url}/api/chat",
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "tools": OLLAMA_TOOLS,
-                    "stream": False,
-                    "options": {"num_ctx": self.num_ctx},  # room for the tools, the history and the data
-                },
-                timeout=300,  # a local model can take a while, especially the first time it loads
+                json=body,
+                timeout=timeout,  # a local model can take a while, especially the first time it loads
             )
         except httpx.TimeoutException:
             raise AssistantError(504, "The local AI took too long to answer. Try a shorter question or a smaller model.")

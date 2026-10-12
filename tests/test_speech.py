@@ -16,8 +16,9 @@ class FakeTranscriber:
     def __init__(self, text="add a banana to breakfast", error=None):
         self.text, self.error, self.calls = text, error, []
 
-    def transcribe(self, audio: bytes) -> str:
+    def transcribe(self, audio: bytes, prompt: str | None = None) -> str:
         self.calls.append(audio)
+        self.prompts = [*getattr(self, "prompts", []), prompt]
         if self.error:
             raise speech.SpeechError(self.error)
         return self.text
@@ -38,6 +39,10 @@ def test_voice_message_becomes_text(client, auth, fake):
     r = upload(client, auth)
     assert r.status_code == 200 and r.json() == {"text": "add a banana to breakfast"}
     assert fake.calls == [b"fake-audio"]
+    # hands-free sends a hint (the wake word, exercise names) so Whisper spells them right
+    r = client.post("/api/assistant/transcribe", files={"audio": ("v.webm", b"x", "audio/webm")},
+                    data={"prompt": "Chat, Leg Press, Lat Pulldown."}, headers=auth)
+    assert r.status_code == 200 and fake.prompts == [None, "Chat, Leg Press, Lat Pulldown."]
 
 
 def test_empty_silent_or_failed_recordings(client, auth, fake):

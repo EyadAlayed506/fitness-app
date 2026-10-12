@@ -177,7 +177,7 @@ export interface SetInput {
   unit: string;
   rpe: number | null;
   notes: string;
-  added_via: "name" | "qr" | "photo";
+  added_via: "name" | "qr" | "photo" | "voice";
 }
 
 const KG_PER_LB = 0.45359237;

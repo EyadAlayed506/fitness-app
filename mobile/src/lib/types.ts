@@ -150,7 +150,7 @@ export interface WorkoutSet {
   rpe: number | null;
   rest_seconds: number | null;
   notes: string;
-  added_via: "name" | "qr" | "photo";
+  added_via: "name" | "qr" | "photo" | "voice";
 }
 
 export interface Workout {

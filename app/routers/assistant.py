@@ -6,7 +6,7 @@ from typing import Annotated
 
 import anthropic
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlmodel import Session, delete, func, select
 
 from app.config import get_settings
@@ -141,7 +141,12 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024  # about 10 minutes of compressed speech
 
 
 @router.post("/transcribe")
-def transcribe(user: CurrentUser, transcriber: SpeechToText, audio: UploadFile = File(...)):
+def transcribe(
+    user: CurrentUser,
+    transcriber: SpeechToText,
+    audio: UploadFile = File(...),
+    prompt: str | None = Form(default=None, max_length=500, description="Words likely to be said, e.g. the wake word and exercise names"),
+):
     """Turn a voice recording into text (on this PC). The app puts the text in the message box to check and send."""
     data = audio.file.read(MAX_AUDIO_BYTES + 1)
     if not data:
@@ -149,7 +154,7 @@ def transcribe(user: CurrentUser, transcriber: SpeechToText, audio: UploadFile =
     if len(data) > MAX_AUDIO_BYTES:
         raise HTTPException(status_code=413, detail="The recording is too long. Keep voice messages under a few minutes.")
     try:
-        text = transcriber.transcribe(data)
+        text = transcriber.transcribe(data, prompt=prompt) if prompt else transcriber.transcribe(data)
     except speech.SpeechError as e:
         raise HTTPException(status_code=503, detail=str(e))
     if not text:
