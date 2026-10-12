@@ -98,11 +98,14 @@ export function Txt({
   variant = "body",
   style,
   numberOfLines,
+  selectable,
 }: {
   children: ReactNode;
   variant?: Variant;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
+  /** lets the user select and copy the text (e.g. a URL to paste elsewhere) */
+  selectable?: boolean;
 }) {
   const t = useTheme();
   const v: Record<Variant, TextStyle> = {
@@ -117,7 +120,7 @@ export function Txt({
     hero: { fontSize: 48, fontWeight: "700", color: t.text, letterSpacing: -1, fontVariant: ["tabular-nums"] },
   };
   return (
-    <Text style={[v[variant], style]} numberOfLines={numberOfLines}>
+    <Text style={[v[variant], style]} numberOfLines={numberOfLines} selectable={selectable}>
       {children}
     </Text>
   );

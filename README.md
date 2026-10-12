@@ -78,7 +78,7 @@ Also useful:
 
 ## Settings
 
-Copy `.env.example` to `.env` to change settings:
+Copy `.env.example` to `.env` (in the `fitness-app` folder) to change settings. The backend reads that file wherever you start it from; restart it after a change:
 
 | Setting | Default | Notes |
 |---|---|---|
@@ -92,10 +92,18 @@ Copy `.env.example` to `.env` to change settings:
 
 ### Connecting WHOOP
 
-1. Log in at https://developer.whoop.com with your WHOOP account and create an app.
-2. Add the redirect URL `http://localhost:8000/api/whoop/callback` and pick the scopes `read:profile`, `read:sleep`, `read:recovery` and `offline`.
-3. Put the app's Client ID and Client Secret in `.env` as `WHOOP_CLIENT_ID` and `WHOOP_CLIENT_SECRET`, then restart the backend.
-4. In the app: Sleep → **Connect WHOOP**. Do this from the browser on your PC (press `w` in Expo), because the WHOOP login sends you back to `localhost`. The connection belongs to your account, so the phone app syncs too afterwards.
+Why the app says "WHOOP isn't set up on this server yet": WHOOP only lets registered apps read sleep data, and each app gets its own Client ID and Client Secret from WHOOP. Nobody can ship those keys inside the code, so whoever runs the backend registers once (free, but it needs a WHOOP membership):
+
+1. Go to https://developer.whoop.com, log in with your WHOOP account and open the Developer Dashboard. Create a team if it asks, then create an app.
+2. Scopes: `read:profile`, `read:sleep`, `read:recovery` and `offline`. Redirect URL: `http://localhost:8000/api/whoop/callback`, exactly (the app's Sleep screen shows the URL your server expects).
+3. In the `fitness-app` folder, make the settings file if you don't have one: `copy .env.example .env` (Windows) or `cp .env.example .env` (Mac/Linux). Open `.env` and paste the keys:
+   ```
+   WHOOP_CLIENT_ID=paste-the-client-id
+   WHOOP_CLIENT_SECRET=paste-the-client-secret
+   ```
+   Keep the secret to yourself: don't commit `.env` or paste it into chats.
+4. Stop the backend (Ctrl+C) and start it again. Its console now says `WHOOP: on`. If it says `WHOOP: off`, it also prints which `.env` file it read.
+5. In the app: Sleep → **Connect WHOOP**. Do this from the browser on your PC (press `w` in Expo), because the WHOOP login sends you back to `localhost`. The connection belongs to your account, so the phone app syncs too afterwards.
 
 The app imports the last 30 days, then syncs again when you open Home or the Sleep screen (at most every 15–30 minutes) or tap **Sync now**. WHOOP nights replace nights you typed in by hand for the same time.
 

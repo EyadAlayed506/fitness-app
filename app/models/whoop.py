@@ -25,6 +25,7 @@ class WhoopConnection(SQLModel, table=True):
 
 class WhoopStatus(SQLModel):
     configured: bool  # the server has WHOOP app keys
+    redirect_uri: str  # must be registered in the WHOOP developer dashboard exactly like this
     connected: bool
     whoop_name: str = ""
     connected_at: dt.datetime | None = None

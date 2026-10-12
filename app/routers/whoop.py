@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from sqlmodel import Session, select
 
+from app.config import get_settings
 from app.database import SessionDep
 from app.deps import CurrentUser
 from app.models.user import User
@@ -42,6 +43,7 @@ def whoop_status(user: CurrentUser, session: SessionDep):
     connected = bool(conn and conn.access_token)
     return WhoopStatus(
         configured=whoop.is_configured(),
+        redirect_uri=get_settings().whoop_redirect_uri,
         connected=connected,
         whoop_name=conn.whoop_name if connected else "",
         connected_at=conn.connected_at if connected else None,
@@ -55,7 +57,10 @@ def start_connect(user: CurrentUser, session: SessionDep):
     if not whoop.is_configured():
         raise HTTPException(
             status_code=503,
-            detail="WHOOP isn't set up on this server yet: add WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET to the .env file.",
+            detail=(
+                "WHOOP isn't set up on this server yet: create an app at developer.whoop.com, put its "
+                "WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET in the backend's .env file and restart the backend."
+            ),
         )
     conn = _connection(session, user) or WhoopConnection(user_id=user.id)
     conn.oauth_state = secrets.token_urlsafe(24)

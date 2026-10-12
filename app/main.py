@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session
 
-from app.config import get_settings
+from app.config import PROJECT_ENV, get_settings
 from app.database import create_db_and_tables, engine
 from app.routers import (
     analytics,
@@ -25,6 +26,7 @@ from app.routers import (
 from app.seed import seed_catalogue
 
 STATIC_DIR = Path(__file__).parent / "static"
+log = logging.getLogger("uvicorn.error")  # shows up in the server's console
 
 
 @asynccontextmanager
@@ -32,6 +34,11 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
     with Session(engine) as session:
         seed_catalogue(session)
+    s = get_settings()
+    if s.whoop_client_id and s.whoop_client_secret:
+        log.info("WHOOP: on (redirect URL %s)", s.whoop_redirect_uri)
+    else:
+        log.warning("WHOOP: off. To turn it on, put WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET in %s and restart", PROJECT_ENV)
     yield
 
 

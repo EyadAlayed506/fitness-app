@@ -7,6 +7,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
 from app import models  # noqa: F401  (register tables)
+from app.config import get_settings
 from app.database import get_session
 from app.main import app
 from app.models.sleep import SleepEntry
@@ -57,6 +58,16 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
     if "openfoodfacts" in request.url.host:
         return httpx.Response(200, json=OFF_RESPONSE)
     return httpx.Response(404)
+
+
+@pytest.fixture(autouse=True)
+def whoop_off(monkeypatch):
+    """Tests never use the WHOOP keys from a developer's own .env (test_whoop turns on a fake WHOOP)."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "whoop_client_id", "")
+    monkeypatch.setattr(settings, "whoop_client_secret", "")
+    monkeypatch.setattr(settings, "whoop_redirect_uri", "http://localhost:8000/api/whoop/callback")
+    monkeypatch.setattr(settings, "whoop_base_url", "https://api.prod.whoop.com")
 
 
 @pytest.fixture

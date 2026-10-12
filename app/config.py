@@ -1,10 +1,16 @@
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The .env next to pyproject.toml is used wherever the server is started from (a .env in the
+# current folder, if there is a different one, wins).
+PROJECT_ENV = Path(__file__).resolve().parent.parent / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=(PROJECT_ENV, ".env"), extra="ignore")
 
     database_url: str = "sqlite:///./fitness.db"
     jwt_secret: str = "dev-only-secret-change-me-in-the-env-file"
@@ -22,6 +28,12 @@ class Settings(BaseSettings):
     whoop_client_secret: str = ""
     whoop_redirect_uri: str = "http://localhost:8000/api/whoop/callback"
     whoop_base_url: str = "https://api.prod.whoop.com"  # only changed for testing against a fake WHOOP
+
+    @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri")
+    @classmethod
+    def _strip(cls, v: str) -> str:
+        # keys pasted with a stray space or quotes still work
+        return v.strip().strip("\"'").strip()
 
 
 @lru_cache

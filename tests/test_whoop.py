@@ -136,7 +136,10 @@ def entries(session):
 
 def test_not_configured(client, auth):
     status = client.get("/api/whoop", headers=auth).json()
-    assert status == {"configured": False, "connected": False, "whoop_name": "", "connected_at": None, "last_sync_at": None}
+    assert status == {
+        "configured": False, "connected": False, "whoop_name": "", "connected_at": None, "last_sync_at": None,
+        "redirect_uri": "http://localhost:8000/api/whoop/callback",
+    }
     r = client.post("/api/whoop/connect", headers=auth)
     assert r.status_code == 503 and "WHOOP_CLIENT_ID" in r.json()["detail"]
 
@@ -295,3 +298,19 @@ def test_old_database_gets_new_columns(tmp_path):
     with engine.connect() as conn:
         assert conn.execute(text("SELECT duration_minutes FROM sleepentry")).scalar() == 480
     assert add_missing_columns(engine) == []  # running again changes nothing
+
+
+def test_settings_find_the_project_env_and_trim_keys(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from app.config import PROJECT_ENV, Settings
+
+    assert PROJECT_ENV == Path(__file__).resolve().parent.parent / ".env"
+    monkeypatch.chdir(tmp_path)  # started from another folder: the project's .env is still the one used
+    s = Settings(whoop_client_id=' "abc123" ', whoop_client_secret=" secret\n")
+    assert (s.whoop_client_id, s.whoop_client_secret) == ("abc123", "secret")
+
+
+def test_status_shows_the_redirect_url_to_register(client, auth):
+    body = client.get("/api/whoop", headers=auth).json()
+    assert body["redirect_uri"].endswith("/api/whoop/callback")

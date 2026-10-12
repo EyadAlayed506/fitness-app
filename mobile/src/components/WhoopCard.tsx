@@ -136,10 +136,7 @@ export function WhoopCard({
             loading={waiting}
           />
         ) : (
-          <Txt variant="tiny">
-            WHOOP isn&apos;t set up on this server yet. Add WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET to the backend&apos;s .env file (see the
-            README).
-          </Txt>
+          <WhoopSetupSteps redirectUri={status.redirect_uri} />
         )}
         {waiting ? (
           <Row style={{ justifyContent: "center" }}>
@@ -149,5 +146,47 @@ export function WhoopCard({
       </View>
       <ErrorText message={error} />
     </Card>
+  );
+}
+
+/**
+ * Shown while the server has no WHOOP app keys. WHOOP only gives keys to a registered developer app,
+ * so whoever runs the backend does this once; after that every user just taps "Connect WHOOP".
+ */
+function WhoopSetupSteps({ redirectUri }: { redirectUri: string }) {
+  const t = useTheme();
+  const steps = [
+    "Log in to WHOOP's developer site with a WHOOP account (it needs a WHOOP membership).",
+    "Create an app. Scopes: read:profile, read:sleep, read:recovery and offline.",
+    `Add this redirect URL, exactly: ${redirectUri}`,
+    "Copy the app's Client ID and Client Secret into the backend's .env file as WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET.",
+    "Stop the backend and start it again. This button then turns into “Connect WHOOP”.",
+  ];
+  return (
+    <View style={{ gap: 6 }}>
+      <Txt variant="small" style={{ color: t.warnInk }}>
+        WHOOP isn&apos;t set up on this server yet. The person running the backend does this once:
+      </Txt>
+      {steps.map((step, i) => (
+        <Row key={step} gap={6} style={{ alignItems: "flex-start" }}>
+          <Txt variant="tiny" style={{ width: 14 }}>
+            {i + 1}.
+          </Txt>
+          <Txt variant="tiny" style={{ flex: 1 }} selectable>
+            {step}
+          </Txt>
+        </Row>
+      ))}
+      <Button
+        title="Open WHOOP developer site"
+        icon="open-outline"
+        kind="ghost"
+        small
+        onPress={() => {
+          WebBrowser.openBrowserAsync("https://developer.whoop.com").catch(() => {});
+        }}
+      />
+      <Txt variant="tiny">Until then you can log sleep by hand above.</Txt>
+    </View>
   );
 }

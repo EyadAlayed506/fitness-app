@@ -269,6 +269,8 @@ export interface SleepEntry {
 
 export interface WhoopStatus {
   configured: boolean;
+  /** register exactly this redirect URL in the WHOOP developer dashboard */
+  redirect_uri: string;
   connected: boolean;
   whoop_name: string;
   connected_at: string | null;
