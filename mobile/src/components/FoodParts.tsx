@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { api } from "@/lib/api";
+import { addFood, deleteFood, updateFood, useRecentFoods } from "@/lib/data";
 import { MASS_TO_G, VOLUME_TO_ML, cap, fmt, unitLabel } from "@/lib/format";
-import { useTheme } from "@/lib/theme";
-import type { Food, FoodCandidate, FoodSearch as SearchResult, Meal } from "@/lib/types";
+import { haptics } from "@/lib/haptics";
+import { errorMessage } from "@/lib/query";
+import { space, useTheme } from "@/lib/theme";
+import type { Food, FoodCandidate, FoodLogEntry, FoodSearch as SearchResult, Meal, RecentFood } from "@/lib/types";
 
-import { Badge, Button, Checkbox, Chips, ErrorText, Field, ListRow, Row, Stat, Txt } from "./ui";
+import { Badge, Button, Checkbox, Chips, ErrorText, Field, IconButton, ListRow, Row, Skeleton, Stat, Stepper, Txt } from "./ui";
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -23,7 +26,7 @@ const SUB_NUTRIENTS: [keyof Food, string, string][] = [
   ["potassium_mg", "Potassium", "mg"],
 ];
 
-function baseAmount(food: Food, quantity: number, unit: string): number | null {
+export function baseAmount(food: Food, quantity: number, unit: string): number | null {
   if (unit === "serving") {
     if (!food.serving_size || !food.serving_unit) return null;
     const one = baseAmount(food, food.serving_size, food.serving_unit);
@@ -35,7 +38,23 @@ function baseAmount(food: Food, quantity: number, unit: string): number | null {
 
 // ---------- search ----------
 
-export function FoodSearch({ onPick, onCustom }: { onPick: (food: Food) => void; onCustom: () => void }) {
+/** Calories of a portion of a food (per-100 values × amount), or null if the unit doesn't fit. */
+export function portionCalories(food: Food, quantity: number, unit: string): number | null {
+  const amount = baseAmount(food, quantity, unit);
+  return amount == null ? null : (food.calories * amount) / 100;
+}
+
+export function FoodSearch({
+  onPick,
+  onCustom,
+  onQuickAdd,
+}: {
+  onPick: (food: Food, portion?: { quantity: number; unit: string }) => void;
+  onCustom: () => void;
+  /** log a recent food again with last time's amount, in one tap */
+  onQuickAdd?: (item: RecentFood) => void;
+}) {
+  const recentFoods = useRecentFoods();
   const [query, setQuery] = useState("");
   const [local, setLocal] = useState<Food[]>([]);
   const [online, setOnline] = useState<FoodCandidate[] | null>(null);
@@ -84,9 +103,49 @@ export function FoodSearch({ onPick, onCustom }: { onPick: (food: Food) => void;
   const subtitle = (f: Food | FoodCandidate) =>
     `${f.brand ? `${f.brand} · ` : ""}${fmt(f.calories)} kcal per ${f.is_liquid ? "100 ml" : "100 g"}`;
 
+  // With an empty box: what the user logs most, so a repeat is one or two taps
+  const recent = recentFoods.data?.recent.slice(0, 6) ?? [];
+  const shownIds = new Set(recent.map((r) => r.food.id));
+  const frequent = recentFoods.data?.frequent.filter((r) => !shownIds.has(r.food.id)).slice(0, 6) ?? [];
+  const recentRow = (r: RecentFood, i: number) => {
+    const kcal = portionCalories(r.food, r.quantity, r.unit);
+    return (
+      <ListRow
+        key={`${r.food.id}`}
+        first={i === 0}
+        title={r.food.name}
+        subtitle={`${fmt(r.quantity, 2)} ${unitLabel(r.unit)}${kcal != null ? ` · ${fmt(kcal)} kcal` : ""}${r.times > 1 ? ` · ${r.times}×` : ""}`}
+        onPress={() => onPick(r.food, { quantity: r.quantity, unit: r.unit })}
+        right={
+          onQuickAdd ? (
+            <IconButton icon="add" label={`Add ${r.food.name}, ${fmt(r.quantity, 2)} ${unitLabel(r.unit)}`} onPress={() => onQuickAdd(r)} />
+          ) : undefined
+        }
+      />
+    );
+  };
+
   return (
     <View>
       <Field label="Search food" value={query} onChangeText={setQuery} placeholder="e.g. banana, chicken breast, nutella" autoFocus autoCorrect={false} />
+      {!searching && recentFoods.isPending ? (
+        <View style={{ gap: space.sm, marginTop: space.md }}>
+          <Skeleton height={44} />
+          <Skeleton height={44} />
+        </View>
+      ) : null}
+      {!searching && recent.length ? (
+        <View style={{ marginTop: space.md }}>
+          <Txt variant="label">Recent</Txt>
+          {recent.map(recentRow)}
+        </View>
+      ) : null}
+      {!searching && frequent.length ? (
+        <View style={{ marginTop: space.md }}>
+          <Txt variant="label">Frequent</Txt>
+          {frequent.map(recentRow)}
+        </View>
+      ) : null}
       {searching && local.length ? (
         <View style={{ marginTop: 10 }}>
           <Txt variant="label">In the app</Txt>
@@ -140,38 +199,107 @@ export function FoodSearch({ onPick, onCustom }: { onPick: (food: Food) => void;
 
 // ---------- amount, unit and meal for one food ----------
 
-export function FoodDetail({ food, meal: initialMeal, date, onAdded }: { food: Food; meal: Meal; date: string; onAdded: () => void }) {
+/** How much one tap of − / + changes the amount, per unit. */
+const STEP: Record<string, number> = {
+  g: 10, ml: 25, serving: 0.5, oz: 0.5, lb: 0.1, kg: 0.05, l: 0.1,
+  cup: 0.25, tbsp: 1, tsp: 1, fl_oz: 1, pint: 0.25, quart: 0.25, gallon: 0.1,
+};
+
+/**
+ * Amount, unit and meal for a food, with what it adds up to. Adds a new entry, or, with `entry`,
+ * edits that logged entry (and can delete it).
+ */
+export function FoodDetail({
+  food,
+  meal: initialMeal,
+  date,
+  portion,
+  entry,
+  onAdded,
+  onSaved,
+  onDeleted,
+}: {
+  food: Food;
+  meal: Meal;
+  date: string;
+  /** start with this amount (e.g. last time's) */
+  portion?: { quantity: number; unit: string };
+  /** editing a logged entry */
+  entry?: FoodLogEntry;
+  onAdded?: (entry: FoodLogEntry) => void;
+  onSaved?: (entry: FoodLogEntry) => void;
+  onDeleted?: (entry: FoodLogEntry) => void;
+}) {
   const t = useTheme();
+  const start = entry ? { quantity: entry.quantity, unit: entry.unit } : portion;
   const [units, setUnits] = useState<string[]>([]);
-  const [unit, setUnit] = useState("g");
-  const [qty, setQty] = useState("100");
-  const [meal, setMeal] = useState<Meal>(initialMeal);
+  const [unit, setUnit] = useState(start?.unit ?? "g");
+  const [qty, setQty] = useState(start ? String(start.quantity) : "100");
+  const [meal, setMeal] = useState<Meal>(entry?.meal ?? initialMeal);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api<string[]>(`/foods/${food.id}/units`)
       .then((list) => {
         setUnits(list);
+        if (start && list.includes(start.unit)) return; // keep the amount we started with
         setUnit(list[0]);
         setQty(list[0] === "serving" ? "1" : food.is_liquid ? "250" : "100");
       })
       .catch(() => {});
+    // only when the food changes; `start` is the first amount shown
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [food.id, food.is_liquid]);
 
-  const amount = baseAmount(food, Number(qty.replace(",", ".")) || 0, unit) ?? 0;
+  const quantity = Number(qty.replace(",", ".")) || 0;
+  const amount = baseAmount(food, quantity, unit) ?? 0;
   const f = amount / 100;
   const subs = SUB_NUTRIENTS.filter(([k]) => food[k] != null);
 
   const add = async () => {
     setError(null);
     try {
-      await api("/food-logs", {
-        method: "POST",
-        body: { food_id: food.id, date, meal, quantity: Number(qty.replace(",", ".")), unit },
-      });
-      onAdded();
+      const saved = await addFood(
+        { food_id: food.id, date, meal, quantity, unit },
+        {
+          food_id: food.id,
+          food_name: food.name,
+          date,
+          meal,
+          quantity,
+          unit,
+          amount_base: amount,
+          calories: food.calories * f,
+          protein_g: food.protein_g * f,
+          carbs_g: food.carbs_g * f,
+          fat_g: food.fat_g * f,
+        },
+      );
+      haptics.success();
+      onAdded?.(saved);
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorMessage(e));
+    }
+  };
+  const save = async () => {
+    if (!entry) return;
+    setError(null);
+    try {
+      const saved = await updateFood(entry, { quantity, unit, meal });
+      haptics.success();
+      onSaved?.(saved);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+  const remove = async () => {
+    if (!entry) return;
+    setError(null);
+    try {
+      await deleteFood(entry);
+      onDeleted?.(entry);
+    } catch (e) {
+      setError(errorMessage(e));
     }
   };
 
@@ -189,7 +317,7 @@ export function FoodDetail({ food, meal: initialMeal, date, onAdded }: { food: F
         {food.is_liquid ? "Drink / liquid" : "Solid"}
         {food.serving_size && food.serving_unit ? ` · 1 serving = ${fmt(food.serving_size, 1)} ${unitLabel(food.serving_unit)}` : ""}
       </Txt>
-      <Field label="Amount" value={qty} onChangeText={setQty} keyboardType="decimal-pad" />
+      <Stepper label="Amount" value={qty} onChange={setQty} step={STEP[unit] ?? 1} min={0} max={100000} decimals={2} suffix={unitLabel(unit)} />
       {units.length ? <Chips label="Unit" value={unit} onChange={setUnit} options={units.map((u) => ({ value: u, label: unitLabel(u) }))} /> : null}
       <Chips label="Meal" value={meal} onChange={setMeal} options={MEALS.map((m) => ({ value: m, label: cap(m) }))} />
       <Row style={{ marginTop: 12 }} gap={6}>
@@ -199,7 +327,14 @@ export function FoodDetail({ food, meal: initialMeal, date, onAdded }: { food: F
         <Stat label="Fat g" value={fmt(food.fat_g * f, 1)} />
       </Row>
       <ErrorText message={error} />
-      <Button title="Add to log" onPress={add} style={{ marginTop: 14 }} />
+      {entry ? (
+        <>
+          <Button title="Save changes" icon="checkmark" onPress={save} disabled={quantity <= 0} style={{ marginTop: 14 }} />
+          <Button title="Remove from log" icon="trash-outline" kind="danger" onPress={remove} style={{ marginTop: space.sm, borderColor: "transparent" }} />
+        </>
+      ) : (
+        <Button title="Add to log" icon="add" onPress={add} disabled={quantity <= 0} style={{ marginTop: 14 }} />
+      )}
 
       <Txt variant="h3" style={{ marginTop: 18, marginBottom: 4 }}>
         Per {food.is_liquid ? "100 ml" : "100 g"}

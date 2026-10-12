@@ -68,7 +68,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
           title={training ? "Start workout" : "Open workouts"}
           icon={training ? "play" : undefined}
           kind={training ? "primary" : "soft"}
-          onPress={() => router.push("/workouts")}
+          onPress={() => router.navigate(training ? { pathname: "/workouts", params: { start: "today" } } : "/workouts")}
           style={{ flex: 1 }}
         />
         <Pressable

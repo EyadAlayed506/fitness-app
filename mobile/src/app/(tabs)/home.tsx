@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
+import { FirstWeek } from "@/components/FirstWeek";
 import { MacroBars } from "@/components/MacroBars";
 import { PointsCard } from "@/components/PointsParts";
 import { goalHours } from "@/components/SleepDashboard";
@@ -28,10 +29,22 @@ import {
 } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth, useProfile } from "@/lib/auth";
-import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, tzOffset, units } from "@/lib/format";
+import {
+  useFoodDay,
+  useGettingStarted,
+  usePoints,
+  useRecommendations,
+  useSleepAnalytics,
+  useSleepList,
+  useWhoopAutoSync,
+  useWhoopStatus,
+} from "@/lib/data";
+import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, units } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 import { profilePayload } from "@/lib/profile";
+import { derivedKeys, errorMessage, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
-import type { DietOption, FoodDay, Plan, Points, Recommendations, SleepAnalytics, SleepEntry, WhoopStatus } from "@/lib/types";
+import type { DietOption, Plan } from "@/lib/types";
 
 const BMI_BADGE = { underweight: "info", normal: "good", overweight: "warn", obese: "bad" } as const;
 const SCALE_MIN = 15;
@@ -48,56 +61,39 @@ export default function Home() {
   const { refresh, user } = useAuth();
   const { profile, plan } = useProfile();
   const u = units(profile.unit_system);
-  const [day, setDay] = useState<FoodDay | null>(null);
-  const [lastSleep, setLastSleep] = useState<SleepEntry | null>(null);
-  const [sleepStats, setSleepStats] = useState<SleepAnalytics | null>(null);
-  const [today, setToday] = useState<Recommendations | null>(null);
-  const [points, setPoints] = useState<Points | null>(null);
-  const [whoopConnected, setWhoopConnected] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const foodDay = useFoodDay(todayISO());
+  const sleepList = useSleepList(1);
+  const sleepStatsQuery = useSleepAnalytics(7);
+  const recommendations = useRecommendations();
+  const pointsQuery = usePoints();
+  const whoop = useWhoopStatus();
+  const gettingStarted = useGettingStarted();
+  useRefreshOnFocus([qk.foodDay(todayISO()), qk.sleep, qk.recommendations, qk.points, qk.whoop, qk.gettingStarted]);
+  useWhoopAutoSync(!!whoop.data?.connected, 30);
   const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      const whoop = await api<WhoopStatus>("/whoop").catch(() => null);
-      setWhoopConnected(!!whoop?.connected);
-      if (whoop?.connected) {
-        // bring in last night's WHOOP sleep (at most every 30 minutes); failures just show older data
-        await api("/whoop/sync?stale_minutes=30", { method: "POST" }).catch(() => null);
-      }
-      const [food, sleeps, stats, recs] = await Promise.all([
-        api<FoodDay>(`/food-logs?date=${todayISO()}`),
-        api<SleepEntry[]>("/sleep?limit=1"),
-        api<SleepAnalytics>(`/analytics/sleep?days=7&tz_offset=${tzOffset()}`),
-        api<Recommendations>(`/me/recommendations?tz_offset=${tzOffset()}`).catch(() => null),
-      ]);
-      setToday(recs);
-      // after the sync above, so last night's WHOOP sleep can count
-      setPoints(await api<Points>(`/points?tz_offset=${tzOffset()}`).catch(() => null));
-      setDay(food);
-      setLastSleep(sleeps[0] ?? null);
-      setSleepStats(stats);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load today. Pull down to try again.");
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
+  const day = foodDay.data ?? null;
+  const lastSleep = sleepList.data?.[0] ?? null;
+  const sleepStats = sleepStatsQuery.data ?? null;
+  const today = recommendations.data ?? null;
+  const points = pointsQuery.data ?? null;
+  const whoopConnected = !!whoop.data?.connected;
+  const loaded = !foodDay.isPending && !sleepList.isPending;
+  const error = errorMessage(foodDay.error ?? sleepList.error);
+  const load = async () => {
+    await Promise.all([foodDay.refetch(), sleepList.refetch(), sleepStatsQuery.refetch(), recommendations.refetch(), pointsQuery.refetch(), gettingStarted.refetch()]);
+  };
+  // A new user sees a short checklist instead of cards with nothing in them yet
+  const start = gettingStarted.data;
+  const checklist = start && start.days_since_signup < 14 && !(start.weighed_in && start.logged_food && start.finished_workout && start.sleep_goal_set) ? start : null;
 
   const pickDiet = async (o: DietOption) => {
     if (o.selected || o.option === "maintain") return;
     await api("/me/profile", { method: "PUT", body: profilePayload(profile, { diet_option: o.option }) });
     await refresh();
-    await load();
+    invalidate(qk.foodDay(todayISO()), ...derivedKeys);
     toast(`Switched to the ${o.option} diet`);
   };
 
@@ -107,6 +103,8 @@ export default function Home() {
     await api("/me/weight", { method: "POST", body: { weight: v, unit: u.w } });
     setWeight("");
     await refresh();
+    invalidate(...derivedKeys);
+    haptics.success();
     toast("Weight saved");
   };
 
@@ -153,6 +151,7 @@ export default function Home() {
       ) : (
         <FadeIn>
           {today ? <TodayCard data={today} /> : null}
+          {checklist ? <FirstWeek data={checklist} /> : null}
 
           {/* Calories: a ring for the headline number, macros beside it */}
           <Card onPress={() => router.push("/food")}>
@@ -181,67 +180,69 @@ export default function Home() {
             </Row>
           </Card>
 
-          {/* Sleep */}
-          <Card>
-            <Pressable onPress={() => router.push("/sleep")} accessibilityRole="button" accessibilityLabel="Open sleep">
-              <Row style={{ justifyContent: "space-between" }}>
-                <Txt variant="h3">Sleep</Txt>
-                <Ionicons name="chevron-forward" size={18} color={t.muted} />
-              </Row>
-              {lastSleep ? (
-                <>
-                  <Row style={{ justifyContent: "space-between", alignItems: "flex-end", marginTop: space.sm, flexWrap: "wrap" }}>
-                    <Txt>
-                      <Txt variant="big">{hoursMinutes(lastSleep.duration_minutes)}</Txt>
-                      <Txt variant="small">
-                        {"  "}
-                        {lastSleep.date === todayISO() ? "last night" : `night to ${shortDate(lastSleep.date)}`}
+          {/* Sleep (new users without any nights see the checklist instead) */}
+          {checklist && !lastSleep ? null : (
+            <Card>
+              <Pressable onPress={() => router.push("/sleep")} accessibilityRole="button" accessibilityLabel="Open sleep">
+                <Row style={{ justifyContent: "space-between" }}>
+                  <Txt variant="h3">Sleep</Txt>
+                  <Ionicons name="chevron-forward" size={18} color={t.muted} />
+                </Row>
+                {lastSleep ? (
+                  <>
+                    <Row style={{ justifyContent: "space-between", alignItems: "flex-end", marginTop: space.sm, flexWrap: "wrap" }}>
+                      <Txt>
+                        <Txt variant="big">{hoursMinutes(lastSleep.duration_minutes)}</Txt>
+                        <Txt variant="small">
+                          {"  "}
+                          {lastSleep.date === todayISO() ? "last night" : `night to ${shortDate(lastSleep.date)}`}
+                        </Txt>
                       </Txt>
+                      <Row gap={6}>
+                        {lastSleep.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : null}
+                        {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
+                      </Row>
+                    </Row>
+                    <Txt variant="small" style={{ marginTop: 2 }}>
+                      {clockOf(lastSleep.bedtime)} → {clockOf(lastSleep.wake_time)}
+                      {lastSleep.source !== "manual" && trackerSummary(lastSleep) ? ` · ${trackerSummary(lastSleep)}` : ""}
                     </Txt>
-                    <Row gap={6}>
-                      {lastSleep.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : null}
-                      {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
-                    </Row>
-                  </Row>
-                  <Txt variant="small" style={{ marginTop: 2 }}>
-                    {clockOf(lastSleep.bedtime)} → {clockOf(lastSleep.wake_time)}
-                    {lastSleep.source !== "manual" && trackerSummary(lastSleep) ? ` · ${trackerSummary(lastSleep)}` : ""}
+                    {sleepStats?.average_hours_7d != null ? (
+                      <Row style={{ justifyContent: "space-between", marginTop: space.md, gap: space.sm }}>
+                        <Txt variant="tiny" style={{ flex: 1 }}>
+                          7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · goal {goalHours(sleepStats.goal_minutes)}
+                        </Txt>
+                        {rangeBadge(sleepStats.average_hours_7d, sleepStats.recommended_hours)}
+                      </Row>
+                    ) : null}
+                  </>
+                ) : (
+                  <Txt variant="small" style={{ marginTop: space.sm }}>
+                    No sleep logged yet. Add last night by hand, or connect WHOOP to import it automatically.
                   </Txt>
-                  {sleepStats?.average_hours_7d != null ? (
-                    <Row style={{ justifyContent: "space-between", marginTop: space.md, gap: space.sm }}>
-                      <Txt variant="tiny" style={{ flex: 1 }}>
-                        7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · goal {goalHours(sleepStats.goal_minutes)}
-                      </Txt>
-                      {rangeBadge(sleepStats.average_hours_7d, sleepStats.recommended_hours)}
-                    </Row>
-                  ) : null}
-                </>
-              ) : (
-                <Txt variant="small" style={{ marginTop: space.sm }}>
-                  No sleep logged yet. Add last night by hand, or connect WHOOP to import it automatically.
-                </Txt>
+                )}
+              </Pressable>
+              {whoopConnected ? null : (
+                <Row style={{ marginTop: space.lg }}>
+                  <Button title="Log sleep" icon="moon" kind="soft" small onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
+                  <Button title="Connect WHOOP" kind="ghost" small onPress={() => router.push("/sleep")} style={{ flex: 1 }} />
+                </Row>
               )}
-            </Pressable>
-            {whoopConnected ? null : (
-              <Row style={{ marginTop: space.lg }}>
-                <Button title="Log sleep" icon="moon" kind="soft" small onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
-                <Button title="Connect WHOOP" kind="ghost" small onPress={() => router.push("/sleep")} style={{ flex: 1 }} />
-              </Row>
-            )}
-          </Card>
+            </Card>
+          )}
           <Sheet visible={loggingSleep} title="Log sleep" onClose={() => setLoggingSleep(false)}>
             {loggingSleep ? (
               <SleepForm
                 onSaved={async (message) => {
                   setLoggingSleep(false);
                   toast(message);
-                  await load();
+                  invalidate(qk.sleep, ...derivedKeys);
                 }}
               />
             ) : null}
           </Sheet>
 
-          {points ? <PointsCard data={points} /> : null}
+          {points && !(checklist && points.total === 0) ? <PointsCard data={points} /> : null}
 
           <Shortcut
             icon="chatbubble-ellipses"

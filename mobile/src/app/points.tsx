@@ -1,26 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { Redirect } from "expo-router";
 import { ScrollView, View } from "react-native";
 
 import { AwardRow, LevelMeter } from "@/components/PointsParts";
 import { Card, EmptyState, Loading, Meter, Row, Section, SkeletonCards, Txt } from "@/components/ui";
-import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { tzOffset } from "@/lib/format";
+import { usePoints } from "@/lib/data";
+import { qk, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, useTheme } from "@/lib/theme";
 import type { Points } from "@/lib/types";
 
 export default function PointsScreen() {
   const t = useTheme();
   const { ready, token } = useAuth();
-  const [data, setData] = useState<Points | null>(null);
-  useFocusEffect(
-    useCallback(() => {
-      if (!token) return;
-      api<Points>(`/points?tz_offset=${tzOffset()}`).then(setData).catch(() => {});
-    }, [token]),
-  );
+  const points = usePoints();
+  useRefreshOnFocus([qk.points]);
+  const data = token ? (points.data ?? null) : null;
 
   if (!ready) return <Loading />;
   if (!token) return <Redirect href="/login" />;

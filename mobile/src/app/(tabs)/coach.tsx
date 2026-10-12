@@ -1,13 +1,27 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { router } from "expo-router";
+import { useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button, Card, ErrorText, FadeIn, IconButton, Row, Skeleton, Txt, type IconName } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
+import { afterCoachActions, useAssistant } from "@/lib/data";
 import { tzOffset } from "@/lib/format";
+import { errorMessage, qk, queryClient, useRefreshOnFocus } from "@/lib/query";
 import { useVoiceMessage } from "@/lib/voice";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { AssistantAction, AssistantStatus, ChatMessage, ChatReply } from "@/lib/types";
@@ -42,24 +56,22 @@ const TOOL_LABELS: Record<string, string> = {
 /** Chat with the assistant about your training, sleep and food. It reads your data and can log things you ask it to. */
 export default function Coach() {
   const t = useTheme();
-  const [status, setStatus] = useState<AssistantStatus | null>(null);
+  const { refresh } = useAuth();
+  const assistant = useAssistant();
+  useRefreshOnFocus([qk.assistant]);
+  const status = assistant.data ?? null;
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null); // the question being answered
-  const [error, setError] = useState<string | null>(null);
-  const scroll = useRef<ScrollView>(null);
+  const [sendError, setError] = useState<string | null>(null);
+  const error = sendError ?? (status ? null : errorMessage(assistant.error));
   const voice = useVoiceMessage(
     (text) => setDraft((d) => (d.trim() ? `${d.trim()} ${text}` : text)),
     (message) => setError(message),
   );
 
-  const load = useCallback(async () => {
-    setStatus(await api<AssistantStatus>("/assistant"));
-  }, []);
-  useFocusEffect(
-    useCallback(() => {
-      load().catch((e) => setError((e as Error).message));
-    }, [load]),
-  );
+  const load = async () => {
+    await assistant.refetch();
+  };
 
   const send = async (text: string) => {
     const question = text.trim();
@@ -69,7 +81,12 @@ export default function Coach() {
     setDraft("");
     try {
       const r = await api<ChatReply>(`/assistant/messages?tz_offset=${tzOffset()}`, { method: "POST", body: { text: question } });
-      setStatus((s) => (s ? { ...s, messages: [...s.messages, r.question, r.answer], messages_left_today: r.messages_left_today } : s));
+      queryClient.setQueryData<AssistantStatus>(qk.assistant, (s) =>
+        s ? { ...s, messages: [...s.messages, r.question, r.answer], messages_left_today: r.messages_left_today } : s,
+      );
+      const kinds = r.answer.actions.map((a) => a.kind);
+      afterCoachActions(kinds);
+      if (kinds.includes("weight")) refresh().catch(() => {}); // the current weight is part of the profile
     } catch (e) {
       setError((e as Error).message);
       setDraft(question); // keep what they typed so they can try again
@@ -81,7 +98,7 @@ export default function Coach() {
   const clear = async () => {
     if (!(await confirm("Clear the conversation?", "This deletes the messages for good."))) return;
     await api("/assistant/messages", { method: "DELETE" });
-    await load();
+    queryClient.setQueryData<AssistantStatus>(qk.assistant, (s) => (s ? { ...s, messages: [] } : s));
   };
 
   const messages = status?.messages ?? [];
@@ -103,94 +120,108 @@ export default function Coach() {
             {messages.length ? <IconButton icon="trash-outline" label="Clear conversation" onPress={clear} /> : null}
           </Row>
 
-          <ScrollView
-            ref={scroll}
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg, gap: space.md, flexGrow: 1 }}
-            keyboardShouldPersistTaps="handled"
-            onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
-          >
-            {!status && !error ? (
-              <View style={{ gap: space.md }} accessibilityLabel="Loading the conversation">
-                <Skeleton height={44} width="70%" style={{ borderRadius: radius.lg }} />
-                <Skeleton height={44} width="55%" style={{ borderRadius: radius.lg, alignSelf: "flex-end" }} />
-                <Skeleton height={64} width="80%" style={{ borderRadius: radius.lg }} />
-              </View>
-            ) : null}
-            {status && !status.configured ? (
-              <Card>
-                <Row gap={space.sm}>
-                  <Ionicons name="alert-circle" size={18} color={t.warnInk} />
-                  <Txt variant="h3">The coach isn&apos;t ready yet</Txt>
-                </Row>
-                <Txt variant="small" style={{ marginTop: space.sm }} selectable>
-                  {status.problem}
-                </Txt>
-                <Button
-                  title="Check again"
-                  kind="soft"
-                  small
-                  onPress={() => load().catch((e) => setError((e as Error).message))}
-                  style={{ marginTop: space.md, alignSelf: "flex-start" }}
-                />
-              </Card>
-            ) : null}
-            {status?.configured && !messages.length && !pending ? (
-              <FadeIn style={{ flex: 1, justifyContent: "center", paddingVertical: space.xl }}>
-                <View style={{ alignItems: "center", marginBottom: space.xl }}>
-                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: t.accentSoft, alignItems: "center", justifyContent: "center" }}>
-                    <Ionicons name="chatbubble-ellipses" size={24} color={t.accent} />
+          {messages.length || pending ? (
+            // newest at the bottom; only the messages on screen are rendered
+            <FlatList
+              inverted
+              style={{ flex: 1 }}
+              data={[...messages].reverse()}
+              keyExtractor={(m) => String(m.id)}
+              renderItem={({ item }) => (
+                <View style={{ paddingBottom: space.md }}>
+                  <Bubble message={item} />
+                </View>
+              )}
+              contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm }}
+              keyboardShouldPersistTaps="handled"
+              ListHeaderComponent={
+                <View style={{ gap: space.md, paddingBottom: space.md }}>
+                  {pending ? (
+                    <>
+                      <Bubble message={{ id: -1, role: "user", text: pending, tools_used: [], actions: [], created_at: "" }} />
+                      <Row
+                        gap={space.sm}
+                        style={{ alignSelf: "flex-start", backgroundColor: t.surface, borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: space.sm + 2 }}
+                      >
+                        <ActivityIndicator size="small" color={t.muted} />
+                        <Txt variant="small">
+                          Looking at your data…{status?.provider === "ollama" ? " (a model on your PC can take up to a minute)" : ""}
+                        </Txt>
+                      </Row>
+                    </>
+                  ) : null}
+                  <ErrorText message={error} />
+                </View>
+              }
+            />
+          ) : (
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg, gap: space.md, flexGrow: 1 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {!status && !error ? (
+                <View style={{ gap: space.md }} accessibilityLabel="Loading the conversation">
+                  <Skeleton height={44} width="70%" style={{ borderRadius: radius.lg }} />
+                  <Skeleton height={44} width="55%" style={{ borderRadius: radius.lg, alignSelf: "flex-end" }} />
+                  <Skeleton height={64} width="80%" style={{ borderRadius: radius.lg }} />
+                </View>
+              ) : null}
+              {status && !status.configured ? (
+                <Card>
+                  <Row gap={space.sm}>
+                    <Ionicons name="alert-circle" size={18} color={t.warnInk} />
+                    <Txt variant="h3">The coach isn&apos;t ready yet</Txt>
+                  </Row>
+                  <Txt variant="small" style={{ marginTop: space.sm }} selectable>
+                    {status.problem}
+                  </Txt>
+                  <Button title="Check again" kind="soft" small onPress={load} style={{ marginTop: space.md, alignSelf: "flex-start" }} />
+                </Card>
+              ) : null}
+              {status?.configured ? (
+                <FadeIn style={{ flex: 1, justifyContent: "center", paddingVertical: space.xl }}>
+                  <View style={{ alignItems: "center", marginBottom: space.xl }}>
+                    <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: t.accentSoft, alignItems: "center", justifyContent: "center" }}>
+                      <Ionicons name="chatbubble-ellipses" size={24} color={t.accent} />
+                    </View>
+                    <Txt variant="h2" style={{ marginTop: space.md, textAlign: "center" }}>
+                      How can I help today?
+                    </Txt>
+                    <Txt variant="small" style={{ marginTop: space.xs, textAlign: "center", maxWidth: 320 }}>
+                      Ask about your training, sleep and food, or tell me what to log. I&apos;ll add it right away.
+                    </Txt>
                   </View>
-                  <Txt variant="h2" style={{ marginTop: space.md, textAlign: "center" }}>
-                    How can I help today?
-                  </Txt>
-                  <Txt variant="small" style={{ marginTop: space.xs, textAlign: "center", maxWidth: 320 }}>
-                    Ask about your training, sleep and food, or tell me what to log. I&apos;ll add it right away.
-                  </Txt>
-                </View>
-                <View style={{ gap: space.sm }}>
-                  {STARTERS.map((q) => (
-                    <Pressable
-                      key={q.text}
-                      onPress={() => send(q.text)}
-                      accessibilityRole="button"
-                      style={({ pressed }) => ({
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: space.md,
-                        minHeight: 52,
-                        paddingHorizontal: space.lg,
-                        borderRadius: radius.lg,
-                        backgroundColor: t.surface,
-                        borderWidth: t.dark ? 1 : 0,
-                        borderColor: t.border,
-                        opacity: pressed ? 0.7 : 1,
-                      })}
-                    >
-                      <Ionicons name={q.icon} size={18} color={t.text2} />
-                      <Txt style={{ flex: 1 }}>{q.text}</Txt>
-                      <Ionicons name="arrow-up" size={16} color={t.muted} style={{ transform: [{ rotate: "45deg" }] }} />
-                    </Pressable>
-                  ))}
-                </View>
-              </FadeIn>
-            ) : null}
-            {messages.map((m) => (
-              <Bubble key={m.id} message={m} />
-            ))}
-            {pending ? (
-              <>
-                <Bubble message={{ id: -1, role: "user", text: pending, tools_used: [], actions: [], created_at: "" }} />
-                <Row gap={space.sm} style={{ alignSelf: "flex-start", backgroundColor: t.surface, borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: space.sm + 2 }}>
-                  <ActivityIndicator size="small" color={t.muted} />
-                  <Txt variant="small">
-                    Looking at your data…{status?.provider === "ollama" ? " (a model on your PC can take up to a minute)" : ""}
-                  </Txt>
-                </Row>
-              </>
-            ) : null}
-            <ErrorText message={error} />
-          </ScrollView>
+                  <View style={{ gap: space.sm }}>
+                    {STARTERS.map((q) => (
+                      <Pressable
+                        key={q.text}
+                        onPress={() => send(q.text)}
+                        accessibilityRole="button"
+                        style={({ pressed }) => ({
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: space.md,
+                          minHeight: 52,
+                          paddingHorizontal: space.lg,
+                          borderRadius: radius.lg,
+                          backgroundColor: t.surface,
+                          borderWidth: t.dark ? 1 : 0,
+                          borderColor: t.border,
+                          opacity: pressed ? 0.7 : 1,
+                        })}
+                      >
+                        <Ionicons name={q.icon} size={18} color={t.text2} />
+                        <Txt style={{ flex: 1 }}>{q.text}</Txt>
+                        <Ionicons name="arrow-up" size={16} color={t.muted} style={{ transform: [{ rotate: "45deg" }] }} />
+                      </Pressable>
+                    ))}
+                  </View>
+                </FadeIn>
+              ) : null}
+              <ErrorText message={error} />
+            </ScrollView>
+          )}
 
           {status?.configured ? (
             <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border, backgroundColor: t.surface, paddingHorizontal: space.md, paddingTop: space.sm + 2, paddingBottom: space.sm }}>
@@ -205,6 +236,15 @@ export default function Coach() {
                   maxLength={2000}
                   accessibilityLabel="Message"
                   onSubmitEditing={() => send(draft)}
+                  onKeyPress={(e) => {
+                    // keyboard on a computer: Enter sends, Shift+Enter starts a new line
+                    if (Platform.OS !== "web") return;
+                    const key = e.nativeEvent as unknown as { key: string; shiftKey?: boolean; isComposing?: boolean };
+                    if (key.key === "Enter" && !key.shiftKey && !key.isComposing) {
+                      e.preventDefault();
+                      send(draft);
+                    }
+                  }}
                   style={[
                     typeScale.body,
                     {
@@ -344,6 +384,7 @@ function ActionCard({ action }: { action: AssistantAction }) {
         });
       }
       setUndone(true);
+      afterCoachActions([action.kind === "removed" ? "removed" : action.kind]);
     } catch (e) {
       setError((e as Error).message);
     } finally {

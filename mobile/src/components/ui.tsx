@@ -698,7 +698,7 @@ export function ListRow({
   icon?: IconName;
 }) {
   const t = useTheme();
-  const content = (
+  const text = (
     <>
       {icon ? (
         <View style={[styles.rowIcon, { backgroundColor: t.surface2 }]}>
@@ -715,17 +715,35 @@ export function ListRow({
           </Txt>
         ) : null}
       </View>
-      {right}
-      {onPress ? <Ionicons name="chevron-forward" size={18} color={t.muted} /> : null}
     </>
   );
   const style = [styles.row, styles.listRow, { borderTopColor: t.border, borderTopWidth: first ? 0 : StyleSheet.hairlineWidth }];
-  return onPress ? (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [style, { opacity: pressed ? 0.6 : 1 }]}>
-      {content}
-    </Pressable>
-  ) : (
-    <View style={style}>{content}</View>
+  if (!onPress)
+    return (
+      <View style={style}>
+        {text}
+        {right}
+      </View>
+    );
+  if (!right)
+    return (
+      <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [style, { opacity: pressed ? 0.6 : 1 }]}>
+        {text}
+        <Ionicons name="chevron-forward" size={18} color={t.muted} />
+      </Pressable>
+    );
+  // a tappable row with its own buttons on the right: side by side, never a button inside a button
+  return (
+    <View style={style}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.row, { flex: 1, minWidth: 0, gap: space.md, alignSelf: "stretch", opacity: pressed ? 0.6 : 1 }]}
+      >
+        {text}
+      </Pressable>
+      {right}
+    </View>
   );
 }
 

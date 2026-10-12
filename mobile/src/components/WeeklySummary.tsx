@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { WEEKDAYS_SHORT, addDays, fmt, hoursMinutes, plural, shortDate, todayISO, tzOffset, units } from "@/lib/format";
+import { errorMessage, qk, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, useTheme } from "@/lib/theme";
 import type { WeeklySummary as Summary } from "@/lib/types";
 
@@ -18,20 +19,13 @@ export function WeeklySummaryCard() {
   const { profile } = useProfile();
   const u = units(profile.unit_system);
   const [week, setWeek] = useState<string | null>(null); // null = this week
-  const [data, setData] = useState<Summary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // reload when the screen comes back into view (e.g. after finishing a workout)
-  useFocusEffect(
-    useCallback(() => {
-      api<Summary>(`/analytics/weekly-summary?tz_offset=${tzOffset()}${week ? `&week=${week}` : ""}`)
-        .then((s) => {
-          setError(null);
-          setData(s);
-        })
-        .catch((e) => setError((e as Error).message));
-    }, [week]),
-  );
+  const query = useQuery({
+    queryKey: qk.weekly(week),
+    queryFn: () => api<Summary>(`/analytics/weekly-summary?tz_offset=${tzOffset()}${week ? `&week=${week}` : ""}`),
+  });
+  useRefreshOnFocus([qk.weekly(week)]); // e.g. after finishing a workout
+  const data = query.data ?? null;
+  const error = data ? null : errorMessage(query.error);
 
   if (error)
     return (

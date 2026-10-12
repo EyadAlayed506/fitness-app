@@ -1,9 +1,11 @@
 import { router } from "expo-router";
+import { useContext } from "react";
 import { Switch, Text, View } from "react-native";
 
 import { ProfileForm } from "@/components/ProfileForm";
-import { Button, Card, ListRow, Row, Screen, Section, Txt, useToast } from "@/components/ui";
+import { Button, Card, ListRow, Row, Screen, Section, Segmented, Txt, useToast } from "@/components/ui";
 import { api } from "@/lib/api";
+import { AppearanceContext } from "@/lib/appearance";
 import { useAuth, useProfile } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
@@ -15,6 +17,7 @@ export default function ProfileTab() {
   const toast = useToast();
   const { user, setUser, logout } = useAuth();
   const { profile, plan } = useProfile();
+  const appearance = useContext(AppearanceContext);
   if (!user) return null;
 
   const toggleMarketing = async (on: boolean) => {
@@ -48,6 +51,22 @@ export default function ProfileTab() {
 
       <Section title="Your details" />
       <ProfileForm key={JSON.stringify(profile)} profile={profile} onSaved={() => toast("Profile saved")} />
+
+      <Section title="Appearance" />
+      <Card>
+        <Segmented
+          options={[
+            { value: "system", label: "System" },
+            { value: "light", label: "Light" },
+            { value: "dark", label: "Dark" },
+          ]}
+          value={appearance.preference}
+          onChange={appearance.setPreference}
+        />
+        <Txt variant="tiny" style={{ marginTop: space.sm }}>
+          {appearance.preference === "system" ? "Follows your phone's light or dark mode." : "Saved on this device."}
+        </Txt>
+      </Card>
 
       <Section title="Email" />
       <Card>

@@ -1,5 +1,5 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Chart, ChartCard, type ChartSeries } from "@/components/charts";
@@ -25,6 +25,7 @@ import {
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { fmt, monthLabel, round, shortDate, todayISO, units } from "@/lib/format";
+import { errorMessage, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { useTheme } from "@/lib/theme";
 import type {
   CalorieAnalytics,
@@ -61,46 +62,48 @@ export default function Progress() {
   const t = useTheme();
   const { profile } = useProfile();
   const u = units(profile.unit_system);
-  const [data, setData] = useState<Data | null>(null);
-  const [liftId, setLiftId] = useState<number | null>(null);
-  const [lift, setLift] = useState<ExerciseProgress | null>(null);
+  const [chosenLift, setLiftId] = useState<number | null>(null);
+  const [months, setMonths] = useState<string[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<View_>("week");
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadCompare = async (months?: string[]) =>
-    api<MeasurementCompare>(`/measurements/compare${months ? `?months=${months.join(",")}` : ""}`);
-
-  const load = useCallback(async () => {
-    const [weight, projection, calories, volume, lifts, compare, sleep] = await Promise.all([
-      api<WeightAnalytics>("/analytics/weight"),
-      api<Projection>("/me/plan/projection"),
-      api<CalorieAnalytics>("/analytics/calories"),
-      api<Data["volume"]>("/analytics/volume?weeks=8"),
-      api<Data["lifts"]>("/analytics/exercises"),
-      loadCompare(),
-      api<SleepAnalytics>("/analytics/sleep?days=14"),
-    ]);
-    setData({ weight, projection, calories, volume, lifts, compare, sleep });
-    setError(null);
-    const first = lifts[0]?.id ?? null;
-    setLiftId((current) => (current && lifts.some((l) => l.id === current) ? current : first));
-  }, []);
-  useFocusEffect(
-    useCallback(() => {
-      load().catch((e: Error) => setError(e.message));
-    }, [load]),
-  );
-  useFocusEffect(
-    useCallback(() => {
-      if (liftId == null) {
-        setLift(null);
-        return;
-      }
-      api<ExerciseProgress>(`/analytics/exercise/${liftId}`).then(setLift).catch(() => {});
-    }, [liftId]),
-  );
+  const loadCompare = (m: string[] | null) =>
+    api<MeasurementCompare>(`/measurements/compare${m ? `?months=${m.join(",")}` : ""}`);
+  const progress = useQuery({
+    queryKey: qk.progress,
+    queryFn: async (): Promise<Data> => {
+      const [weight, projection, calories, volume, lifts, compare, sleep] = await Promise.all([
+        api<WeightAnalytics>("/analytics/weight"),
+        api<Projection>("/me/plan/projection"),
+        api<CalorieAnalytics>("/analytics/calories"),
+        api<Data["volume"]>("/analytics/volume?weeks=8"),
+        api<Data["lifts"]>("/analytics/exercises"),
+        loadCompare(null),
+        api<SleepAnalytics>("/analytics/sleep?days=14"),
+      ]);
+      return { weight, projection, calories, volume, lifts, compare, sleep };
+    },
+  });
+  // months picked for the measurement comparison (the default pair comes with the rest)
+  const comparison = useQuery({
+    queryKey: [...qk.progress, "compare", months?.join(",")],
+    queryFn: () => loadCompare(months),
+    enabled: months != null,
+  });
+  useRefreshOnFocus([qk.progress]);
+  const data = progress.data ?? null;
+  const error = errorMessage(progress.error);
+  const liftId = chosenLift && data?.lifts.some((l) => l.id === chosenLift) ? chosenLift : (data?.lifts[0]?.id ?? null);
+  const liftQuery = useQuery({
+    queryKey: qk.lift(liftId ?? 0),
+    queryFn: () => api<ExerciseProgress>(`/analytics/exercise/${liftId}`),
+    enabled: liftId != null,
+  });
+  const lift = liftId != null ? (liftQuery.data ?? null) : null;
+  const load = async () => {
+    await progress.refetch();
+  };
 
   if (!data)
     return (
@@ -108,14 +111,15 @@ export default function Progress() {
         {error ? (
           <Card>
             <ErrorText message={error} />
-            <Button title="Try again" kind="soft" small onPress={() => load().catch((e: Error) => setError(e.message))} style={{ marginTop: 12, alignSelf: "flex-start" }} />
+            <Button title="Try again" kind="soft" small onPress={load} style={{ marginTop: 12, alignSelf: "flex-start" }} />
           </Card>
         ) : (
           <SkeletonCards count={3} />
         )}
       </Screen>
     );
-  const { weight, projection, calories, volume, lifts, compare } = data;
+  const { weight, projection, calories, volume, lifts } = data;
+  const compare = (months != null ? comparison.data : null) ?? data.compare;
   const kg = (vals: (number | null)[]) => vals.map((v) => (v == null ? null : round(u.fromKg(v), 2)));
 
   // Body weight
@@ -161,7 +165,7 @@ export default function Progress() {
       refreshing={refreshing}
       onRefresh={async () => {
         setRefreshing(true);
-        await load().catch((e: Error) => setError(e.message));
+        await load();
         setRefreshing(false);
       }}
     >
@@ -196,7 +200,7 @@ export default function Progress() {
           <Measurements
             compare={compare}
             onAdd={() => setAdding(true)}
-            onChangeMonths={async (months) => setData({ ...data, compare: await loadCompare(months) })}
+            onChangeMonths={setMonths}
           />
         </FadeIn>
       ) : null}
@@ -271,7 +275,8 @@ export default function Progress() {
           <MeasurementForm
             onSaved={async () => {
               setAdding(false);
-              await load();
+              setMonths(null);
+              invalidate(qk.progress);
             }}
           />
         ) : null}

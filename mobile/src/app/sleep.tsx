@@ -1,5 +1,6 @@
-import { Redirect, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Redirect } from "expo-router";
+import { useState } from "react";
 import { ScrollView } from "react-native";
 
 import { LastNightCard, SleepConsistencyCard, SleepGoalForm, SleepWeekCard } from "@/components/SleepDashboard";
@@ -9,8 +10,10 @@ import { WhoopCard, syncSummary } from "@/components/WhoopCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { clockOf, hoursMinutes, longDate, tzOffset } from "@/lib/format";
+import { useWhoopAutoSync, useWhoopStatus } from "@/lib/data";
+import { derivedKeys, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { space, useTheme } from "@/lib/theme";
-import type { SleepAnalytics, SleepEntry, WhoopStatus, WhoopSyncResult } from "@/lib/types";
+import type { SleepAnalytics, SleepEntry } from "@/lib/types";
 
 type SheetState = { kind: "new" } | { kind: "edit"; entry: SleepEntry } | { kind: "goal" } | null;
 
@@ -18,40 +21,32 @@ export default function Sleep() {
   const t = useTheme();
   const toast = useToast();
   const { ready, token } = useAuth();
-  const [entries, setEntries] = useState<SleepEntry[]>([]);
-  const [stats, setStats] = useState<SleepAnalytics | null>(null);
-  const [whoop, setWhoop] = useState<WhoopStatus | null>(null);
   const [sheet, setSheet] = useState<SheetState>(null);
-
-  const load = useCallback(async () => {
-    // give any sleep-goal points first, so the nights that earned them are marked
-    await api(`/points?tz_offset=${tzOffset()}`).catch(() => null);
-    const [list, analytics, status] = await Promise.all([
-      api<SleepEntry[]>("/sleep?limit=60"),
-      api<SleepAnalytics>(`/analytics/sleep?days=14&tz_offset=${tzOffset()}`),
-      api<WhoopStatus>("/whoop"),
-    ]);
-    setEntries(list);
-    setStats(analytics);
-    setWhoop(status);
-    return status;
-  }, []);
-  useFocusEffect(
-    useCallback(() => {
-      if (!token) return;
-      (async () => {
-        const status = await load();
-        // Pull new WHOOP sleep when the screen opens (at most every 15 minutes)
-        if (status.connected) {
-          const r = await api<WhoopSyncResult>("/whoop/sync?stale_minutes=15", { method: "POST" }).catch(() => null);
-          if (r && !r.skipped) {
-            if (r.imported || r.replaced_manual) toast(syncSummary(r));
-            await load();
-          }
-        }
-      })().catch(() => {});
-    }, [load, token, toast]),
-  );
+  const screen = useQuery({
+    queryKey: [...qk.sleep, "screen"],
+    enabled: !!token,
+    queryFn: async () => {
+      // give any sleep-goal points first, so the nights that earned them are marked
+      await api(`/points?tz_offset=${tzOffset()}`).catch(() => null);
+      const [list, analytics] = await Promise.all([
+        api<SleepEntry[]>("/sleep?limit=60"),
+        api<SleepAnalytics>(`/analytics/sleep?days=14&tz_offset=${tzOffset()}`),
+      ]);
+      return { list, analytics };
+    },
+  });
+  const whoopQuery = useWhoopStatus();
+  useRefreshOnFocus([qk.sleep, qk.whoop]);
+  // Pull new WHOOP sleep when the screen opens (at most every 15 minutes)
+  useWhoopAutoSync(!!whoopQuery.data?.connected, 15, (r) => {
+    if (!r.skipped && (r.imported || r.replaced_manual)) toast(syncSummary(r));
+  });
+  const entries = screen.data?.list ?? [];
+  const stats = screen.data?.analytics ?? null;
+  const whoop = whoopQuery.data ?? null;
+  const load = async () => {
+    invalidate(qk.sleep, qk.whoop, ...derivedKeys);
+  };
 
   if (!ready) return <Loading />;
   if (!token) return <Redirect href="/login" />;

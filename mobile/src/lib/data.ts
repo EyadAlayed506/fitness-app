@@ -1,4 +1,6 @@
 import { useQuery, type QueryKey } from "@tanstack/react-query";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef } from "react";
 
 import { api } from "./api";
 import { tzOffset } from "./format";
@@ -17,6 +19,7 @@ import type {
   SleepAnalytics,
   SleepEntry,
   WhoopStatus,
+  WhoopSyncResult,
   Workout,
   WorkoutSet,
 } from "./types";
@@ -70,6 +73,28 @@ export const useExerciseHistory = (exerciseId: number | null, excludeWorkoutId: 
       ),
     enabled: exerciseId != null,
   });
+
+/**
+ * With WHOOP connected: each time the screen comes into view, bring in new sleep (the server skips it
+ * if it synced less than `staleMinutes` ago). New nights refresh sleep, points and suggestions.
+ */
+export function useWhoopAutoSync(connected: boolean, staleMinutes: number, onSynced?: (r: WhoopSyncResult) => void) {
+  const callback = useRef(onSynced);
+  useEffect(() => {
+    callback.current = onSynced;
+  });
+  useFocusEffect(
+    useCallback(() => {
+      if (!connected) return;
+      api<WhoopSyncResult>(`/whoop/sync?stale_minutes=${staleMinutes}`, { method: "POST" })
+        .then((r) => {
+          if (!r.skipped && (r.imported || r.replaced_manual)) invalidate(qk.sleep, qk.whoop, ...derivedKeys);
+          callback.current?.(r);
+        })
+        .catch(() => {}); // older data stays on screen
+    }, [connected, staleMinutes]),
+  );
+}
 
 // ---------- helpers ----------
 
@@ -312,4 +337,16 @@ export async function deleteFoods(entries: FoodLogEntry[]): Promise<void> {
     },
   );
   afterFoodChange(date);
+}
+
+// ---------- coach ----------
+
+/** The coach logged or removed something: refresh the screens that show it. */
+export function afterCoachActions(kinds: string[]) {
+  if (!kinds.length) return;
+  const keys: QueryKey[] = [...derivedKeys];
+  if (kinds.some((k) => k === "food" || k === "removed")) keys.push(["food-day"], qk.foodRecent);
+  if (kinds.some((k) => k === "sets" || k === "removed")) keys.push(qk.workouts, ["exercise-history"], ["workout"]);
+  if (kinds.includes("sleep")) keys.push(qk.sleep);
+  invalidate(...keys);
 }
