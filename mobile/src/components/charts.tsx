@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Platform, Text, View, type LayoutChangeEvent } from "react-native";
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
@@ -298,6 +299,7 @@ export function ChartCard({
   children: React.ReactNode;
   table?: { labels: string[]; series: ChartSeries[]; digits?: number };
 }) {
+  const t = useTheme();
   const [showTable, setShowTable] = useState(false);
   return (
     <Card>
@@ -308,13 +310,14 @@ export function ChartCard({
         {!empty && table ? <LinkButton title={showTable ? "Chart" : "Table"} onPress={() => setShowTable(!showTable)} /> : null}
       </Row>
       {subtitle ? (
-        <Txt variant="small" style={{ marginBottom: 4 }}>
+        <Txt variant="tiny" style={{ marginBottom: 8 }}>
           {subtitle}
         </Txt>
       ) : null}
       {empty ? (
-        <View style={{ height: 110, alignItems: "center", justifyContent: "center" }}>
-          <Txt variant="muted" style={{ textAlign: "center" }}>
+        <View style={{ minHeight: 120, alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16 }}>
+          <Ionicons name="analytics-outline" size={22} color={t.muted} />
+          <Txt variant="small" style={{ textAlign: "center", maxWidth: 280 }}>
             {emptyText}
           </Txt>
         </View>

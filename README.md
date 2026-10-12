@@ -64,13 +64,13 @@ Also useful:
 | Today (Home) | Rule-based suggestions with their reasons: today's session or a rest day, "consider going lighter" after a short night or low WHOOP recovery, missed sessions (never "make them up"), when to add weight. Your plan is never changed for you |
 | Workouts | Start a workout, add exercises by **typing the name** (typos are fine) or **scanning the machine's QR code**, log reps, weight (kg or lb), RPE and notes. Each exercise has how-to steps and **alternatives** from the library ("similar movement" or "different movement") |
 | Rest timer | Starts by itself after every set with that exercise's rest time; pause, resume, skip, restart, ±15 s (remembered per exercise); vibrates (or beeps in the browser) at zero |
-| Weekly summary | Progress tab: sessions done vs planned, each lift against last time, records, sleep, weight goal and points, compared with the week before; planned vs done for 8 weeks |
+| Weekly summary | Progress tab → Week: sessions done vs planned, each lift against last time, records, sleep, weight goal and points, compared with the week before; planned vs done for 8 weeks |
 | Wellness points | Points for finished workouts, a full planned week, reaching your sleep goal, eating to plan and weekly weigh-ins; levels and achievements. Never taken away, no penalties for rest days |
 | QR stickers | Workouts tab → "Print QR stickers" shows a printable code for every machine |
 | Food | Search the built-in list, **USDA FoodData Central** and **Open Food Facts**; units change with the food (g/kg/oz/lb for solids, ml/l/cup/gallon… for drinks, or servings); create custom foods by hand with all macros and sub-macros |
 | Progress | Weight trend, projected weight per diet option, calories vs target, macros, lift progress (estimated 1RM), weekly volume per body region, sleep per night (mobile app), month-to-month body measurements with body-fat estimate |
 | Sleep (mobile app) | Choose how to track: **type it in** or **connect WHOOP** (sleep, stages, sleep performance and recovery imported automatically). Log bedtime, wake-up time, quality and notes; set a sleep goal (or use the amount recommended for your age); last night against the goal, sleep stages for WHOOP nights, a 7-night chart with the goal line, this week vs the week before, and bedtime / wake-up consistency. Overlapping entries are refused so a night isn't counted twice |
-| Emails | Opt in/out in the Profile tab; every user has a one-click unsubscribe link (`/api/marketing/unsubscribe/{token}`) |
+| Emails | Opt in/out on the Profile screen (the avatar at the top of Today); every user has a one-click unsubscribe link (`/api/marketing/unsubscribe/{token}`) |
 
 **Scanning QR codes:** on a PC with a webcam it works at `http://localhost:8000`. To test, open the QR sticker page on your phone and hold it up to the webcam, or type the code printed under the sticker (e.g. `leg-press`).
 

@@ -4,7 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { server } from "@/lib/api";
-import { useTheme } from "@/lib/theme";
+import { radius, space, useTheme } from "@/lib/theme";
 
 import { Button, Field, LinkButton, Row, Txt } from "./ui";
 
@@ -15,12 +15,12 @@ export function AuthScreen({ children }: { children: ReactNode }) {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 20, paddingTop: 48, width: "100%", maxWidth: 480, alignSelf: "center" }}
+          contentContainerStyle={{ paddingHorizontal: space.xl, paddingTop: 56, paddingBottom: space.xxl, width: "100%", maxWidth: 440, alignSelf: "center" }}
         >
           <View
-            style={{ width: 52, height: 52, borderRadius: 14, backgroundColor: t.accent, alignItems: "center", justifyContent: "center", marginBottom: 18 }}
+            style={{ width: 48, height: 48, borderRadius: radius.md + 2, backgroundColor: t.ink, alignItems: "center", justifyContent: "center", marginBottom: space.xl }}
           >
-            <Ionicons name="barbell" size={30} color="#fff" />
+            <Ionicons name="barbell" size={24} color={t.inkText} />
           </View>
           {children}
         </ScrollView>
@@ -36,7 +36,7 @@ export function ServerSetting() {
   const [shown, setShown] = useState(server.url);
   if (!editing) {
     return (
-      <Row style={{ justifyContent: "center", marginTop: 28, flexWrap: "wrap" }} gap={6}>
+      <Row style={{ justifyContent: "center", marginTop: space.xxl, flexWrap: "wrap" }} gap={6}>
         <Txt variant="tiny">Server: {shown}</Txt>
         <LinkButton title="Change" onPress={() => setEditing(true)} />
       </Row>

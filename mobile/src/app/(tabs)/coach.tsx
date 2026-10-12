@@ -1,22 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Card, ErrorText, IconButton, LinkButton, Row, Txt } from "@/components/ui";
+import { Button, Card, ErrorText, FadeIn, IconButton, Row, Skeleton, Txt, type IconName } from "@/components/ui";
 import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
 import { tzOffset } from "@/lib/format";
 import { useVoiceMessage } from "@/lib/voice";
-import { useTheme } from "@/lib/theme";
+import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { AssistantAction, AssistantStatus, ChatMessage, ChatReply } from "@/lib/types";
 
-const STARTERS = [
-  "What should I train today?",
-  "Add a banana to breakfast",
-  "How did I sleep this week?",
-  "Am I eating to my plan?",
+const STARTERS: { text: string; icon: IconName }[] = [
+  { text: "What should I train today?", icon: "barbell-outline" },
+  { text: "Add a banana to breakfast", icon: "restaurant-outline" },
+  { text: "How did I sleep this week?", icon: "moon-outline" },
+  { text: "Am I eating to my plan?", icon: "pie-chart-outline" },
 ];
 
 // What each tool looked at, shown under an answer so the user knows where it came from
@@ -39,7 +39,7 @@ const TOOL_LABELS: Record<string, string> = {
   log_sleep: "sleep",
 };
 
-/** Chat with the assistant about your training, sleep and food. It reads your data; it can't change it. */
+/** Chat with the assistant about your training, sleep and food. It reads your data and can log things you ask it to. */
 export default function Coach() {
   const t = useTheme();
   const [status, setStatus] = useState<AssistantStatus | null>(null);
@@ -85,19 +85,20 @@ export default function Coach() {
   };
 
   const messages = status?.messages ?? [];
+  const canSend = !!draft.trim() && !pending;
+  const recording = voice.state === "recording";
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <View style={{ width: "100%", maxWidth: 560, alignSelf: "center", flex: 1 }}>
-          <Row style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, justifyContent: "space-between" }}>
+        <View style={{ width: "100%", maxWidth: 600, alignSelf: "center", flex: 1 }}>
+          <Row style={{ paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm, justifyContent: "space-between" }} gap={space.md}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 26, fontWeight: "800", letterSpacing: -0.5, color: t.text }} accessibilityRole="header">
+              <Text style={[typeScale.overline, { color: t.muted, marginBottom: 2 }]} numberOfLines={1}>
+                {status ? (status.provider === "ollama" ? `ON YOUR PC · ${status.model.toUpperCase()}` : "RUNS ON CLAUDE") : " "}
+              </Text>
+              <Text style={[typeScale.title, { color: t.text }]} accessibilityRole="header">
                 Coach
               </Text>
-              <Txt variant="tiny">
-                Ask about your training, sleep and food, or tell it what to log.
-                {status ? (status.provider === "ollama" ? ` Runs on your PC (${status.model}).` : " Runs on Claude.") : ""}
-              </Txt>
             </View>
             {messages.length ? <IconButton icon="trash-outline" label="Clear conversation" onPress={clear} /> : null}
           </Row>
@@ -105,35 +106,74 @@ export default function Coach() {
           <ScrollView
             ref={scroll}
             style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 16, gap: 10 }}
+            contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.lg, gap: space.md, flexGrow: 1 }}
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}
           >
+            {!status && !error ? (
+              <View style={{ gap: space.md }} accessibilityLabel="Loading the conversation">
+                <Skeleton height={44} width="70%" style={{ borderRadius: radius.lg }} />
+                <Skeleton height={44} width="55%" style={{ borderRadius: radius.lg, alignSelf: "flex-end" }} />
+                <Skeleton height={64} width="80%" style={{ borderRadius: radius.lg }} />
+              </View>
+            ) : null}
             {status && !status.configured ? (
               <Card>
-                <Txt variant="h3">The coach isn&apos;t ready yet</Txt>
-                <Txt variant="small" style={{ marginTop: 6 }} selectable>
+                <Row gap={space.sm}>
+                  <Ionicons name="alert-circle" size={18} color={t.warnInk} />
+                  <Txt variant="h3">The coach isn&apos;t ready yet</Txt>
+                </Row>
+                <Txt variant="small" style={{ marginTop: space.sm }} selectable>
                   {status.problem}
                 </Txt>
-                <View style={{ marginTop: 10 }}>
-                  <LinkButton title="Check again" onPress={() => load().catch((e) => setError((e as Error).message))} />
-                </View>
+                <Button
+                  title="Check again"
+                  kind="soft"
+                  small
+                  onPress={() => load().catch((e) => setError((e as Error).message))}
+                  style={{ marginTop: space.md, alignSelf: "flex-start" }}
+                />
               </Card>
             ) : null}
             {status?.configured && !messages.length && !pending ? (
-              <View style={{ gap: 8 }}>
-                <Txt variant="small">Try one of these:</Txt>
-                {STARTERS.map((q) => (
-                  <Pressable
-                    key={q}
-                    onPress={() => send(q)}
-                    accessibilityRole="button"
-                    style={{ borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, borderRadius: 12, padding: 12 }}
-                  >
-                    <Txt>{q}</Txt>
-                  </Pressable>
-                ))}
-              </View>
+              <FadeIn style={{ flex: 1, justifyContent: "center", paddingVertical: space.xl }}>
+                <View style={{ alignItems: "center", marginBottom: space.xl }}>
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: t.accentSoft, alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons name="chatbubble-ellipses" size={24} color={t.accent} />
+                  </View>
+                  <Txt variant="h2" style={{ marginTop: space.md, textAlign: "center" }}>
+                    How can I help today?
+                  </Txt>
+                  <Txt variant="small" style={{ marginTop: space.xs, textAlign: "center", maxWidth: 320 }}>
+                    Ask about your training, sleep and food, or tell me what to log. I&apos;ll add it right away.
+                  </Txt>
+                </View>
+                <View style={{ gap: space.sm }}>
+                  {STARTERS.map((q) => (
+                    <Pressable
+                      key={q.text}
+                      onPress={() => send(q.text)}
+                      accessibilityRole="button"
+                      style={({ pressed }) => ({
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: space.md,
+                        minHeight: 52,
+                        paddingHorizontal: space.lg,
+                        borderRadius: radius.lg,
+                        backgroundColor: t.surface,
+                        borderWidth: t.dark ? 1 : 0,
+                        borderColor: t.border,
+                        opacity: pressed ? 0.7 : 1,
+                      })}
+                    >
+                      <Ionicons name={q.icon} size={18} color={t.text2} />
+                      <Txt style={{ flex: 1 }}>{q.text}</Txt>
+                      <Ionicons name="arrow-up" size={16} color={t.muted} style={{ transform: [{ rotate: "45deg" }] }} />
+                    </Pressable>
+                  ))}
+                </View>
+              </FadeIn>
             ) : null}
             {messages.map((m) => (
               <Bubble key={m.id} message={m} />
@@ -141,8 +181,8 @@ export default function Coach() {
             {pending ? (
               <>
                 <Bubble message={{ id: -1, role: "user", text: pending, tools_used: [], actions: [], created_at: "" }} />
-                <Row gap={8} style={{ paddingHorizontal: 4 }}>
-                  <ActivityIndicator size="small" color={t.accent} />
+                <Row gap={space.sm} style={{ alignSelf: "flex-start", backgroundColor: t.surface, borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: space.sm + 2 }}>
+                  <ActivityIndicator size="small" color={t.muted} />
                   <Txt variant="small">
                     Looking at your data…{status?.provider === "ollama" ? " (a model on your PC can take up to a minute)" : ""}
                   </Txt>
@@ -153,30 +193,33 @@ export default function Coach() {
           </ScrollView>
 
           {status?.configured ? (
-            <View style={{ borderTopWidth: 1, borderTopColor: t.border, backgroundColor: t.surface, padding: 10 }}>
-              <Row gap={8} style={{ alignItems: "flex-end" }}>
+            <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border, backgroundColor: t.surface, paddingHorizontal: space.md, paddingTop: space.sm + 2, paddingBottom: space.sm }}>
+              <Row gap={space.sm} style={{ alignItems: "flex-end" }}>
                 <TextInput
                   value={draft}
                   onChangeText={setDraft}
-                  placeholder="Ask your coach…"
+                  placeholder={recording ? "Listening…" : "Message your coach"}
                   placeholderTextColor={t.muted}
                   multiline
+                  numberOfLines={1}
                   maxLength={2000}
                   accessibilityLabel="Message"
                   onSubmitEditing={() => send(draft)}
-                  style={{
-                    flex: 1,
-                    minHeight: 42,
-                    maxHeight: 120,
-                    borderWidth: 1,
-                    borderColor: t.border,
-                    borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    color: t.text,
-                    backgroundColor: t.bg,
-                    fontSize: 15,
-                  }}
+                  style={[
+                    typeScale.body,
+                    {
+                      flex: 1,
+                      minHeight: 44,
+                      maxHeight: 120,
+                      borderRadius: 22,
+                      paddingHorizontal: space.lg,
+                      paddingTop: 11,
+                      paddingBottom: 11,
+                      color: t.text,
+                      backgroundColor: t.surface2,
+                      outlineWidth: 0,
+                    },
+                  ]}
                 />
                 <Pressable
                   onPress={() => {
@@ -185,47 +228,53 @@ export default function Coach() {
                   }}
                   disabled={!!pending || voice.state === "transcribing"}
                   accessibilityRole="button"
-                  accessibilityLabel={voice.state === "recording" ? "Stop recording" : "Record a voice message"}
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 21,
+                  accessibilityLabel={recording ? "Stop recording" : "Record a voice message"}
+                  style={({ pressed }) => ({
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: voice.state === "recording" ? t.critical : t.surface2,
-                  }}
+                    backgroundColor: recording ? t.critical : t.surface2,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
                 >
                   {voice.state === "transcribing" ? (
-                    <ActivityIndicator size="small" color={t.accent} />
+                    <ActivityIndicator size="small" color={t.text2} />
                   ) : (
-                    <Ionicons name={voice.state === "recording" ? "stop" : "mic-outline"} size={20} color={voice.state === "recording" ? "#fff" : t.text2} />
+                    <Ionicons name={recording ? "stop" : "mic-outline"} size={20} color={recording ? "#fff" : t.text2} />
                   )}
                 </Pressable>
                 <Pressable
                   onPress={() => send(draft)}
-                  disabled={!draft.trim() || !!pending}
+                  disabled={!canSend}
                   accessibilityRole="button"
                   accessibilityLabel="Send"
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 21,
+                  accessibilityState={{ disabled: !canSend }}
+                  style={({ pressed }) => ({
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: draft.trim() && !pending ? t.accent : t.surface2,
-                  }}
+                    backgroundColor: canSend ? t.ink : t.surface2,
+                    opacity: pressed ? 0.8 : 1,
+                  })}
                 >
-                  <Ionicons name="arrow-up" size={20} color={draft.trim() && !pending ? t.accentInk : t.muted} />
+                  <Ionicons name="arrow-up" size={20} color={canSend ? t.inkText : t.muted} />
                 </Pressable>
               </Row>
               {voice.state !== "idle" ? (
-                <Txt variant="small" style={{ marginTop: 6, color: voice.state === "recording" ? t.critical : t.text2 }}>
-                  {voice.state === "recording"
-                    ? `Recording… ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")}  Tap ■ to stop.`
-                    : "Turning your voice into text…"}
-                </Txt>
+                <Row gap={6} style={{ marginTop: space.sm, paddingHorizontal: space.xs }}>
+                  {recording ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.critical }} /> : null}
+                  <Txt variant="small" style={{ color: recording ? t.critical : t.text2 }}>
+                    {recording
+                      ? `Recording ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")} · tap stop when you're done`
+                      : "Turning your voice into text…"}
+                  </Txt>
+                </Row>
               ) : null}
-              <Txt variant="tiny" style={{ marginTop: 6 }}>
+              <Txt variant="tiny" style={{ marginTop: space.sm, paddingHorizontal: space.xs, fontSize: 11, lineHeight: 15 }}>
                 {status.disclaimer}
                 {status.messages_left_today != null ? ` ${status.messages_left_today} questions left in the last 24 hours.` : ""}
               </Txt>
@@ -242,18 +291,20 @@ function Bubble({ message: m }: { message: ChatMessage }) {
   const mine = m.role === "user";
   const sources = [...new Set(m.tools_used.map((x) => TOOL_LABELS[x] ?? x))];
   return (
-    <View style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "88%" }}>
+    <View style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: mine ? "85%" : "92%" }}>
       <View
         style={{
-          backgroundColor: mine ? t.accent : t.surface,
+          backgroundColor: mine ? t.ink : t.surface,
           borderColor: t.border,
-          borderWidth: mine ? 0 : 1,
-          borderRadius: 14,
-          paddingHorizontal: 12,
-          paddingVertical: 9,
+          borderWidth: !mine && t.dark ? 1 : 0,
+          borderRadius: 20,
+          borderBottomRightRadius: mine ? 6 : 20,
+          borderBottomLeftRadius: mine ? 20 : 6,
+          paddingHorizontal: space.md + 2,
+          paddingVertical: space.sm + 2,
         }}
       >
-        <Text style={{ color: mine ? t.accentInk : t.text, fontSize: 15, lineHeight: 21 }} selectable>
+        <Text style={[typeScale.body, { color: mine ? t.inkText : t.text }]} selectable>
           {m.text}
         </Text>
       </View>
@@ -261,7 +312,7 @@ function Bubble({ message: m }: { message: ChatMessage }) {
         <ActionCard key={`${m.id}-${i}`} action={a} />
       ))}
       {sources.length ? (
-        <Txt variant="tiny" style={{ marginTop: 3, marginLeft: 4 }}>
+        <Txt variant="tiny" style={{ marginTop: space.xs, marginLeft: space.xs }}>
           Looked at: {sources.join(", ")}
         </Txt>
       ) : null}
@@ -269,12 +320,12 @@ function Bubble({ message: m }: { message: ChatMessage }) {
   );
 }
 
-const ACTION_ICON: Record<AssistantAction["kind"], keyof typeof Ionicons.glyphMap> = {
-  food: "restaurant-outline",
-  sets: "barbell-outline",
-  weight: "scale-outline",
-  sleep: "moon-outline",
-  removed: "trash-outline",
+const ACTION_ICON: Record<AssistantAction["kind"], IconName> = {
+  food: "restaurant",
+  sets: "barbell",
+  weight: "scale",
+  sleep: "moon",
+  removed: "trash",
 };
 
 /** Something the coach added: where to see it, and an Undo. */
@@ -282,8 +333,10 @@ function ActionCard({ action }: { action: AssistantAction }) {
   const t = useTheme();
   const [undone, setUndone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const undo = async () => {
     setBusy(true);
+    setError(null);
     try {
       for (const path of action.undo) {
         await api(path, { method: "DELETE" }).catch((e) => {
@@ -291,6 +344,8 @@ function ActionCard({ action }: { action: AssistantAction }) {
         });
       }
       setUndone(true);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -298,30 +353,45 @@ function ActionCard({ action }: { action: AssistantAction }) {
   return (
     <View
       style={{
-        marginTop: 6,
-        borderRadius: 12,
+        marginTop: space.sm,
+        borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: t.border,
-        backgroundColor: undone ? t.surface2 : t.accentSoft,
-        padding: 10,
-        gap: 6,
+        backgroundColor: t.surface,
+        padding: space.md,
       }}
     >
-      <Row gap={8} style={{ alignItems: "flex-start" }}>
-        <Ionicons name={undone ? "arrow-undo-outline" : ACTION_ICON[action.kind]} size={18} color={undone ? t.muted : t.accent} />
-        <Txt variant="small" style={{ flex: 1, color: undone ? t.muted : t.text, textDecorationLine: undone ? "line-through" : "none" }}>
-          {action.kind === "removed" ? "" : "Added: "}
-          {action.summary}
-        </Txt>
+      <Row gap={space.md} style={{ alignItems: "flex-start" }}>
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: radius.sm + 2,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: undone ? t.surface2 : t.goodSoft,
+          }}
+        >
+          <Ionicons name={undone ? "arrow-undo" : ACTION_ICON[action.kind]} size={16} color={undone ? t.muted : t.goodInk} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Txt variant="tiny" style={{ ...typeScale.overline, color: undone ? t.muted : t.goodInk }}>
+            {undone ? "UNDONE" : action.kind === "removed" ? "REMOVED" : "ADDED"}
+          </Txt>
+          <Txt variant="small" style={{ color: undone ? t.muted : t.text, textDecorationLine: undone ? "line-through" : "none" }}>
+            {action.summary}
+          </Txt>
+        </View>
       </Row>
-      {undone ? (
-        <Txt variant="tiny">Undone</Txt>
-      ) : (
-        <Row gap={14}>
-          <LinkButton title="Open" onPress={() => router.push(action.screen as never)} />
-          {action.undo.length ? <LinkButton title={busy ? "Undoing…" : "Undo"} onPress={undo} /> : null}
+      {undone ? null : (
+        <Row gap={space.sm} style={{ marginTop: space.md }}>
+          <Button title="Open" kind="soft" small icon="open-outline" onPress={() => router.push(action.screen as never)} style={{ flex: 1 }} />
+          {action.undo.length ? (
+            <Button title="Undo" kind="ghost" small icon="arrow-undo-outline" loading={busy} onPress={undo} style={{ flex: 1 }} />
+          ) : null}
         </Row>
       )}
+      <ErrorText message={error} />
     </View>
   );
 }

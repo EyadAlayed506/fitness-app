@@ -4,12 +4,12 @@ import { ScrollView } from "react-native";
 
 import { LastNightCard, SleepConsistencyCard, SleepGoalForm, SleepWeekCard } from "@/components/SleepDashboard";
 import { QUALITY, SleepChart, SleepForm, qualityLabel, trackerSummary } from "@/components/SleepParts";
-import { Badge, Card, ListRow, Loading, Section, Sheet, Txt, useToast } from "@/components/ui";
+import { Badge, Card, EmptyState, ListRow, Loading, Section, Sheet, SkeletonCards, Txt, useToast } from "@/components/ui";
 import { WhoopCard, syncSummary } from "@/components/WhoopCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { clockOf, hoursMinutes, longDate, tzOffset } from "@/lib/format";
-import { useTheme } from "@/lib/theme";
+import { space, useTheme } from "@/lib/theme";
 import type { SleepAnalytics, SleepEntry, WhoopStatus, WhoopSyncResult } from "@/lib/types";
 
 type SheetState = { kind: "new" } | { kind: "edit"; entry: SleepEntry } | { kind: "goal" } | null;
@@ -63,7 +63,8 @@ export default function Sleep() {
   };
 
   return (
-    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 40, width: "100%", maxWidth: 560, alignSelf: "center" }}>
+    <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl, width: "100%", maxWidth: 600, alignSelf: "center" }}>
+      {stats ? null : <SkeletonCards count={2} />}
       {stats ? <LastNightCard data={stats} onEditGoal={() => setSheet({ kind: "goal" })} /> : null}
       {stats ? <SleepWeekCard data={stats} /> : null}
       {stats ? <SleepConsistencyCard data={stats} /> : null}
@@ -79,8 +80,8 @@ export default function Sleep() {
 
       {stats ? <SleepChart data={stats} /> : null}
 
-      <Section title="History" />
-      <Card>
+      <Section title="History" action="Log sleep" onAction={() => setSheet({ kind: "new" })} />
+      <Card style={entries.length ? { paddingVertical: space.xs } : undefined}>
         {entries.length ? (
           entries.map((e, i) => (
             <ListRow
@@ -100,12 +101,16 @@ export default function Sleep() {
             />
           ))
         ) : (
-          <Txt variant="muted" style={{ textAlign: "center" }}>
-            No sleep logged yet.
-          </Txt>
+          <EmptyState
+            icon="moon-outline"
+            title="No sleep logged yet"
+            text="Log last night by hand, or connect WHOOP to import it."
+            action="Log sleep"
+            onAction={() => setSheet({ kind: "new" })}
+          />
         )}
       </Card>
-      <Txt variant="tiny" style={{ textAlign: "center", marginTop: 4 }}>
+      <Txt variant="tiny" style={{ textAlign: "center", marginTop: space.xs, paddingHorizontal: space.sm }}>
         Quality: {QUALITY.map((q) => `${q.value} = ${q.label}`).join(", ")}. Recommended hours follow CDC / National Sleep Foundation guidance for your age.
       </Txt>
 

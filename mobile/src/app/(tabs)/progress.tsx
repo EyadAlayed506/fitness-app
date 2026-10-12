@@ -1,11 +1,27 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { Chart, ChartCard, type ChartSeries } from "@/components/charts";
 import { SleepChart } from "@/components/SleepParts";
 import { WeeklySummaryCard } from "@/components/WeeklySummary";
-import { Button, Card, Chips, ErrorText, Field, Row, Screen, Section, Sheet, Txt, useToast } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Chips,
+  EmptyState,
+  ErrorText,
+  FadeIn,
+  Field,
+  Row,
+  Screen,
+  Section,
+  Segmented,
+  Sheet,
+  SkeletonCards,
+  Txt,
+  useToast,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { fmt, monthLabel, round, shortDate, todayISO, units } from "@/lib/format";
@@ -30,6 +46,15 @@ interface Data {
   sleep: SleepAnalytics;
 }
 
+type View_ = "week" | "body" | "food" | "strength" | "sleep";
+const VIEWS: { value: View_; label: string }[] = [
+  { value: "week", label: "Week" },
+  { value: "body", label: "Body" },
+  { value: "food", label: "Food" },
+  { value: "strength", label: "Strength" },
+  { value: "sleep", label: "Sleep" },
+];
+
 const hasValues = (series: { data: (number | null)[] }[]) => series.some((s) => s.data.some((v) => v != null && v !== 0));
 
 export default function Progress() {
@@ -40,6 +65,9 @@ export default function Progress() {
   const [liftId, setLiftId] = useState<number | null>(null);
   const [lift, setLift] = useState<ExerciseProgress | null>(null);
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<View_>("week");
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadCompare = async (months?: string[]) =>
     api<MeasurementCompare>(`/measurements/compare${months ? `?months=${months.join(",")}` : ""}`);
@@ -55,12 +83,13 @@ export default function Progress() {
       api<SleepAnalytics>("/analytics/sleep?days=14"),
     ]);
     setData({ weight, projection, calories, volume, lifts, compare, sleep });
+    setError(null);
     const first = lifts[0]?.id ?? null;
     setLiftId((current) => (current && lifts.some((l) => l.id === current) ? current : first));
   }, []);
   useFocusEffect(
     useCallback(() => {
-      load().catch(() => {});
+      load().catch((e: Error) => setError(e.message));
     }, [load]),
   );
   useFocusEffect(
@@ -73,7 +102,19 @@ export default function Progress() {
     }, [liftId]),
   );
 
-  if (!data) return <Screen title="Progress" subtitle="Loading…">{null}</Screen>;
+  if (!data)
+    return (
+      <Screen title="Progress">
+        {error ? (
+          <Card>
+            <ErrorText message={error} />
+            <Button title="Try again" kind="soft" small onPress={() => load().catch((e: Error) => setError(e.message))} style={{ marginTop: 12, alignSelf: "flex-start" }} />
+          </Card>
+        ) : (
+          <SkeletonCards count={3} />
+        )}
+      </Screen>
+    );
   const { weight, projection, calories, volume, lifts, compare } = data;
   const kg = (vals: (number | null)[]) => vals.map((v) => (v == null ? null : round(u.fromKg(v), 2)));
 
@@ -115,86 +156,116 @@ export default function Progress() {
   const vSeries: ChartSeries[] = volume.series.map((s, i) => ({ name: s.name, data: kg(s.data), color: t.series[i], type: "bar" }));
 
   return (
-    <Screen title="Progress" subtitle="Weight loss and strength over time">
-      <WeeklySummaryCard />
+    <Screen
+      title="Progress"
+      refreshing={refreshing}
+      onRefresh={async () => {
+        setRefreshing(true);
+        await load().catch((e: Error) => setError(e.message));
+        setRefreshing(false);
+      }}
+    >
+      <Segmented options={VIEWS} value={view} onChange={setView} style={{ marginBottom: 16 }} />
+      <ErrorText message={error} />
 
-      <ChartCard
-        title={`Body weight (${u.w})`}
-        subtitle="Each weigh-in, the 7-day average and your BMI 22 target"
-        empty={!hasValues(wSeries.filter((s) => s.type !== "ref"))}
-        emptyText="Log your weight on the Home tab to see the trend."
-        table={{ labels: wLabels, series: wSeries }}
-      >
-        <Chart labels={wLabels} series={wSeries} />
-      </ChartCard>
+      {view === "week" ? <WeeklySummaryCard /> : null}
 
-      <ChartCard
-        title={`Projected weight (${u.w})`}
-        subtitle={projection.note}
-        empty={!pSeries.length}
-        emptyText="You're at a healthy weight, so there's nothing to project."
-        table={{ labels: projection.labels.map(String), series: pSeries }}
-      >
-        <Chart labels={projection.labels.map(String)} series={pSeries} xTitle="Weeks from today" />
-      </ChartCard>
+      {view === "body" ? (
+        <FadeIn key="body">
+          <ChartCard
+            title={`Body weight (${u.w})`}
+            subtitle="Each weigh-in, the 7-day average and your BMI 22 target"
+            empty={!hasValues(wSeries.filter((s) => s.type !== "ref"))}
+            emptyText="Log your weight on the Today tab to see the trend."
+            table={{ labels: wLabels, series: wSeries }}
+          >
+            <Chart labels={wLabels} series={wSeries} />
+          </ChartCard>
 
-      <ChartCard
-        title="Calories, last 14 days"
-        subtitle="Daily intake against your target"
-        empty={!hasValues(cSeries.filter((s) => s.type !== "ref"))}
-        emptyText="Log food to see your daily calories."
-        table={{ labels: cLabels, series: cSeries, digits: 0 }}
-      >
-        <Chart labels={cLabels} series={cSeries} digits={0} />
-      </ChartCard>
+          <ChartCard
+            title={`Projected weight (${u.w})`}
+            subtitle={projection.note}
+            empty={!pSeries.length}
+            emptyText="You're at a healthy weight, so there's nothing to project."
+            table={{ labels: projection.labels.map(String), series: pSeries }}
+          >
+            <Chart labels={projection.labels.map(String)} series={pSeries} xTitle="Weeks from today" />
+          </ChartCard>
 
-      <ChartCard
-        title="Macros, last 14 days (g)"
-        empty={!hasValues(mSeries)}
-        emptyText="Log food to see your macros."
-        table={{ labels: cLabels, series: mSeries, digits: 0 }}
-      >
-        <Chart labels={cLabels} series={mSeries} stacked digits={0} />
-      </ChartCard>
+          <Section title="Body measurements" action="Add" onAction={() => setAdding(true)} />
+          <Measurements
+            compare={compare}
+            onAdd={() => setAdding(true)}
+            onChangeMonths={async (months) => setData({ ...data, compare: await loadCompare(months) })}
+          />
+        </FadeIn>
+      ) : null}
 
-      <ChartCard
-        title={`Lift progress (${u.w})`}
-        subtitle="Estimated 1-rep max (Epley) and heaviest set per workout"
-        empty={!lifts.length}
-        emptyText="Log a workout to see your strength progress."
-        table={{ labels: lLabels, series: lSeries }}
-      >
-        <Chips
-          value={liftId ?? 0}
-          onChange={setLiftId}
-          options={lifts.slice(0, 6).map((l) => ({ value: l.id, label: l.name }))}
-          style={{ marginTop: 4, marginBottom: 6 }}
-        />
-        {lift && hasValues(lSeries) ? (
-          <Chart labels={lLabels} series={lSeries} />
-        ) : (
-          <Txt variant="muted">No sets with weight for this exercise yet.</Txt>
-        )}
-      </ChartCard>
+      {view === "food" ? (
+        <FadeIn key="food">
+          <ChartCard
+            title="Calories, last 14 days"
+            subtitle="Daily intake against your target"
+            empty={!hasValues(cSeries.filter((s) => s.type !== "ref"))}
+            emptyText="Log food to see your daily calories."
+            table={{ labels: cLabels, series: cSeries, digits: 0 }}
+          >
+            <Chart labels={cLabels} series={cSeries} digits={0} />
+          </ChartCard>
 
-      <ChartCard
-        title="Weekly training volume"
-        subtitle={`Reps × weight (${u.w}) per body region, weeks starting`}
-        empty={!hasValues(vSeries)}
-        emptyText="Log workouts to see your weekly volume."
-        table={{ labels: vLabels, series: vSeries, digits: 0 }}
-      >
-        <Chart labels={vLabels} series={vSeries} stacked digits={0} />
-      </ChartCard>
+          <ChartCard
+            title="Macros, last 14 days (g)"
+            empty={!hasValues(mSeries)}
+            emptyText="Log food to see your macros."
+            table={{ labels: cLabels, series: mSeries, digits: 0 }}
+          >
+            <Chart labels={cLabels} series={mSeries} stacked digits={0} />
+          </ChartCard>
+        </FadeIn>
+      ) : null}
 
-      <SleepChart data={data.sleep} />
+      {view === "strength" ? (
+        <FadeIn key="strength">
+          <ChartCard
+            title={`Lift progress (${u.w})`}
+            subtitle="Estimated 1-rep max (Epley) and heaviest set per workout"
+            empty={!lifts.length}
+            emptyText="Log a workout to see your strength progress."
+            table={{ labels: lLabels, series: lSeries }}
+          >
+            <Chips
+              value={liftId ?? 0}
+              onChange={setLiftId}
+              options={lifts.slice(0, 6).map((l) => ({ value: l.id, label: l.name }))}
+              style={{ marginTop: 4, marginBottom: 6 }}
+            />
+            {lift && hasValues(lSeries) ? (
+              <Chart labels={lLabels} series={lSeries} />
+            ) : (
+              <Txt variant="small" style={{ paddingVertical: 16, textAlign: "center" }}>
+                No sets with weight for this exercise yet.
+              </Txt>
+            )}
+          </ChartCard>
 
-      <Section title="Body measurements" />
-      <Measurements
-        compare={compare}
-        onChangeMonths={async (months) => setData({ ...data, compare: await loadCompare(months) })}
-      />
-      <Button title="Add measurements" kind="ghost" onPress={() => setAdding(true)} />
+          <ChartCard
+            title="Weekly training volume"
+            subtitle={`Reps × weight (${u.w}) per body region, weeks starting`}
+            empty={!hasValues(vSeries)}
+            emptyText="Log workouts to see your weekly volume."
+            table={{ labels: vLabels, series: vSeries, digits: 0 }}
+          >
+            <Chart labels={vLabels} series={vSeries} stacked digits={0} />
+          </ChartCard>
+        </FadeIn>
+      ) : null}
+
+      {view === "sleep" ? (
+        <FadeIn key="sleep">
+          <SleepChart data={data.sleep} />
+        </FadeIn>
+      ) : null}
+
       <Sheet visible={adding} title="Add measurements" onClose={() => setAdding(false)}>
         {adding ? (
           <MeasurementForm
@@ -211,17 +282,30 @@ export default function Progress() {
 
 const SHRINK_IS_GOOD = ["waist_cm", "hips_cm", "neck_cm", "body_fat_pct"];
 
-function Measurements({ compare, onChangeMonths }: { compare: MeasurementCompare; onChangeMonths: (m: string[]) => void }) {
+function Measurements({
+  compare,
+  onChangeMonths,
+  onAdd,
+}: {
+  compare: MeasurementCompare;
+  onChangeMonths: (m: string[]) => void;
+  onAdd: () => void;
+}) {
   const t = useTheme();
   const { profile } = useProfile();
   const u = units(profile.unit_system);
   if (!compare.rows.length) {
     return (
       <Card>
-        <Txt variant="muted" style={{ textAlign: "center" }}>
-          Add measurements (waist, shoulders…) at least once a month to compare months.
-          {compare.available_months.length === 1 ? " You have one month so far." : ""}
-        </Txt>
+        <EmptyState
+          icon="resize-outline"
+          title="Compare your measurements"
+          text={`Add measurements (waist, shoulders…) at least once a month to compare months.${
+            compare.available_months.length === 1 ? " You have one month so far." : ""
+          }`}
+          action="Add measurements"
+          onAction={onAdd}
+        />
       </Card>
     );
   }
@@ -254,7 +338,7 @@ function Measurements({ compare, onChangeMonths }: { compare: MeasurementCompare
         const good = d != null && d !== 0 && d < 0 === SHRINK_IS_GOOD.includes(r.field);
         const color = d == null || d === 0 ? t.text : good ? t.goodInk : t.critical;
         return (
-          <Row key={r.field} style={{ paddingVertical: 7, borderTopWidth: 1, borderTopColor: t.border }}>
+          <Row key={r.field} style={{ paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }}>
             <Text style={{ flex: 1.2, color: t.text, fontSize: 13 }}>{r.label}</Text>
             <Text style={cell}>{val(r.field, r.first)}</Text>
             <Text style={cell}>{val(r.field, r.second)}</Text>

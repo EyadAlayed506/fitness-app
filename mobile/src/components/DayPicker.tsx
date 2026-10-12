@@ -33,16 +33,15 @@ export function DayPicker({ value, onChange }: { value: number[]; onChange: (day
               accessibilityState={{ checked: on, disabled }}
               style={{
                 flex: 1,
-                paddingVertical: 10,
+                minHeight: 44,
                 borderRadius: 10,
-                borderWidth: 1.5,
                 alignItems: "center",
-                borderColor: on ? t.accent : t.border,
-                backgroundColor: on ? t.accent : t.surface,
-                opacity: disabled ? 0.45 : 1,
+                justifyContent: "center",
+                backgroundColor: on ? t.ink : t.surface2,
+                opacity: disabled ? 0.4 : 1,
               }}
             >
-              <Text style={{ color: on ? t.accentInk : t.text, fontWeight: on ? "700" : "500", fontSize: 13 }}>{label}</Text>
+              <Text style={{ color: on ? t.inkText : t.text, fontWeight: on ? "600" : "500", fontSize: 13 }}>{label}</Text>
             </Pressable>
           );
         })}

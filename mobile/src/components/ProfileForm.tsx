@@ -174,7 +174,7 @@ export function ProfileForm({ profile, onSaved }: { profile: Profile | null; onS
         <Chips label="Equipment" value={equipment} onChange={setEquipment} options={EQUIPMENT} />
       </Card>
       <ErrorText message={error} />
-      <Button title={profile ? "Save changes" : "See my plan"} onPress={save} style={{ marginTop: 8 }} />
+      <Button title={profile ? "Save changes" : "See my plan"} onPress={save} style={{ marginTop: 16 }} />
     </View>
   );
 }

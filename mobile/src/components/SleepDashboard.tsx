@@ -34,11 +34,11 @@ export function LastNightCard({ data, onEditGoal }: { data: SleepAnalytics; onEd
       <CardHead title="Last night" right={night ? sourceBadge(night) : undefined} />
       {night ? (
         <>
-          <Row style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-            <Txt>
+          <Row style={{ justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap" }}>
+            <View style={{ flexShrink: 1 }}>
               <Txt variant="big">{hoursMinutes(night.minutes)}</Txt>
-              <Txt variant="muted"> of your {goalHours(goal)} goal</Txt>
-            </Txt>
+              <Txt variant="small">of your {goalHours(goal)} goal</Txt>
+            </View>
             {night.points ? <Badge label="Points earned" tone="good" /> : null}
           </Row>
           <View style={{ marginTop: 8 }}>

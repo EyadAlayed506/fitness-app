@@ -10,7 +10,7 @@ import {
   type RestTimerAction,
   type RestTimerState,
 } from "@/lib/restTimer";
-import { useTheme } from "@/lib/theme";
+import { radius, space, useTheme } from "@/lib/theme";
 import type { RestSetting } from "@/lib/types";
 
 import { Button, Meter, Row, Txt } from "./ui";
@@ -126,7 +126,7 @@ export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; c
 
   return (
     <View
-      style={{ borderRadius: 12, padding: 12, marginTop: 12, backgroundColor: done ? t.accentSoft : t.surface2 }}
+      style={{ borderRadius: radius.md, padding: space.md + 2, marginTop: space.md, backgroundColor: done ? t.accentSoft : t.surface2 }}
       accessibilityLabel={`Rest timer, ${formatRest(left)} left`}
     >
       <Row style={{ justifyContent: "space-between" }}>
@@ -142,7 +142,7 @@ export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; c
       </Row>
       <Row style={{ alignItems: "baseline", marginTop: 4 }} gap={8}>
         <Text
-          style={{ fontSize: compact ? 28 : 44, fontWeight: "700", color: done ? t.accent : t.text, fontVariant: ["tabular-nums"] }}
+          style={{ fontSize: compact ? 28 : 44, fontWeight: "700", letterSpacing: -0.8, color: done ? t.accent : t.text, fontVariant: ["tabular-nums"] }}
           accessibilityLiveRegion="polite"
         >
           {done ? "0:00" : formatRest(left)}
@@ -151,12 +151,12 @@ export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; c
           {done ? "Time for your next set" : paused ? "Paused" : `of ${formatRest(total)}`}
         </Txt>
       </Row>
-      {running || paused ? <View style={{ marginTop: 6 }}><Meter value={total - left} max={total} height={6} /></View> : null}
+      {running || paused ? <View style={{ marginTop: 6 }}><Meter value={total - left} max={total} height={4} /></View> : null}
       <Row style={{ marginTop: 10, flexWrap: "wrap" }} gap={6}>
         {running ? <Button title="Pause" icon="pause" small onPress={() => dispatch({ type: "pause", now: Date.now() })} /> : null}
         {paused ? <Button title="Resume" icon="play" small onPress={() => dispatch({ type: "resume", now: Date.now() })} /> : null}
         {state.status === "idle" || done ? (
-          <Button title={done ? "Start again" : "Start rest"} icon="timer-outline" small kind="soft" onPress={() => dispatch({ type: "start", now: Date.now() })} />
+          <Button title={done ? "Start again" : "Start rest"} icon="timer-outline" small onPress={() => dispatch({ type: "start", now: Date.now() })} />
         ) : null}
         {running || paused ? <Button title="Restart" icon="refresh" small kind="ghost" onPress={() => dispatch({ type: "restart", now: Date.now() })} /> : null}
         {running || paused || done ? <Button title={done ? "Dismiss" : "Skip"} small kind="ghost" onPress={() => dispatch({ type: "skip" })} /> : null}

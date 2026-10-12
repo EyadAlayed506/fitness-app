@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AuthScreen, ServerSetting } from "@/components/AuthScreen";
 import { Button, Checkbox, ErrorText, Field, LinkButton, Row, Txt } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { space, type as typeScale } from "@/lib/theme";
 
 export default function Signup() {
   const { token, signup } = useAuth();
@@ -29,19 +30,19 @@ export default function Signup() {
 
   return (
     <AuthScreen>
-      <Txt variant="h2" style={{ fontSize: 28 }}>
+      <Txt variant="h2" style={{ ...typeScale.title, fontSize: 28, lineHeight: 34 }}>
         Create your account
       </Txt>
-      <Txt variant="muted" style={{ marginTop: 4 }}>
+      <Txt variant="small" style={{ marginTop: space.xs, marginBottom: space.md }}>
         Get your BMI, daily calories and a workout plan in a minute.
       </Txt>
       <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
       <Field label="Password (at least 8 characters)" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" />
       <Checkbox checked={marketing} onChange={setMarketing} label="Email me ads and discounts. You can unsubscribe at any time." />
       <ErrorText message={error} />
-      <Button title="Sign up" onPress={submit} style={{ marginTop: 16 }} />
-      <Row style={{ justifyContent: "center", marginTop: 16 }} gap={6}>
-        <Txt variant="muted">Already have an account?</Txt>
+      <Button title="Sign up" onPress={submit} style={{ marginTop: space.xl }} />
+      <Row style={{ justifyContent: "center", marginTop: space.lg }} gap={6}>
+        <Txt variant="small">Already have an account?</Txt>
         <LinkButton title="Log in" onPress={() => router.replace("/login")} />
       </Row>
       <ServerSetting />

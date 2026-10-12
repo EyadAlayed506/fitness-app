@@ -1,27 +1,51 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import { MacroBars } from "@/components/MacroBars";
-import { SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
-import { goalHours } from "@/components/SleepDashboard";
-import { TodayCard } from "@/components/TodayCard";
 import { PointsCard } from "@/components/PointsParts";
-import { Badge, Button, Card, CardHead, Field, LinkButton, Meter, Row, Screen, Section, Sheet, Stat, Txt, useToast } from "@/components/ui";
+import { goalHours } from "@/components/SleepDashboard";
+import { SleepForm, qualityLabel, rangeBadge, trackerSummary } from "@/components/SleepParts";
+import { TodayCard } from "@/components/TodayCard";
+import {
+  Badge,
+  Button,
+  Card,
+  ErrorText,
+  FadeIn,
+  Field,
+  ProgressRing,
+  Row,
+  Screen,
+  Section,
+  Sheet,
+  Skeleton,
+  Stat,
+  Txt,
+  useToast,
+  type IconName,
+} from "@/components/ui";
 import { api } from "@/lib/api";
 import { useAuth, useProfile } from "@/lib/auth";
 import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, tzOffset, units } from "@/lib/format";
 import { profilePayload } from "@/lib/profile";
-import { useTheme } from "@/lib/theme";
+import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { DietOption, FoodDay, Plan, Points, Recommendations, SleepAnalytics, SleepEntry, WhoopStatus } from "@/lib/types";
 
 const BMI_BADGE = { underweight: "info", normal: "good", overweight: "warn", obese: "bad" } as const;
 const SCALE_MIN = 15;
 const SCALE_MAX = 40;
 
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 5 ? "Good evening" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
 export default function Home() {
+  const t = useTheme();
   const toast = useToast();
-  const { refresh } = useAuth();
+  const { refresh, user } = useAuth();
   const { profile, plan } = useProfile();
   const u = units(profile.unit_system);
   const [day, setDay] = useState<FoodDay | null>(null);
@@ -30,33 +54,42 @@ export default function Home() {
   const [today, setToday] = useState<Recommendations | null>(null);
   const [points, setPoints] = useState<Points | null>(null);
   const [whoopConnected, setWhoopConnected] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const whoop = await api<WhoopStatus>("/whoop").catch(() => null);
-    setWhoopConnected(!!whoop?.connected);
-    if (whoop?.connected) {
-      // bring in last night's WHOOP sleep (at most every 30 minutes); failures just show older data
-      await api("/whoop/sync?stale_minutes=30", { method: "POST" }).catch(() => null);
+    try {
+      const whoop = await api<WhoopStatus>("/whoop").catch(() => null);
+      setWhoopConnected(!!whoop?.connected);
+      if (whoop?.connected) {
+        // bring in last night's WHOOP sleep (at most every 30 minutes); failures just show older data
+        await api("/whoop/sync?stale_minutes=30", { method: "POST" }).catch(() => null);
+      }
+      const [food, sleeps, stats, recs] = await Promise.all([
+        api<FoodDay>(`/food-logs?date=${todayISO()}`),
+        api<SleepEntry[]>("/sleep?limit=1"),
+        api<SleepAnalytics>(`/analytics/sleep?days=7&tz_offset=${tzOffset()}`),
+        api<Recommendations>(`/me/recommendations?tz_offset=${tzOffset()}`).catch(() => null),
+      ]);
+      setToday(recs);
+      // after the sync above, so last night's WHOOP sleep can count
+      setPoints(await api<Points>(`/points?tz_offset=${tzOffset()}`).catch(() => null));
+      setDay(food);
+      setLastSleep(sleeps[0] ?? null);
+      setSleepStats(stats);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't load today. Pull down to try again.");
+    } finally {
+      setLoaded(true);
     }
-    const [food, sleeps, stats, recs] = await Promise.all([
-      api<FoodDay>(`/food-logs?date=${todayISO()}`),
-      api<SleepEntry[]>("/sleep?limit=1"),
-      api<SleepAnalytics>(`/analytics/sleep?days=7&tz_offset=${tzOffset()}`),
-      api<Recommendations>(`/me/recommendations?tz_offset=${tzOffset()}`).catch(() => null),
-    ]);
-    setToday(recs);
-    // after the sync above, so last night's WHOOP sleep can count
-    setPoints(await api<Points>(`/points?tz_offset=${tzOffset()}`).catch(() => null));
-    setDay(food);
-    setLastSleep(sleeps[0] ?? null);
-    setSleepStats(stats);
   }, []);
   useFocusEffect(
     useCallback(() => {
-      load().catch(() => {});
+      load();
     }, [load]),
   );
 
@@ -80,11 +113,27 @@ export default function Home() {
   const eaten = day?.totals.calories ?? 0;
   const target = plan.target_calories;
   const change = plan.weight_change_kg;
+  const left = target - eaten;
+  const initial = (user?.email ?? "?").charAt(0).toUpperCase();
 
   return (
     <Screen
-      title="Hi there"
-      subtitle={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+      title={greeting()}
+      subtitle={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }).toUpperCase()}
+      right={
+        <Pressable
+          onPress={() => router.push("/profile")}
+          accessibilityRole="button"
+          accessibilityLabel="Profile and settings"
+          hitSlop={4}
+          style={({ pressed }) => [
+            { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: t.ink, alignItems: "center", justifyContent: "center" },
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <Text style={[typeScale.bodyStrong, { color: t.inkText }]}>{initial}</Text>
+        </Pressable>
+      }
       refreshing={refreshing}
       onRefresh={async () => {
         setRefreshing(true);
@@ -92,151 +141,256 @@ export default function Home() {
         setRefreshing(false);
       }}
     >
-      {today ? <TodayCard data={today} /> : null}
-      {points ? <PointsCard data={points} /> : null}
+      {error ? (
+        <Card>
+          <ErrorText message={error} />
+          <Button title="Try again" kind="soft" small onPress={load} style={{ marginTop: space.md, alignSelf: "flex-start" }} />
+        </Card>
+      ) : null}
 
-      <Card>
-        <CardHead title="Body mass index" right={<Badge label={cap(plan.bmi_category)} tone={BMI_BADGE[plan.bmi_category]} />} />
-        <Row style={{ justifyContent: "space-between", alignItems: "flex-end" }}>
-          <Txt variant="hero">{plan.bmi.toFixed(1)}</Txt>
-          <View style={{ alignItems: "flex-end" }}>
-            <Txt variant="small">
-              {u.weight(profile.weight_kg)} · {u.length(profile.height_cm, u.imperial ? 1 : 0)}
+      {!loaded ? (
+        <HomeSkeleton />
+      ) : (
+        <FadeIn>
+          {today ? <TodayCard data={today} /> : null}
+
+          {/* Calories: a ring for the headline number, macros beside it */}
+          <Card onPress={() => router.push("/food")}>
+            <Row style={{ justifyContent: "space-between", marginBottom: space.md }}>
+              <Txt variant="h3">Calories</Txt>
+              <Ionicons name="chevron-forward" size={18} color={t.muted} />
+            </Row>
+            <Row gap={space.lg + 4} style={{ alignItems: "center" }}>
+              <ProgressRing
+                value={eaten}
+                max={target}
+                diameter={112}
+                stroke={9}
+                color={left < 0 ? t.warn : t.accent}
+                label={`${fmt(eaten)} of ${fmt(target)} calories eaten`}
+              >
+                <Txt style={{ ...typeScale.heading, fontSize: 22, lineHeight: 26, fontVariant: ["tabular-nums"] }}>{fmt(Math.abs(left))}</Txt>
+                <Txt variant="tiny">{left >= 0 ? "kcal left" : "kcal over"}</Txt>
+              </ProgressRing>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                {day ? <MacroBars totals={day.totals} targetKcal={target} stacked /> : null}
+                <Txt variant="tiny" style={{ marginTop: space.md }}>
+                  {fmt(eaten)} eaten · {fmt(target)} target
+                </Txt>
+              </View>
+            </Row>
+          </Card>
+
+          {/* Sleep */}
+          <Card>
+            <Pressable onPress={() => router.push("/sleep")} accessibilityRole="button" accessibilityLabel="Open sleep">
+              <Row style={{ justifyContent: "space-between" }}>
+                <Txt variant="h3">Sleep</Txt>
+                <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              </Row>
+              {lastSleep ? (
+                <>
+                  <Row style={{ justifyContent: "space-between", alignItems: "flex-end", marginTop: space.sm, flexWrap: "wrap" }}>
+                    <Txt>
+                      <Txt variant="big">{hoursMinutes(lastSleep.duration_minutes)}</Txt>
+                      <Txt variant="small">
+                        {"  "}
+                        {lastSleep.date === todayISO() ? "last night" : `night to ${shortDate(lastSleep.date)}`}
+                      </Txt>
+                    </Txt>
+                    <Row gap={6}>
+                      {lastSleep.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : null}
+                      {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
+                    </Row>
+                  </Row>
+                  <Txt variant="small" style={{ marginTop: 2 }}>
+                    {clockOf(lastSleep.bedtime)} → {clockOf(lastSleep.wake_time)}
+                    {lastSleep.source !== "manual" && trackerSummary(lastSleep) ? ` · ${trackerSummary(lastSleep)}` : ""}
+                  </Txt>
+                  {sleepStats?.average_hours_7d != null ? (
+                    <Row style={{ justifyContent: "space-between", marginTop: space.md, gap: space.sm }}>
+                      <Txt variant="tiny" style={{ flex: 1 }}>
+                        7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · goal {goalHours(sleepStats.goal_minutes)}
+                      </Txt>
+                      {rangeBadge(sleepStats.average_hours_7d, sleepStats.recommended_hours)}
+                    </Row>
+                  ) : null}
+                </>
+              ) : (
+                <Txt variant="small" style={{ marginTop: space.sm }}>
+                  No sleep logged yet. Add last night by hand, or connect WHOOP to import it automatically.
+                </Txt>
+              )}
+            </Pressable>
+            {whoopConnected ? null : (
+              <Row style={{ marginTop: space.lg }}>
+                <Button title="Log sleep" icon="moon" kind="soft" small onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
+                <Button title="Connect WHOOP" kind="ghost" small onPress={() => router.push("/sleep")} style={{ flex: 1 }} />
+              </Row>
+            )}
+          </Card>
+          <Sheet visible={loggingSleep} title="Log sleep" onClose={() => setLoggingSleep(false)}>
+            {loggingSleep ? (
+              <SleepForm
+                onSaved={async (message) => {
+                  setLoggingSleep(false);
+                  toast(message);
+                  await load();
+                }}
+              />
+            ) : null}
+          </Sheet>
+
+          {points ? <PointsCard data={points} /> : null}
+
+          <Shortcut
+            icon="chatbubble-ellipses"
+            title="Ask your coach"
+            text="Questions, or “log a banana for breakfast”"
+            onPress={() => router.push("/coach")}
+          />
+
+          <Section title="Weigh-in" />
+          <Card>
+            <Row style={{ alignItems: "flex-end" }}>
+              <Field
+                label={`Today's weight · last ${u.weight(profile.weight_kg)}`}
+                placeholder={u.w === "kg" ? "e.g. 72.5" : "e.g. 160"}
+                value={weight}
+                onChangeText={setWeight}
+                keyboardType="decimal-pad"
+                suffix={u.w}
+                style={{ flex: 1, marginTop: 0 }}
+                accessibilityLabel="Today's weight"
+                onSubmitEditing={saveWeight}
+              />
+              <Button title="Save" onPress={saveWeight} disabled={!weight.trim()} />
+            </Row>
+          </Card>
+
+          <Section title="Your plan" />
+          <Card>
+            <Row style={{ justifyContent: "space-between" }}>
+              <Txt variant="h3">Body mass index</Txt>
+              <Badge label={cap(plan.bmi_category)} tone={BMI_BADGE[plan.bmi_category]} />
+            </Row>
+            <Row style={{ justifyContent: "space-between", alignItems: "flex-end", marginTop: space.sm }}>
+              <Txt variant="big">{plan.bmi.toFixed(1)}</Txt>
+              <View style={{ alignItems: "flex-end" }}>
+                <Txt variant="small">
+                  {u.weight(profile.weight_kg)} · {u.length(profile.height_cm, u.imperial ? 1 : 0)}
+                </Txt>
+                <Txt variant="small">Age {plan.age}</Txt>
+              </View>
+            </Row>
+            <BmiScale bmi={plan.bmi} />
+            <Txt variant="small" style={{ marginTop: space.md, color: t.text }}>
+              {plan.direction === "maintain" ? (
+                "You are in the healthy range. Your plan keeps your weight steady."
+              ) : (
+                <>
+                  {change < 0 ? "Lose " : "Gain "}
+                  <Txt variant="small" style={{ fontWeight: "700", color: t.text }}>
+                    {u.weight(Math.abs(change))}
+                  </Txt>{" "}
+                  to reach the optimal BMI of 22 (
+                  <Txt variant="small" style={{ fontWeight: "700", color: t.text }}>
+                    {u.weight(plan.optimal_weight_kg)}
+                  </Txt>
+                  ).
+                </>
+              )}
             </Txt>
-            <Txt variant="small">Age {plan.age}</Txt>
+            <Txt variant="tiny" style={{ marginTop: space.xs }}>
+              Healthy weight for your height: {u.weight(plan.healthy_weight_min_kg)} – {u.weight(plan.healthy_weight_max_kg)}
+              {plan.change_to_healthy_range_kg !== 0
+                ? ` · smallest step into the range: ${u.weightDelta(plan.change_to_healthy_range_kg)}`
+                : ""}
+            </Txt>
+          </Card>
+
+          <Card>
+            <Txt variant="h3">Daily calories</Txt>
+            <Row style={{ marginTop: space.md }}>
+              <Stat label="Resting (BMR)" value={fmt(plan.bmr)} />
+              <Stat label="Maintenance" value={fmt(plan.tdee)} />
+              <Stat label="Your target" value={fmt(plan.target_calories)} />
+            </Row>
+            <Txt variant="small" style={{ marginTop: space.lg, marginBottom: space.sm }}>
+              {plan.direction === "maintain"
+                ? "Eat about your maintenance calories to keep your weight."
+                : `How fast do you want to ${plan.direction} weight? Eating exactly this many calories a day:`}
+            </Txt>
+            <View style={{ gap: space.sm }} accessibilityRole="radiogroup">
+              {plan.options.map((o) => (
+                <DietOptionRow key={o.option} option={o} plan={plan} onPress={() => pickDiet(o)} />
+              ))}
+            </View>
+            <Txt variant="tiny" style={{ marginTop: space.md }}>
+              {plan.disclaimer} 1 kg of body fat ≈ 7,700 kcal.
+            </Txt>
+          </Card>
+        </FadeIn>
+      )}
+    </Screen>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <View accessibilityLabel="Loading today">
+      <Card>
+        <Row gap={space.md}>
+          <Skeleton width={40} height={40} />
+          <View style={{ flex: 1, gap: space.sm }}>
+            <Skeleton width="30%" height={10} />
+            <Skeleton width="65%" height={18} />
           </View>
         </Row>
-        <BmiScale bmi={plan.bmi} />
-        <Txt style={{ marginTop: 12 }}>
-          {plan.direction === "maintain" ? (
-            "You are in the healthy range. Your plan keeps your weight steady."
-          ) : (
-            <>
-              {change < 0 ? "Lose " : "Gain "}
-              <Txt style={{ fontWeight: "700" }}>{u.weight(Math.abs(change))}</Txt> to reach the optimal BMI of 22 (
-              <Txt style={{ fontWeight: "700" }}>{u.weight(plan.optimal_weight_kg)}</Txt>).
-            </>
-          )}
-        </Txt>
-        <Txt variant="small" style={{ marginTop: 6 }}>
-          Healthy weight for your height: {u.weight(plan.healthy_weight_min_kg)} – {u.weight(plan.healthy_weight_max_kg)}
-        </Txt>
-        {plan.change_to_healthy_range_kg !== 0 ? (
-          <Txt variant="small" style={{ marginTop: 4 }}>
-            Smallest step into the healthy range: {u.weightDelta(plan.change_to_healthy_range_kg)}
-          </Txt>
-        ) : null}
+        <Skeleton height={12} style={{ marginTop: space.lg }} />
+        <Skeleton height={50} style={{ marginTop: space.lg, borderRadius: radius.md }} />
       </Card>
-
       <Card>
-        <CardHead title="Today's calories" right={<LinkButton title="Food log ›" onPress={() => router.push("/food")} />} />
-        <Row style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-          <Txt>
-            <Txt variant="big">{fmt(eaten)}</Txt>
-            <Txt variant="muted"> / {fmt(target)} kcal</Txt>
-          </Txt>
-          <Txt variant="small">{eaten <= target ? `${fmt(target - eaten)} left` : `${fmt(eaten - target)} over`}</Txt>
+        <Row gap={space.lg}>
+          <Skeleton width={112} height={112} style={{ borderRadius: radius.pill }} />
+          <View style={{ flex: 1, gap: space.lg }}>
+            <Skeleton height={8} />
+            <Skeleton height={8} />
+            <Skeleton height={8} />
+          </View>
         </Row>
-        <Meter value={eaten} max={target} />
-        {day ? <MacroBars totals={day.totals} targetKcal={target} /> : null}
       </Card>
-
       <Card>
-        <CardHead title="Sleep" right={<LinkButton title="Details ›" onPress={() => router.push("/sleep")} />} />
-        {lastSleep ? (
-          <>
-            <Row style={{ justifyContent: "space-between", alignItems: "baseline" }}>
-              <Txt>
-                <Txt variant="big">{hoursMinutes(lastSleep.duration_minutes)}</Txt>
-                <Txt variant="muted"> {lastSleep.date === todayISO() ? "last night" : `night to ${shortDate(lastSleep.date)}`}</Txt>
-              </Txt>
-              <Row gap={6}>
-                {lastSleep.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : null}
-                {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
-              </Row>
-            </Row>
-            <Txt variant="small" style={{ marginTop: 2 }}>
-              {clockOf(lastSleep.bedtime)} → {clockOf(lastSleep.wake_time)}
-              {lastSleep.source !== "manual" && trackerSummary(lastSleep) ? ` · ${trackerSummary(lastSleep)}` : ""}
-            </Txt>
-            {sleepStats?.average_hours_7d != null ? (
-              <Row style={{ justifyContent: "space-between", marginTop: 8 }}>
-                <Txt variant="small">
-                  7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · goal {goalHours(sleepStats.goal_minutes)}
-                </Txt>
-                {rangeBadge(sleepStats.average_hours_7d, sleepStats.recommended_hours)}
-              </Row>
-            ) : null}
-          </>
-        ) : (
-          <Txt variant="small">
-            No sleep yet. Log last night by hand, or connect WHOOP on the Sleep screen to import it automatically.
-          </Txt>
-        )}
-        {whoopConnected ? (
-          <Button title="Open sleep" icon="moon" kind="soft" onPress={() => router.push("/sleep")} style={{ marginTop: 12 }} />
-        ) : (
-          <Row style={{ marginTop: 12 }}>
-            <Button title="Log sleep" icon="moon" kind="soft" onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
-            <Button title="Connect WHOOP" kind="ghost" onPress={() => router.push("/sleep")} />
-          </Row>
-        )}
+        <Skeleton width="25%" height={14} />
+        <Skeleton width="45%" height={26} style={{ marginTop: space.md }} />
       </Card>
-      <Sheet visible={loggingSleep} title="Log sleep" onClose={() => setLoggingSleep(false)}>
-        {loggingSleep ? (
-          <SleepForm
-            onSaved={async (message) => {
-              setLoggingSleep(false);
-              toast(message);
-              await load();
-            }}
-          />
-        ) : null}
-      </Sheet>
+    </View>
+  );
+}
 
-      <Section title="Daily calories" />
-      <Card>
-        <Row>
-          <Stat label="Resting (BMR)" value={fmt(plan.bmr)} />
-          <Stat label="Maintenance" value={fmt(plan.tdee)} />
-          <Stat label="Your target" value={fmt(plan.target_calories)} />
-        </Row>
-        <Txt variant="small" style={{ marginTop: 12, marginBottom: 8 }}>
-          {plan.direction === "maintain"
-            ? "Eat about your maintenance calories to keep your weight."
-            : `Pick how fast you want to ${plan.direction} weight. Eating exactly this many calories a day:`}
-        </Txt>
-        <View style={{ gap: 8 }}>
-          {plan.options.map((o) => (
-            <DietCard key={o.option} option={o} plan={plan} onPress={() => pickDiet(o)} />
-          ))}
+function Shortcut({ icon, title, text, onPress }: { icon: IconName; title: string; text: string; onPress: () => void }) {
+  const t = useTheme();
+  return (
+    <Card onPress={onPress}>
+      <Row gap={space.md}>
+        <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: t.accentSoft, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name={icon} size={19} color={t.accent} />
         </View>
-        <Txt variant="tiny" style={{ marginTop: 10 }}>
-          {plan.disclaimer} 1 kg of body fat ≈ 7,700 kcal.
-        </Txt>
-      </Card>
-
-      <Section title="Log your weight" />
-      <Card>
-        <Row>
-          <Field
-            placeholder={`Today's weight (${u.w})`}
-            value={weight}
-            onChangeText={setWeight}
-            keyboardType="decimal-pad"
-            style={{ flex: 1, marginTop: 0 }}
-            accessibilityLabel="Today's weight"
-            onSubmitEditing={saveWeight}
-          />
-          <Button title="Save" onPress={saveWeight} />
-        </Row>
-      </Card>
-    </Screen>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Txt style={{ fontWeight: "600" }}>{title}</Txt>
+          <Txt variant="small" numberOfLines={1}>
+            {text}
+          </Txt>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={t.muted} />
+      </Row>
+    </Card>
   );
 }
 
 function BmiScale({ bmi }: { bmi: number }) {
   const t = useTheme();
+  // status colours: under / healthy / over / obese, each labelled by the badge and the numbers below
   const zones = [
     { from: 15, to: 18.5, color: t.series[0] },
     { from: 18.5, to: 25, color: t.good },
@@ -245,27 +399,27 @@ function BmiScale({ bmi }: { bmi: number }) {
   ];
   const pos = (v: number) => ((Math.min(Math.max(v, SCALE_MIN), SCALE_MAX) - SCALE_MIN) / (SCALE_MAX - SCALE_MIN)) * 100;
   return (
-    <View style={{ marginTop: 14 }} accessibilityLabel={`BMI scale, your BMI is ${bmi}`}>
-      <View style={{ flexDirection: "row", height: 10, borderRadius: 99, overflow: "hidden", gap: 2 }}>
+    <View style={{ marginTop: space.lg }} accessibilityLabel={`BMI scale, your BMI is ${bmi}`}>
+      <View style={{ flexDirection: "row", height: 6, borderRadius: 99, overflow: "hidden", gap: 2 }}>
         {zones.map((z) => (
-          <View key={z.from} style={{ flex: z.to - z.from, backgroundColor: z.color }} />
+          <View key={z.from} style={{ flex: z.to - z.from, backgroundColor: z.color, opacity: 0.85 }} />
         ))}
       </View>
       <View
         style={{
           position: "absolute",
-          top: -4,
+          top: -5,
           left: `${pos(bmi)}%`,
-          width: 4,
-          height: 18,
-          marginLeft: -2,
-          borderRadius: 2,
-          backgroundColor: t.text,
-          borderWidth: 1,
-          borderColor: t.surface,
+          width: 16,
+          height: 16,
+          marginLeft: -8,
+          borderRadius: 8,
+          backgroundColor: t.surface,
+          borderWidth: 3,
+          borderColor: t.text,
         }}
       />
-      <View style={{ height: 16, marginTop: 4 }}>
+      <View style={{ height: 16, marginTop: 8 }}>
         {[15, 18.5, 25, 30, 40].map((v, i, all) => (
           <Txt
             key={v}
@@ -284,53 +438,62 @@ function BmiScale({ bmi }: { bmi: number }) {
   );
 }
 
-function DietCard({ option: o, plan, onPress }: { option: DietOption; plan: Plan; onPress: () => void }) {
+function DietOptionRow({ option: o, plan, onPress }: { option: DietOption; plan: Plan; onPress: () => void }) {
   const t = useTheme();
   const { profile } = useProfile();
   const u = units(profile.unit_system);
-  if (o.option === "maintain") {
-    return (
-      <View style={{ borderWidth: 1.5, borderColor: t.accent, backgroundColor: t.accentSoft, borderRadius: 12, padding: 12 }}>
-        <Row style={{ justifyContent: "space-between" }}>
-          <Txt style={{ fontWeight: "700" }}>Maintain</Txt>
-          <Txt style={{ fontWeight: "700", fontSize: 18 }}>{fmt(o.calories)} kcal</Txt>
-        </Row>
-        <Txt variant="small">Same as your maintenance calories</Txt>
-      </View>
-    );
-  }
+  const selected = o.option === "maintain" || o.selected;
   const sign = o.difference > 0 ? "+" : "−";
   return (
     <Pressable
       onPress={onPress}
+      disabled={o.option === "maintain"}
       accessibilityRole="radio"
-      accessibilityState={{ selected: o.selected }}
+      accessibilityState={{ selected }}
       style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: space.md,
         borderWidth: 1.5,
-        borderColor: o.selected ? t.accent : t.border,
-        backgroundColor: o.selected ? t.accentSoft : t.surface,
-        borderRadius: 12,
-        padding: 12,
+        borderColor: selected ? t.accent : t.border,
+        backgroundColor: selected ? t.accentSoft : "transparent",
+        borderRadius: radius.md,
+        padding: space.md,
         opacity: pressed ? 0.8 : 1,
       })}
     >
-      <Row style={{ justifyContent: "space-between" }}>
-        <Row gap={6}>
-          <Txt style={{ fontWeight: "700" }}>{cap(o.option)}</Txt>
-          {o.selected ? <Badge label="Current" tone="info" /> : null}
+      <View
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          marginTop: 2,
+          borderWidth: selected ? 5 : 1.5,
+          borderColor: selected ? t.accent : t.muted,
+          backgroundColor: t.surface,
+        }}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Row style={{ justifyContent: "space-between" }}>
+          <Txt style={{ fontWeight: "600" }}>{cap(o.option)}</Txt>
+          <Txt style={{ fontWeight: "700", fontVariant: ["tabular-nums"] }}>{fmt(o.calories)} kcal</Txt>
         </Row>
-        <Txt style={{ fontWeight: "700", fontSize: 18 }}>{fmt(o.calories)} kcal</Txt>
-      </Row>
-      <Txt variant="small" style={{ marginTop: 2 }}>
-        {sign}
-        {fmt(Math.abs(o.difference))} kcal/day · {plan.direction} ~{u.weight(Math.abs(o.weekly_change_kg), 2)}/week
-        {o.weeks_to_target != null ? ` · goal in ~${fmt(o.weeks_to_target)} weeks` : ""}
-      </Txt>
-      {o.warning ? (
-        <Txt variant="small" style={{ color: t.warnInk, marginTop: 4 }}>
-          ⚠ {o.warning}
+        <Txt variant="small" style={{ marginTop: 2 }}>
+          {o.option === "maintain"
+            ? "Same as your maintenance calories"
+            : `${sign}${fmt(Math.abs(o.difference))} kcal/day · ${plan.direction} ~${u.weight(Math.abs(o.weekly_change_kg), 2)}/week${
+                o.weeks_to_target != null ? ` · goal in ~${fmt(o.weeks_to_target)} weeks` : ""
+              }`}
         </Txt>
-      ) : null}
+        {o.warning ? (
+          <Row gap={6} style={{ marginTop: space.xs, alignItems: "flex-start" }}>
+            <Ionicons name="warning" size={14} color={t.warnInk} style={{ marginTop: 2 }} />
+            <Txt variant="small" style={{ color: t.warnInk, flex: 1 }}>
+              {o.warning}
+            </Txt>
+          </Row>
+        ) : null}
+      </View>
     </Pressable>
   );
 }

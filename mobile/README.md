@@ -74,10 +74,12 @@ mobile/
 │   │   ├── _layout.tsx    # providers: login state, theme, toasts
 │   │   ├── index.tsx      # sends you to login, profile setup or Home
 │   │   ├── login.tsx  signup.tsx  onboarding.tsx  qr-stickers.tsx  sleep.tsx  points.tsx
-│   │   └── (tabs)/        # Home, Workouts, Food, Progress, Profile
+│   │   └── (tabs)/        # Today, Workouts, Food, Progress, Coach (+ Profile, opened from the avatar on Today)
 │   ├── components/        # UI kit, charts, profile form + day picker, workout parts, exercise info,
 │   │                      # rest timer, Today card, points, weekly summary, sleep dashboard, food parts
 │   └── lib/               # API client, login state, units/formatting, theme, types, rest timer logic (+ tests)
 ```
+
+**Design system.** Colours, spacing, radii, type sizes, control sizes and motion durations live in `src/lib/theme.ts` (light and dark palettes are chosen separately, not inverted). `src/components/ui.tsx` builds every control from those tokens: buttons, fields, chips, segmented tabs, cards, list rows, sheets, toasts, skeletons and empty states. New screens should use these rather than their own colours or sizes. One accent colour (blue) marks progress and selection; near-black "ink" is for primary actions; green/amber/red are only for status, always with a label or icon. Chart colours are a separate, colour-blind-checked series palette. Animations are short, and skipped when the phone's "reduce motion" setting is on.
 
 Charts are drawn with `react-native-svg` (`src/components/charts.tsx`), so they work in Expo Go and in the browser without extra native code. Tap a chart to see the values; "Table" shows the same numbers as a table.

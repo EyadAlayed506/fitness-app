@@ -1,15 +1,16 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
-import { cap, duration, longDateTime, plural, round, units } from "@/lib/format";
-import { useTheme } from "@/lib/theme";
+import { confirm } from "@/lib/confirm";
+import { cap, duration, longDateTime, round, units } from "@/lib/format";
+import { radius, space, useTheme } from "@/lib/theme";
 import type { Exercise, Workout, WorkoutSet } from "@/lib/types";
 
 import { RestTimerPanel, type RestTimer } from "./RestTimer";
-import { Badge, Button, Chips, ErrorText, Field, IconButton, LinkButton, ListRow, Row, Txt } from "./ui";
+import { Badge, Button, Chips, EmptyState, ErrorText, Field, IconButton, LinkButton, ListRow, Row, Skeleton, Stat, Txt } from "./ui";
 
 export type PickedExercise = { id: number; name: string };
 
@@ -33,27 +34,29 @@ export function SetsList({
     if (!g) groups.push((g = { id: s.exercise_id, name: s.exercise_name, sets: [] }));
     g.sets.push(s);
   }
-  if (!groups.length) return <Txt variant="muted">No sets yet.</Txt>;
+  if (!groups.length) return <Txt variant="small">No sets yet.</Txt>;
   return (
-    <View style={{ gap: 10 }}>
+    <View style={{ gap: space.lg }}>
       {groups.map((g) => (
         <View key={g.id}>
-          <Row style={{ justifyContent: "space-between" }}>
-            <Txt style={{ fontWeight: "700", flex: 1 }}>{g.name}</Txt>
-            {onAddSet ? <Button title="+ Set" kind="soft" small onPress={() => onAddSet({ id: g.id, name: g.name })} /> : null}
+          <Row style={{ justifyContent: "space-between", marginBottom: space.xs }}>
+            <Txt style={{ fontWeight: "600", flex: 1 }}>{g.name}</Txt>
+            {onAddSet ? <Button title="Set" icon="add" kind="soft" small onPress={() => onAddSet({ id: g.id, name: g.name })} accessibilityLabel={`Add a set of ${g.name}`} /> : null}
           </Row>
           {g.sets.map((s) => (
-            <Row key={s.id} style={{ paddingVertical: 7, borderTopWidth: 1, borderTopColor: t.border, marginTop: 4 }}>
-              <Txt variant="tiny" style={{ width: 18 }}>
-                {s.set_number}
-              </Txt>
-              <Txt style={{ flex: 1 }}>
-                {s.reps} reps × {u.weight(s.weight_kg)}
-                {s.rpe ? ` · RPE ${s.rpe}` : ""}
-                {s.notes ? <Txt variant="muted"> · {s.notes}</Txt> : null}
+            <Row key={s.id} gap={space.md} style={{ minHeight: 44, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: t.surface2, alignItems: "center", justifyContent: "center" }}>
+                <Txt variant="tiny" style={{ color: t.text2, fontWeight: "600" }}>
+                  {s.set_number}
+                </Txt>
+              </View>
+              <Txt style={{ flex: 1, fontVariant: ["tabular-nums"] }}>
+                {s.reps} × {u.weight(s.weight_kg)}
+                {s.rpe ? <Txt variant="small"> · RPE {s.rpe}</Txt> : null}
+                {s.notes ? <Txt variant="small"> · {s.notes}</Txt> : null}
               </Txt>
               {s.added_via === "qr" ? <Badge label="QR" /> : s.added_via === "photo" ? <Badge label="Photo" /> : null}
-              {onDelete ? <IconButton icon="close" label="Delete set" onPress={() => onDelete(s)} /> : null}
+              {onDelete ? <IconButton icon="close" label={`Delete set ${s.set_number} of ${g.name}`} onPress={() => onDelete(s)} /> : null}
             </Row>
           ))}
         </View>
@@ -78,7 +81,7 @@ export function ExerciseSearch({ onPick }: { onPick: (e: PickedExercise) => void
   return (
     <View>
       <Field label="Machine or exercise name" value={query} onChangeText={setQuery} placeholder="e.g. lat pulldown" autoFocus autoCorrect={false} />
-      <View style={{ marginTop: 8 }}>
+      <View style={{ marginTop: space.sm }}>
         {results.length ? (
           results.map((x, i) => (
             <ListRow
@@ -90,7 +93,7 @@ export function ExerciseSearch({ onPick }: { onPick: (e: PickedExercise) => void
             />
           ))
         ) : (
-          <Txt variant="muted">No match. Try another name, e.g. “chest press”.</Txt>
+          <EmptyState icon="search" title="No match" text="Try another name, e.g. “chest press”." />
         )}
       </View>
     </View>
@@ -123,7 +126,7 @@ export function QrScanner({ onFound }: { onFound: (e: Exercise) => void }) {
   return (
     <View>
       {permission?.granted ? (
-        <View style={{ height: 300, borderRadius: 12, overflow: "hidden", backgroundColor: "#000" }}>
+        <View style={{ height: 300, borderRadius: radius.lg, overflow: "hidden", backgroundColor: "#000" }}>
           <CameraView
             style={{ flex: 1 }}
             facing="back"
@@ -134,7 +137,7 @@ export function QrScanner({ onFound }: { onFound: (e: Exercise) => void }) {
           />
         </View>
       ) : (
-        <View style={{ padding: 16, borderRadius: 12, backgroundColor: t.surface2, gap: 10 }}>
+        <View style={{ padding: space.lg, borderRadius: radius.lg, backgroundColor: t.surface2, gap: space.md }}>
           <Txt variant="small">
             {permission && !permission.canAskAgain
               ? "Camera access is turned off for this app. Allow it in your phone's settings, or type the code below."
@@ -146,7 +149,7 @@ export function QrScanner({ onFound }: { onFound: (e: Exercise) => void }) {
       <Txt variant="small" style={{ marginTop: 10 }}>
         Point the camera at the sticker, or type the code printed under it:
       </Txt>
-      <Row>
+      <Row style={{ alignItems: "flex-end" }}>
         <Field value={code} onChangeText={setCode} placeholder="e.g. leg-press" autoCapitalize="none" autoCorrect={false} style={{ flex: 1, marginTop: 6 }} accessibilityLabel="Machine code" onSubmitEditing={() => lookup(code)} />
         <Button title="Find" onPress={() => lookup(code)} style={{ marginTop: 6 }} />
       </Row>
@@ -228,14 +231,14 @@ export function SetForm({
 
   return (
     <View>
-      <View style={{ marginBottom: 10 }}>
+      <View style={{ marginBottom: space.md }}>
         <LinkButton title="How to do it · alternatives" onPress={onInfo} />
       </View>
       <RestTimerPanel timer={timer} />
-      <View style={{ height: 12 }} />
+      <View style={{ height: space.lg }} />
       {previous.length ? (
         <>
-          <Txt variant="small" style={{ marginBottom: 4 }}>
+          <Txt variant="label" style={{ marginBottom: space.sm }}>
             This workout
           </Txt>
           <SetsList sets={previous} />
@@ -251,7 +254,7 @@ export function SetForm({
       <Field label="RPE 1–10 (optional)" value={rpe} onChangeText={setRpe} keyboardType="decimal-pad" />
       <Field label="Notes" value={notes} onChangeText={setNotes} placeholder="e.g. seat at 4, felt easy" />
       <ErrorText message={error} />
-      <Button title={`Add set ${previous.length + 1}`} onPress={save} style={{ marginTop: 14 }} />
+      <Button title={`Add set ${previous.length + 1}`} icon="add" onPress={save} style={{ marginTop: space.lg }} />
     </View>
   );
 }
@@ -262,25 +265,40 @@ export function WorkoutDetail({ workoutId, onDeleted }: { workoutId: number; onD
   const { profile } = useProfile();
   const u = units(profile.unit_system);
   const [w, setW] = useState<Workout | null>(null);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    api<Workout>(`/workouts/${workoutId}`).then(setW).catch(() => {});
+    api<Workout>(`/workouts/${workoutId}`)
+      .then(setW)
+      .catch((e: Error) => setError(e.message));
   }, [workoutId]);
-  if (!w) return <Txt variant="muted">Loading…</Txt>;
+  if (error) return <ErrorText message={error} />;
+  if (!w)
+    return (
+      <View style={{ gap: space.md }} accessibilityLabel="Loading workout">
+        <Skeleton width="60%" />
+        <Skeleton height={40} />
+        <Skeleton height={40} />
+      </View>
+    );
   return (
     <View>
-      <Txt variant="small">
-        {longDateTime(w.started_at)} · {plural(w.set_count, "set")} · {u.weight(w.volume_kg, 0)} volume
-        {w.ended_at ? ` · ${duration(w.started_at, w.ended_at)}` : ""}
-      </Txt>
-      {w.notes ? <Txt style={{ marginTop: 8 }}>{w.notes}</Txt> : null}
-      <View style={{ marginTop: 12 }}>
+      <Txt variant="small">{longDateTime(w.started_at)}</Txt>
+      <Row style={{ marginTop: space.md }}>
+        <Stat label="Sets" value={String(w.set_count)} />
+        <Stat label="Volume" value={u.weight(w.volume_kg, 0)} />
+        {w.ended_at ? <Stat label="Duration" value={duration(w.started_at, w.ended_at)} /> : null}
+      </Row>
+      {w.notes ? <Txt style={{ marginTop: space.md }}>{w.notes}</Txt> : null}
+      <View style={{ marginTop: space.lg }}>
         <SetsList sets={w.sets} />
       </View>
       <Button
         title="Delete workout"
         kind="danger"
-        style={{ marginTop: 16 }}
+        icon="trash-outline"
+        style={{ marginTop: space.xl }}
         onPress={async () => {
+          if (!(await confirm("Delete workout?", "This removes the workout and all its sets.", "Delete"))) return;
           await api(`/workouts/${w.id}`, { method: "DELETE" });
           onDeleted();
         }}

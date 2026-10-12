@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { api } from "@/lib/api";
 import { MASS_TO_G, VOLUME_TO_ML, cap, fmt, unitLabel } from "@/lib/format";
@@ -68,7 +68,15 @@ export function FoodSearch({ onPick, onCustom }: { onPick: (food: Food) => void;
     return () => clearTimeout(id);
   }, [query]);
 
-  const pickOnline = async (c: FoodCandidate) => onPick(await api<Food>("/foods/import", { method: "POST", body: c }));
+  const [importError, setImportError] = useState<string | null>(null);
+  const pickOnline = async (c: FoodCandidate) => {
+    setImportError(null);
+    try {
+      onPick(await api<Food>("/foods/import", { method: "POST", body: c }));
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Couldn't add that food. Try another result.");
+    }
+  };
 
   // With an empty search box, hide the results of the previous search
   const searching = query.trim() !== "";
@@ -81,7 +89,7 @@ export function FoodSearch({ onPick, onCustom }: { onPick: (food: Food) => void;
       <Field label="Search food" value={query} onChangeText={setQuery} placeholder="e.g. banana, chicken breast, nutella" autoFocus autoCorrect={false} />
       {searching && local.length ? (
         <View style={{ marginTop: 10 }}>
-          <Txt variant="small">In the app</Txt>
+          <Txt variant="label">In the app</Txt>
           {local.map((f, i) => (
             <ListRow
               key={`l${f.id}`}
@@ -101,7 +109,7 @@ export function FoodSearch({ onPick, onCustom }: { onPick: (food: Food) => void;
       ) : null}
       {searching && online?.length ? (
         <View style={{ marginTop: 10 }}>
-          <Txt variant="small">Online databases</Txt>
+          <Txt variant="label">Online databases</Txt>
           {online.map((f, i) => (
             <ListRow
               key={`o${f.source}${f.external_id}`}
@@ -114,6 +122,7 @@ export function FoodSearch({ onPick, onCustom }: { onPick: (food: Food) => void;
           ))}
         </View>
       ) : null}
+      <ErrorText message={importError} />
       {(searching ? warnings : []).map((w) => (
         <Txt key={w} variant="muted" style={{ marginTop: 6, fontSize: 13 }}>
           {w}
@@ -167,7 +176,7 @@ export function FoodDetail({ food, meal: initialMeal, date, onAdded }: { food: F
   };
 
   const row = (label: string, value: string, indent = false) => (
-    <Row key={label} style={{ justifyContent: "space-between", paddingVertical: 7, borderTopWidth: 1, borderTopColor: t.border }}>
+    <Row key={label} style={{ justifyContent: "space-between", paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }}>
       <Text style={{ color: indent ? t.text2 : t.text, paddingLeft: indent ? 12 : 0, fontSize: 14 }}>{label}</Text>
       <Text style={{ color: t.text, fontSize: 14, fontVariant: ["tabular-nums"] }}>{value}</Text>
     </Row>

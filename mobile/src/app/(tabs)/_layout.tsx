@@ -1,20 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect } from "expo-router";
 import { Tabs } from "expo-router/js-tabs";
+import { StyleSheet } from "react-native";
 
-import { Loading } from "@/components/ui";
+import { Loading, type IconName } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 
-type IconName = keyof typeof Ionicons.glyphMap;
-
-const TABS: { name: string; title: string; icon: IconName }[] = [
-  { name: "home", title: "Home", icon: "home-outline" },
-  { name: "workouts", title: "Workouts", icon: "barbell-outline" },
-  { name: "food", title: "Food", icon: "restaurant-outline" },
-  { name: "progress", title: "Progress", icon: "stats-chart-outline" },
-  { name: "coach", title: "Coach", icon: "chatbubbles-outline" },
-  { name: "profile", title: "Profile", icon: "person-outline" },
+// Five destinations in the bar. Profile is still a tab route (/profile) but opens from the
+// avatar button in the Home header, so the bar stays uncluttered.
+const TABS: { name: string; title: string; icon: IconName; active: IconName }[] = [
+  { name: "home", title: "Today", icon: "today-outline", active: "today" },
+  { name: "workouts", title: "Workouts", icon: "barbell-outline", active: "barbell" },
+  { name: "food", title: "Food", icon: "restaurant-outline", active: "restaurant" },
+  { name: "progress", title: "Progress", icon: "stats-chart-outline", active: "stats-chart" },
+  { name: "coach", title: "Coach", icon: "chatbubble-ellipses-outline", active: "chatbubble-ellipses" },
 ];
 
 export default function TabsLayout() {
@@ -27,9 +27,16 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: t.accent,
+        tabBarActiveTintColor: t.text,
         tabBarInactiveTintColor: t.muted,
-        tabBarStyle: { backgroundColor: t.surface, borderTopColor: t.border },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", letterSpacing: 0.1 },
+        tabBarStyle: {
+          backgroundColor: t.surface,
+          borderTopColor: t.border,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
         sceneStyle: { backgroundColor: t.bg },
       }}
     >
@@ -39,10 +46,11 @@ export default function TabsLayout() {
           name={tab.name}
           options={{
             title: tab.title,
-            tabBarIcon: ({ color, size }) => <Ionicons name={tab.icon} color={color} size={size} />,
+            tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? tab.active : tab.icon} color={color} size={23} />,
           }}
         />
       ))}
+      <Tabs.Screen name="profile" options={{ title: "Profile", href: null }} />
     </Tabs>
   );
 }
