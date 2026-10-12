@@ -52,8 +52,10 @@ export function WorkoutSessionProvider({ children }: { children: ReactNode }) {
   const activeId = data?.active?.id ?? null;
   // hands-free sets: what to say when the rest is over (through headphones if they're connected)
   const announcement = useRef<string | null>(null);
+  const [nextSet, setNextSet] = useState<string | null>(null); // also shown in the background notification
   const announceAfterRest = useCallback((text: string | null) => {
     announcement.current = text;
+    setNextSet(text);
   }, []);
   const timer = useRestTimer((name, late) => {
     toast(name ? `Rest is over. Time for your next set of ${name}` : "Rest is over. Time for your next set");
@@ -61,7 +63,7 @@ export function WorkoutSessionProvider({ children }: { children: ReactNode }) {
     announcement.current = null;
     if (text && !late) void speak(`Rest is over. ${text}`);
   });
-  useRestNotification(timer.state);
+  useRestNotification(timer.state, nextSet);
 
   // What the workout follows is remembered on this device per workout (e.g. after the app restarts)
   const [stored, setStored] = useState<{ workoutId: number; plan: GuidedPlan | null } | null>(null);
@@ -126,8 +128,8 @@ export function useWorkoutSession(): WorkoutSessionValue {
   return ctx;
 }
 
-/** Keep one "Rest is over" notification scheduled while a rest counts down. */
-function useRestNotification(state: RestTimerState) {
+/** Keep one "Rest is over" notification scheduled while a rest counts down (with the next set, if known). */
+function useRestNotification(state: RestTimerState, nextSet: string | null) {
   const scheduled = useRef<string | null>(null);
   const { status, endsAt, countdownFor } = state;
   useEffect(() => {
@@ -136,14 +138,14 @@ function useRestNotification(state: RestTimerState) {
       await cancelRestEnd(scheduled.current);
       scheduled.current = null;
       if (status !== "running" || endsAt == null) return;
-      const id = await scheduleRestEnd((endsAt - Date.now()) / 1000, countdownFor);
+      const id = await scheduleRestEnd((endsAt - Date.now()) / 1000, countdownFor, nextSet);
       if (cancelled) await cancelRestEnd(id);
       else scheduled.current = id;
     })();
     return () => {
       cancelled = true;
     };
-  }, [status, endsAt, countdownFor]);
+  }, [status, endsAt, countdownFor, nextSet]);
 }
 
 // ---------- the bar above the tabs ----------

@@ -2,12 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { View } from "react-native";
 
 import { useInsights } from "@/lib/data";
-import { fmt } from "@/lib/format";
+import { fmt, hoursMinutes } from "@/lib/format";
 import { errorMessage } from "@/lib/query";
 import { space, useTheme } from "@/lib/theme";
 import type { Insight } from "@/lib/types";
 
 import { Badge, Card, EmptyState, ErrorText, FadeIn, Meter, Row, Section, SkeletonCards, Txt } from "./ui";
+
+/** "7 h 14 min" for sleep, "103.2 % of usual", "8 done" */
+const valueText = (value: number, unit: string) => (unit === "min" ? hoursMinutes(value) : `${fmt(value, 1)} ${unit}`);
 
 const STRENGTH: Record<string, { label: string; tone: "info" | "neutral" }> = {
   clear: { label: "Clear difference", tone: "info" },
@@ -79,13 +82,13 @@ function InsightCard({ insight }: { insight: Insight }) {
       <Txt style={{ marginTop: space.xs }}>{insight.text}</Txt>
       <View style={{ marginTop: space.md, gap: space.md }}>
         {insight.groups.map((g) => (
-          <View key={g.label} accessible accessibilityLabel={`${g.label}: ${fmt(g.value, 1)} ${g.unit}, ${g.n} ${g.n === 1 ? "sample" : "samples"}`}>
+          <View key={g.label} accessible accessibilityLabel={`${g.label}: ${valueText(g.value, g.unit)}, ${g.n} ${g.n === 1 ? "sample" : "samples"}`}>
             <Row style={{ justifyContent: "space-between" }} gap={space.sm}>
               <Txt variant="small" style={{ flex: 1 }} numberOfLines={2}>
                 {g.label}
               </Txt>
               <Txt variant="small" style={{ color: t.text, fontWeight: "600", fontVariant: ["tabular-nums"] }}>
-                {fmt(g.value, 1)} {g.unit}
+                {valueText(g.value, g.unit)}
               </Txt>
             </Row>
             <View style={{ marginTop: 6 }}>

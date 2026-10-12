@@ -39,8 +39,11 @@ function load(): Promise<Notifications | null> {
   return loading;
 }
 
-/** Schedule "Rest is over" in `seconds`. Returns its id, or null (no permission, or not supported). */
-export async function scheduleRestEnd(seconds: number, exerciseName: string): Promise<string | null> {
+/**
+ * Schedule "Rest is over" in `seconds`. `next` is the next set when it's known (hands-free sets), e.g.
+ * "Next: set 3 of 4, 8 reps at 60 kilos." Returns its id, or null (no permission, or not supported).
+ */
+export async function scheduleRestEnd(seconds: number, exerciseName: string, next: string | null = null): Promise<string | null> {
   const N = await load();
   if (!N || seconds < 1) return null;
   try {
@@ -51,7 +54,7 @@ export async function scheduleRestEnd(seconds: number, exerciseName: string): Pr
     return await N.scheduleNotificationAsync({
       content: {
         title: "Rest is over",
-        body: exerciseName ? `Time for your next set of ${exerciseName}` : "Time for your next set",
+        body: next ?? (exerciseName ? `Time for your next set of ${exerciseName}` : "Time for your next set"),
         sound: "default",
       },
       trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: Math.round(seconds), channelId: CHANNEL },

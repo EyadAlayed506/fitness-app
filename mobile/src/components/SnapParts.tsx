@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from "react-native";
 
 import { logMenuDish, removeCustomDay, saveCustomDay } from "@/lib/data";
-import { WEEKDAYS, WEEKDAYS_SHORT, cap, fmt, todayISO, tzOffset, weekdayIndex } from "@/lib/format";
+import { WEEKDAYS, WEEKDAYS_SHORT, cap, fmt, shortDate, todayISO, tzOffset, weekdayIndex } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { choosePhoto, sendPhoto, type Photo } from "@/lib/photo";
 import { errorMessage } from "@/lib/query";
@@ -289,8 +289,18 @@ const fitLabel = (fit: number) =>
  * Photograph a restaurant menu: each dish gets estimated calories and macros, ranked by how well it fits
  * what's left of today's plan. Everything is labelled as an estimate; logging one is a tap.
  */
-export function MenuScanner({ onLogged }: { onLogged: (entry: FoodLogEntry) => void }) {
+const PORTIONS = [
+  { value: 0.5, label: "½" },
+  { value: 1, label: "1" },
+  { value: 1.5, label: "1½" },
+  { value: 2, label: "2" },
+];
+
+export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry: FoodLogEntry) => void }) {
   const t = useTheme();
+  const isToday = date === todayISO();
+  const dayText = isToday ? "today" : `on ${shortDate(date)}`;
+  const [servings, setServings] = useState(1);
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [scan, setScan] = useState<MenuScan | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -305,7 +315,7 @@ export function MenuScanner({ onLogged }: { onLogged: (entry: FoodLogEntry) => v
       setPhoto(p);
       setScan(null);
       setChosen(null);
-      setScan(await sendPhoto<MenuScan>(`/snap/menu?tz_offset=${tzOffset()}`, p));
+      setScan(await sendPhoto<MenuScan>(`/snap/menu?tz_offset=${tzOffset()}&date=${date}`, p));
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -321,7 +331,9 @@ export function MenuScanner({ onLogged }: { onLogged: (entry: FoodLogEntry) => v
         carbs_g: d.carbs_g,
         fat_g: d.fat_g,
         meal,
-        date: todayISO(),
+        date,
+        servings,
+        portion_g: d.portion_g,
       });
       haptics.success();
       onLogged(entry);
@@ -334,7 +346,7 @@ export function MenuScanner({ onLogged }: { onLogged: (entry: FoodLogEntry) => v
     return (
       <View>
         <Txt variant="small">
-          At a restaurant? Photograph the menu. The AI on your PC estimates each dish and ranks them by how well they fit what&apos;s left of today.
+          At a restaurant? Photograph the menu. The AI on your PC estimates each dish and ranks them by how well they fit what&apos;s left {dayText}.
         </Txt>
         <Row gap={space.sm} style={{ marginTop: space.lg, flexWrap: "wrap" }}>
           <Button title="Take a photo" icon="camera-outline" onPress={() => take("camera")} />
@@ -374,8 +386,8 @@ export function MenuScanner({ onLogged }: { onLogged: (entry: FoodLogEntry) => v
       </View>
       <Txt style={{ marginTop: space.md, fontWeight: "600" }}>
         {left > 0
-          ? `Left today: about ${fmt(left)} kcal and ${fmt(scan.remaining_protein_g)} g protein`
-          : `You're at today's target (${fmt(-left)} kcal over)`}
+          ? `Left ${dayText}: about ${fmt(left)} kcal and ${fmt(scan.remaining_protein_g)} g protein`
+          : `You're at the target ${dayText} (${fmt(-left)} kcal over)`}
       </Txt>
       {scan.seen ? <Txt variant="tiny">The AI saw: {scan.seen}</Txt> : null}
       {!scan.dishes.length ? (
@@ -390,7 +402,10 @@ export function MenuScanner({ onLogged }: { onLogged: (entry: FoodLogEntry) => v
           return (
             <View key={`${d.name}-${i}`} style={[styles.item, { borderColor: open ? t.accent : t.border, backgroundColor: t.surface }]}>
               <Pressable
-                onPress={() => setChosen(open ? null : d.name)}
+                onPress={() => {
+                  setChosen(open ? null : d.name);
+                  setServings(1);
+                }}
                 accessibilityRole="button"
                 aria-expanded={open}
                 accessibilityLabel={`${d.name}, about ${fmt(d.calories)} calories, ${f.label}`}
@@ -411,14 +426,22 @@ export function MenuScanner({ onLogged }: { onLogged: (entry: FoodLogEntry) => v
                   </View>
                 </Row>
                 <Txt variant="small" style={{ marginTop: space.xs, fontVariant: ["tabular-nums"] }}>
-                  ≈ {fmt(d.calories)} kcal · P {fmt(d.protein_g)} · C {fmt(d.carbs_g)} · F {fmt(d.fat_g)} g (estimate)
+                  ≈ {fmt(d.calories)} kcal · P {fmt(d.protein_g)} · C {fmt(d.carbs_g)} · F {fmt(d.fat_g)} g (estimate
+                  {d.portion_g ? `, about ${fmt(d.portion_g)} g` : ""})
                 </Txt>
                 <Txt variant="tiny">{d.verdict}</Txt>
               </Pressable>
               {open ? (
                 <View style={{ marginTop: space.sm }}>
+                  <Chips<number> label="How much did you eat? (portions)" value={servings} onChange={setServings} options={PORTIONS} />
                   <Chips<Meal> label="Log to" value={meal} onChange={setMeal} options={MEALS.map((m) => ({ value: m, label: cap(m) }))} />
-                  <Button title="Log it as an estimate" icon="add" small onPress={() => log(d)} style={{ marginTop: space.md, alignSelf: "flex-start" }} />
+                  <Button
+                    title={`Log ≈ ${fmt(d.calories * servings)} kcal (estimate)`}
+                    icon="add"
+                    small
+                    onPress={() => log(d)}
+                    style={{ marginTop: space.md, alignSelf: "flex-start" }}
+                  />
                 </View>
               ) : null}
             </View>

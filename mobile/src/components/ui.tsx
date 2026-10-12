@@ -520,6 +520,8 @@ export function Segmented<T extends string>({
   style?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
+  // many tabs: tighter padding so they fit a phone's width (it scrolls only on very narrow screens)
+  const padding = options.length > 5 ? 5 : space.md;
   return (
     <View style={[{ backgroundColor: t.surface2, borderRadius: radius.md, padding: 3 }, style]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 2 }} accessibilityRole="tablist">
@@ -538,7 +540,7 @@ export function Segmented<T extends string>({
                 {
                   flexGrow: 1,
                   minHeight: 36,
-                  paddingHorizontal: space.md,
+                  paddingHorizontal: padding,
                   borderRadius: radius.sm + 1,
                   alignItems: "center",
                   justifyContent: "center",

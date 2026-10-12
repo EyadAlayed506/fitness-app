@@ -645,6 +645,8 @@ export interface WeightReading {
 export interface MenuDish {
   name: string;
   description: string;
+  /** estimated weight of one portion (null: not given) */
+  portion_g: number | null;
   /** estimates for one restaurant portion */
   calories: number;
   protein_g: number;

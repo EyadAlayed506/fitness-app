@@ -308,6 +308,9 @@ export async function logMenuDish(body: {
   fat_g: number;
   meal: Meal;
   date: string;
+  /** portions eaten, e.g. 0.5 */
+  servings: number;
+  portion_g: number | null;
 }): Promise<FoodLogEntry> {
   const entry = await api<FoodLogEntry>("/snap/menu/log", { method: "POST", body });
   afterFoodChange(body.date);

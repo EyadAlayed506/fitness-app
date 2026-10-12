@@ -187,18 +187,16 @@ export default function FoodLog() {
               </Card>
             );
           })}
-          {isToday ? (
-            <Card onPress={() => setSheet({ kind: "menu" })}>
-              <Row gap={space.md}>
-                <Ionicons name="restaurant-outline" size={20} color={t.text2} />
-                <View style={{ flex: 1 }}>
-                  <Txt>Eating out? Scan the menu</Txt>
-                  <Txt variant="tiny">See which dishes fit what&apos;s left today (estimates)</Txt>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={t.muted} />
-              </Row>
-            </Card>
-          ) : null}
+          <Card onPress={() => setSheet({ kind: "menu" })}>
+            <Row gap={space.md}>
+              <Ionicons name="restaurant-outline" size={20} color={t.text2} />
+              <View style={{ flex: 1 }}>
+                <Txt>Eating out? Scan the menu</Txt>
+                <Txt variant="tiny">See which dishes fit what&apos;s left {isToday ? "today" : `on ${shortDate(date)}`} (estimates)</Txt>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={t.muted} />
+            </Row>
+          </Card>
           <Card onPress={() => setSheet({ kind: "custom", meal: "snack" })}>
             <Row gap={space.md}>
               <Ionicons name="create-outline" size={20} color={t.text2} />
@@ -238,6 +236,7 @@ export default function FoodLog() {
       <Sheet visible={sheet?.kind === "menu"} title="Scan a menu" onClose={() => setSheet(null)}>
         {sheet?.kind === "menu" ? (
           <MenuScanner
+            date={date}
             onLogged={(entry) => {
               setSheet(null);
               undoable(`${entry.food_name} logged to ${entry.meal} (estimate)`, () => deleteFood(entry));
