@@ -145,6 +145,7 @@ erDiagram
         enum diet_option "light / normal / extreme"
         int days_per_week "derived from training_days"
         string training_days "0,2,4 (0 = Monday); null = older profile, days filled in automatically"
+        string day_plan "JSON: the user's session type and name per weekday; null = all recommended"
         int sleep_goal_minutes "null = recommended for age"
         int minutes_per_session
         enum equipment "gym / home / bodyweight"
@@ -355,7 +356,10 @@ All paths are under `/api` (e.g. `/api/me/plan`). All endpoints except sign-up, 
 |---|---|---|
 | GET | `/me/plan` | BMI, category, target weight, weight change, BMR, TDEE, all three diet options with calories, difference, weekly change, weeks to target |
 | GET | `/me/plan/projection?option=normal` | Week-by-week projected weight |
-| GET | `/me/routine` | Workout routine on the user's training days, with the split and why it was chosen |
+| GET | `/me/routine` | Workout routine on the user's training days: each day's session type, name and recommended type, why, and notes |
+| PUT | `/me/schedule` | Save training days with an optional session type and name per day |
+| POST | `/me/schedule/preview` | Same body as PUT; returns the routine without saving (for the editor) |
+| DELETE | `/me/schedule/custom` | Back to the recommended session for every day |
 | GET | `/me/recommendations?tz_offset=` | Today's rule-based suggestions, each with reasons and the data used |
 | PUT | `/me/sleep-goal` | Nightly sleep goal in minutes, or `null` for the amount recommended for the user's age |
 
@@ -461,18 +465,18 @@ Rule-based; inputs come from the profile.
 
 **Training days.** The user picks the actual weekdays (any combination of 1–6 days, validated on the server). `days_per_week` is derived from them. Sessions are only placed on those days; every other day is a rest day. Profiles saved before days could be picked keep working: they get a fixed, explicit default for their count (`LEGACY_DEFAULT_DAYS`, e.g. 3 → Mon / Wed / Fri) and the app asks the user to pick their own. Changing the days changes the plan from then on; logged workouts are never touched.
 
-**Split, chosen from the days** (`choose_split`), so demanding sessions on back-to-back days train different muscles:
+**Recommended session for each day** (`recommend_focus`):
 
-| Days | No back-to-back days | Some back-to-back days |
-|---|---|---|
-| 1 | Full body | – |
-| 2 | Full body A / B | Upper / Lower |
-| 3 | Full body A / B / A | Push / Pull / Legs |
-| 4 | Upper / Lower × 2 | Upper / Lower × 2 |
-| 5 | Upper / Lower / Push / Pull / Legs | same |
-| 6 | Push / Pull / Legs × 2 | same |
+| Days | Recommended |
+|---|---|
+| 1–3 | Full body every day (full-body days alternate between two exercise variations, A and B) |
+| 4 | Upper / Lower × 2 |
+| 5 | Upper / Lower / Push / Pull / Legs |
+| 6 | Push / Pull / Legs × 2 |
 
-The rotation starts after the longest rest gap (Sunday → Monday counts as back to back), and the routine says why the split was picked. Tests check every combination of days for no repeated muscle groups on consecutive days.
+The rotation starts after the longest rest gap (Sunday → Monday counts as back to back), and the routine says why it recommends the split. Tests check every combination of 4+ days for no shared muscles on consecutive days.
+
+**The user's own plan.** For any day the user can pick another session type (Full body, Upper body, Lower body, Push, Pull, Legs) and give the day their own name ("Heavy day"), in the Workouts tab → **Edit plan** (`PUT /me/schedule`, previewed live with `POST /me/schedule/preview`). Choices are stored as JSON in `PROFILE.day_plan`, keyed by weekday; a day without a choice follows the recommendation, and "Use recommended" (`DELETE /me/schedule/custom`) drops all choices. Changing the training days keeps the choices for days that stay. Plans are never blocked: friendly notes point out back-to-back days that train the same muscles, or a week with no legs, pushing or pulling.
 
 - **Minutes per session** sets the number of exercises (about 9 minutes per exercise including rest).
 - **Goal** sets rep ranges: fat loss 10–15 reps + 10–20 min cardio; muscle gain 6–12 reps; maintain 8–12.

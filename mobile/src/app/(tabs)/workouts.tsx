@@ -5,6 +5,7 @@ import { Pressable, View } from "react-native";
 
 import { ExerciseInfo } from "@/components/ExerciseInfo";
 import { RestTimerPanel, useRestTimer } from "@/components/RestTimer";
+import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { Badge, Button, Card, CardHead, Field, IconButton, LinkButton, ListRow, Row, Screen, Section, Sheet, Txt, useToast } from "@/components/ui";
 import { ExerciseSearch, QrScanner, SetForm, SetsList, WorkoutDetail, type PickedExercise } from "@/components/WorkoutParts";
 import { api } from "@/lib/api";
@@ -18,6 +19,7 @@ type SheetState =
   | { kind: "scan" }
   | { kind: "set"; exercise: PickedExercise; via: "name" | "qr" }
   | { kind: "info"; exercise: PickedExercise }
+  | { kind: "plan" }
   | { kind: "history"; id: number }
   | null;
 
@@ -132,9 +134,17 @@ export default function Workouts() {
           <Txt variant="small" style={{ marginTop: 10 }}>
             {routine.split}: {routine.split_reason}
           </Txt>
-          <Txt variant="small" style={{ marginTop: 4, marginBottom: 4 }}>
-            {routine.exercises_per_day} exercises per session · {routine.minutes_per_session} min. Change your days in Profile.
-          </Txt>
+          {routine.warnings.map((w) => (
+            <Txt key={w} variant="small" style={{ marginTop: 4, color: t.warnInk }}>
+              {w}
+            </Txt>
+          ))}
+          <Row style={{ marginTop: 6, marginBottom: 4, justifyContent: "space-between" }}>
+            <Txt variant="small" style={{ flex: 1 }}>
+              {routine.exercises_per_day} exercises per session · {routine.minutes_per_session} min
+            </Txt>
+            <Button title="Edit plan" icon="create-outline" kind="soft" small onPress={() => setSheet({ kind: "plan" })} />
+          </Row>
           {routine.days.map((d, i) => {
             const shown = openDay ?? nextTrainingDay(routine);
             const open = shown === d.weekday_index;
@@ -150,6 +160,7 @@ export default function Workouts() {
                 <Row gap={6}>
                   <Txt>
                     <Txt style={{ fontWeight: "700" }}>{d.weekday}</Txt> · {d.title}
+                    {d.custom_name ? <Txt variant="tiny"> ({d.focus_label})</Txt> : null}
                   </Txt>
                   {isToday ? <Badge label="Today" tone="info" /> : null}
                 </Row>
@@ -240,6 +251,18 @@ export default function Workouts() {
           />
         ) : null}
       </Sheet>
+      <Sheet visible={sheet?.kind === "plan"} title="Your plan" onClose={closeSheet}>
+        {sheet?.kind === "plan" && routine ? (
+          <ScheduleEditor
+            routine={routine}
+            onSaved={(_, message) => {
+              setOpenDay(null);
+              toast(message);
+              closeSheet();
+            }}
+          />
+        ) : null}
+      </Sheet>
       <Sheet visible={sheet?.kind === "history"} title="Workout" onClose={closeSheet}>
         {sheet?.kind === "history" ? <WorkoutDetail workoutId={sheet.id} onDeleted={closeSheet} /> : null}
       </Sheet>
@@ -284,7 +307,7 @@ function WeekStrip({ routine }: { routine: Routine }) {
               {label}
             </Txt>
             <Txt variant="tiny" style={{ color: title ? t.accent : t.muted, fontWeight: "600", textAlign: "center" }} numberOfLines={2}>
-              {title ? title.replace("Full body", "Full") : "Rest"}
+              {title ?? "Rest"}
             </Txt>
           </View>
         );

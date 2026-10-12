@@ -60,7 +60,7 @@ Also useful:
 | Account | Sign up (with an "email me ads and discounts" checkbox), log in, delete account |
 | Profile | Birth date, sex, height, weight, activity level, goal, diet, training days, minutes per session, equipment, kg/cm or lb/in |
 | Health plan | BMI + category, healthy weight range, kg to lose/gain for BMI 22, resting and maintenance calories, light / normal / extreme diet with calorie difference, kg per week and weeks to goal |
-| Routine | Pick the **weekdays you train** (e.g. Sun / Tue / Thu); sessions go on those days only, the rest are rest days. The split is chosen so back-to-back days train different muscles, and the app says why |
+| Routine | Pick the **weekdays you train** (e.g. Sun / Tue / Thu); sessions go on those days only, the rest are rest days. The app recommends a session for each day (1–3 days: full body every day) and says why. **Edit plan** lets you pick any session type per day (e.g. Full, Full, Upper) and give each day your own name; "Use recommended" goes back |
 | Today (Home) | Rule-based suggestions with their reasons: today's session or a rest day, "consider going lighter" after a short night or low WHOOP recovery, missed sessions (never "make them up"), when to add weight. Your plan is never changed for you |
 | Workouts | Start a workout, add exercises by **typing the name** (typos are fine) or **scanning the machine's QR code**, log reps, weight (kg or lb), RPE and notes. Each exercise has how-to steps and **alternatives** from the library ("similar movement" or "different movement") |
 | Rest timer | Starts by itself after every set with that exercise's rest time; pause, resume, skip, restart, ±15 s (remembered per exercise); vibrates (or beeps in the browser) at zero |

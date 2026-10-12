@@ -18,7 +18,7 @@ from app.models.workout import WorkoutSession, WorkoutSet
 from app.services.calculations import age_on, recommended_sleep_hours
 from app.services.plan import build_plan
 from app.services.routine import Routine, generate_routine
-from app.services.schedule import effective_training_days
+from app.services.schedule import effective_training_days, parse_day_choices
 
 # Query parameter the app sends: -new Date().getTimezoneOffset(). Without it, the server's own time zone is used.
 TzOffset = Annotated[
@@ -114,6 +114,7 @@ def user_routine(session: Session, profile: Profile) -> Routine:
         profile.minutes_per_session,
         profile.equipment,
         build_plan(profile).direction,
+        parse_day_choices(profile.day_plan),
     )
 
 

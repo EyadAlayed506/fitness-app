@@ -6,9 +6,13 @@ from app.models.exercise import Exercise
 from app.seed import exercise_rows
 from app.services.routine import generate_routine
 from app.services.schedule import (
+    FOCUS_MUSCLES,
+    DayChoice,
     back_to_back_pairs,
-    choose_split,
     cycle_order,
+    plan_warnings,
+    recommend_focus,
+    validate_day_choices,
     validate_days,
 )
 
@@ -51,27 +55,66 @@ def test_changed_days_are_respected(catalogue):
 
 
 @pytest.mark.parametrize("n", range(1, 7))
-def test_back_to_back_days_never_repeat_the_same_session(n):
-    """For every possible choice of days: two training days in a row never get the same session type."""
+def test_recommended_sessions_for_every_choice_of_days(n):
+    """Every combination of days: 1-3 days are full body every day; 4+ days never put sessions that train
+    the same muscles on back-to-back days."""
     for days in itertools.combinations(range(7), n):
-        titles, _, _ = choose_split(list(days))
-        assert set(titles) == set(days)
-        for a, b in back_to_back_pairs(list(days)):
-            assert titles[a] != titles[b], (days, titles)
+        focus, _, _ = recommend_focus(list(days))
+        assert set(focus) == set(days)
+        if n <= 3:
+            assert set(focus.values()) == {"full_body"}
+        else:
+            for a, b in back_to_back_pairs(list(days)):
+                assert not FOCUS_MUSCLES[focus[a]] & FOCUS_MUSCLES[focus[b]], (days, focus)
 
 
-def test_split_choice_explained():
-    titles, name, why = choose_split([SAT, SUN])
-    assert name == "Upper / Lower" and "back to back" in why
-    titles, name, _ = choose_split([MON, THU])
-    assert name == "Full body A / B"
-    titles, name, _ = choose_split([MON, WED, FRI])
-    assert name == "Full body A / B / A"
-    titles, name, _ = choose_split([MON, SAT, SUN])
-    assert name == "Push / Pull / Legs"
-    # the cycle starts after the longest rest: Saturday, then Sunday, then Monday
-    assert cycle_order([MON, SAT, SUN]) == [SAT, SUN, MON]
-    assert [titles[d] for d in (SAT, SUN, MON)] == ["Push", "Pull", "Legs"]
+def test_three_days_default_to_full_body_every_day(catalogue):
+    for days in ([MON, WED, FRI], [MON, SAT, SUN], [SUN, TUE, THU]):
+        routine = generate_routine(catalogue, days, 45, "gym", "maintain")
+        assert [d.focus for d in routine.days] == ["full_body"] * 3
+        assert [d.title for d in routine.days] == ["Full body"] * 3
+        assert routine.split == "Full body x3" and not routine.customized
+    # back-to-back full-body days are allowed but come with a note
+    routine = generate_routine(catalogue, [MON, SAT, SUN], 45, "gym", "maintain")
+    assert "back to back" in routine.split_reason
+    assert any("Saturday (Full body) and Sunday (Full body)" in w for w in routine.warnings)
+
+
+def test_full_body_days_alternate_exercises(catalogue):
+    routine = generate_routine(catalogue, [MON, WED, FRI], 60, "gym", "maintain")
+    ids = [[x.exercise_id for x in d.exercises] for d in routine.days]
+    assert ids[0] != ids[1]
+
+
+def test_user_chooses_session_types_and_names(catalogue):
+    choices = {MON: DayChoice("full_body"), WED: DayChoice(None, "Heavy day"), FRI: DayChoice("upper", "Arms & chest")}
+    routine = generate_routine(catalogue, [MON, WED, FRI], 60, "gym", "maintain", choices)
+    assert [(d.focus, d.title, d.custom_name) for d in routine.days] == [
+        ("full_body", "Full body", False),
+        ("full_body", "Heavy day", True),
+        ("upper", "Arms & chest", True),
+    ]
+    assert [d.recommended_focus for d in routine.days] == ["full_body"] * 3
+    assert routine.customized and routine.split == "Full body / Full body / Upper body"
+    assert routine.recommended_split == "Full body x3" and "Recommended" in routine.split_reason
+    groups = {x.muscle_group for x in routine.days[2].exercises}
+    assert groups <= {"chest", "back", "shoulders", "biceps", "triceps", "core"}  # an upper-body day
+
+
+def test_plan_warnings():
+    assert plan_warnings({MON: "upper", TUE: "upper"})[0].startswith("Monday (Upper body) and Tuesday (Upper body)")
+    assert "No day in your week trains the legs." in plan_warnings({MON: "upper", WED: "upper"})
+    assert plan_warnings({MON: "push", TUE: "pull", THU: "legs"}) == []  # different muscles back to back
+    assert plan_warnings({MON: "full_body", WED: "full_body"}) == []
+
+
+def test_day_choices_are_validated():
+    days = [MON, WED]
+    assert validate_day_choices({MON: DayChoice("upper", "  Big   arms ")}, days) == {MON: DayChoice("upper", "Big arms")}
+    assert validate_day_choices({MON: DayChoice(None, "   ")}, days) == {}  # nothing chosen
+    for bad in ({MON: DayChoice("cardio")}, {TUE: DayChoice("upper")}, {MON: DayChoice(None, "x" * 41)}):
+        with pytest.raises(ValueError):
+            validate_day_choices(bad, days)
 
 
 def test_back_to_back_includes_sunday_to_monday():
@@ -103,5 +146,5 @@ def test_goal_sets_reps_and_cardio(catalogue):
 def test_repeated_day_types_vary(catalogue):
     routine = generate_routine(catalogue, [MON, TUE, THU, FRI], 60, "gym", "maintain")
     upper_a, upper_b = routine.days[0], routine.days[2]
-    assert upper_a.title == upper_b.title == "Upper"
+    assert upper_a.title == upper_b.title == "Upper body"
     assert [x.exercise_id for x in upper_a.exercises] != [x.exercise_id for x in upper_b.exercises]

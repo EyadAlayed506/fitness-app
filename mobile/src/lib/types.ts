@@ -77,8 +77,27 @@ export interface Routine {
   minutes_per_session: number;
   exercises_per_day: number;
   reps: string;
-  days: { weekday: string; weekday_index: number; title: string; exercises: RoutineExercise[]; cardio_minutes: number }[];
+  days: RoutineDay[];
   notes: string[];
+  /** the user changed a session type or named a day */
+  customized: boolean;
+  recommended_split: string;
+  /** friendly notes about the plan (never block saving) */
+  warnings: string[];
+  focus_options: { value: string; label: string }[];
+}
+
+export interface RoutineDay {
+  weekday: string;
+  weekday_index: number;
+  /** the user's own name for the day, or the session type */
+  title: string;
+  focus: string;
+  focus_label: string;
+  recommended_focus: string;
+  custom_name: boolean;
+  exercises: RoutineExercise[];
+  cardio_minutes: number;
 }
 
 export interface Exercise {

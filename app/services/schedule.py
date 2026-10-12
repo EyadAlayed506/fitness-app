@@ -1,9 +1,11 @@
-"""Training days: which weekdays a user trains, and which session type goes on each day.
+"""Training days: which weekdays a user trains, and which session type (and name) goes on each day.
 
 Weekdays are numbered like Python's date.weekday(): 0 = Monday ... 6 = Sunday.
 """
 
+import json
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 MAX_TRAINING_DAYS = 6  # keep at least one rest day a week
@@ -70,39 +72,117 @@ def cycle_order(days: list[int]) -> list[int]:
     return days[start:] + days[:start]
 
 
-def choose_split(days: list[int]) -> tuple[dict[int, str], str, str]:
-    """Session type for each training day, the split's name, and why it was chosen.
+# ---------- what each training day trains ----------
 
-    Back-to-back training days get different muscle groups, so nothing is trained hard two days in a row.
+# Session types the user can pick for a day, and what they train (used for warnings)
+FOCUSES = {
+    "full_body": "Full body",
+    "upper": "Upper body",
+    "lower": "Lower body",
+    "push": "Push",
+    "pull": "Pull",
+    "legs": "Legs",
+}
+_UPPER = {"chest", "back", "shoulders", "biceps", "triceps"}
+_LOWER = {"quads", "hamstrings", "glutes", "calves"}
+FOCUS_MUSCLES = {
+    "full_body": _UPPER | _LOWER,
+    "upper": _UPPER,
+    "lower": _LOWER,
+    "push": {"chest", "shoulders", "triceps"},
+    "pull": {"back", "biceps"},
+    "legs": _LOWER,
+}
+MAX_DAY_NAME = 40
+
+
+@dataclass
+class DayChoice:
+    """What the user chose for one weekday. None means "use the recommendation" / "use the session's name"."""
+
+    focus: str | None = None
+    name: str | None = None
+
+
+def recommend_focus(days: list[int]) -> tuple[dict[int, str], str, str]:
+    """Recommended session type for each training day, the split's name, and why.
+
+    1-3 days: full body every day. More days: upper/lower or push/pull/legs, so muscles get rest.
     """
     n = len(days)
     order = cycle_order(days)
-    consecutive = bool(back_to_back_pairs(days))
-    if n == 1:
-        titles, name = ["Full body A"], "Full body"
-        why = "One day a week: a full-body session covers every major muscle group."
-    elif n == 2 and not consecutive:
-        titles, name = ["Full body A", "Full body B"], "Full body A / B"
-        why = "Two days with rest in between: two different full-body sessions."
-    elif n == 2:
-        titles, name = ["Upper", "Lower"], "Upper / Lower"
-        why = "Your two days are back to back, so one trains the upper body and the other the legs."
-    elif n == 3 and not consecutive:
-        titles, name = ["Full body A", "Full body B", "Full body A"], "Full body A / B / A"
-        why = "Three days with rest between them: full-body sessions, alternating A and B."
-    elif n == 3:
-        titles, name = ["Push", "Pull", "Legs"], "Push / Pull / Legs"
-        why = "Some of your days are back to back, so each day trains different muscles (push, pull, legs)."
+    if n <= 3:
+        focuses = ["full_body"] * n
+        name = "Full body" if n == 1 else f"Full body x{n}"
+        why = (
+            "Training 1-3 days a week, a full-body session each day trains every muscle group more than "
+            "once a week. Full-body days alternate between two exercise variations."
+        )
+        if back_to_back_pairs(days):
+            why += " Some of your days are back to back: keep one of them lighter, or pick Upper / Lower for them."
     elif n == 4:
-        titles, name = ["Upper", "Lower", "Upper", "Lower"], "Upper / Lower"
+        focuses, name = ["upper", "lower", "upper", "lower"], "Upper / Lower"
         why = "Four days: upper and lower body alternate, so back-to-back days train different muscles."
     elif n == 5:
-        titles, name = ["Upper", "Lower", "Push", "Pull", "Legs"], "Upper / Lower / Push / Pull / Legs"
+        focuses, name = ["upper", "lower", "push", "pull", "legs"], "Upper / Lower / Push / Pull / Legs"
         why = "Five days: each session trains different muscles from the one before."
     else:
-        titles, name = ["Push", "Pull", "Legs", "Push", "Pull", "Legs"], "Push / Pull / Legs x2"
+        focuses, name = ["push", "pull", "legs", "push", "pull", "legs"], "Push / Pull / Legs x2"
         why = "Six days: push, pull and legs twice, so each muscle gets two days of rest before it's trained again."
-    return dict(zip(order, titles)), name, why
+    return dict(zip(order, focuses)), name, why
+
+
+def validate_day_choices(choices: dict[int, DayChoice], days: list[int]) -> dict[int, DayChoice]:
+    """Clean the user's choices: known session types, trimmed names, only for training days."""
+    clean = {}
+    for weekday, c in choices.items():
+        if weekday not in days:
+            raise ValueError(f"{WEEKDAY_NAMES[weekday]} isn't one of your training days")
+        if c.focus is not None and c.focus not in FOCUSES:
+            raise ValueError(f"Unknown session type '{c.focus}'. Choose from: {', '.join(FOCUSES)}")
+        name = " ".join((c.name or "").split()) or None
+        if name and len(name) > MAX_DAY_NAME:
+            raise ValueError(f"Day names can be up to {MAX_DAY_NAME} characters")
+        if c.focus or name:
+            clean[weekday] = DayChoice(c.focus, name)
+    return clean
+
+
+def parse_day_choices(text: str | None) -> dict[int, DayChoice]:
+    if not text:
+        return {}
+    try:
+        raw = json.loads(text)
+    except ValueError:
+        return {}
+    return {int(k): DayChoice(v.get("focus"), v.get("name")) for k, v in raw.items()}
+
+
+def format_day_choices(choices: dict[int, DayChoice]) -> str | None:
+    if not choices:
+        return None
+    return json.dumps({str(k): {"focus": c.focus, "name": c.name} for k, c in sorted(choices.items())})
+
+
+def plan_warnings(focus_by_day: dict[int, str]) -> list[str]:
+    """Friendly notes about a plan. They never block saving it."""
+    days = sorted(focus_by_day)
+    notes = []
+    for a, b in back_to_back_pairs(days):
+        shared = FOCUS_MUSCLES[focus_by_day[a]] & FOCUS_MUSCLES[focus_by_day[b]]
+        if shared:
+            notes.append(
+                f"{WEEKDAY_NAMES[a]} ({FOCUSES[focus_by_day[a]]}) and {WEEKDAY_NAMES[b]} ({FOCUSES[focus_by_day[b]]}) "
+                "are back to back and train some of the same muscles. Fine if one of them is lighter."
+            )
+    trained = set().union(*(FOCUS_MUSCLES[f] for f in focus_by_day.values())) if focus_by_day else set()
+    if days and not trained & _LOWER:
+        notes.append("No day in your week trains the legs.")
+    if days and not trained & {"chest", "shoulders", "triceps"}:
+        notes.append("No day in your week has pushing exercises (chest, shoulders, triceps).")
+    if days and not trained & {"back", "biceps"}:
+        notes.append("No day in your week has pulling exercises (back, biceps).")
+    return notes
 
 
 def effective_training_days(profile) -> list[int]:

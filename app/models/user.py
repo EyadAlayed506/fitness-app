@@ -113,6 +113,9 @@ class Profile(ProfileBase, table=True):
     weight_kg: float  # latest weigh-in
     # Weekdays the user trains, "0,2,4" (0 = Monday). None for profiles saved before days could be chosen.
     training_days: str | None = None
+    # The user's own session type and/or name per weekday, as JSON: {"0": {"focus": "upper", "name": "Arms"}}.
+    # Days not in it use the recommended session. See services/schedule.py.
+    day_plan: str | None = None
     sleep_goal_minutes: int | None = None  # None = the recommended amount for the user's age
 
 
