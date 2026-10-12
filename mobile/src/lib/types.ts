@@ -440,12 +440,23 @@ export interface WeeklySummary {
   notes: string[];
 }
 
+export interface AssistantAction {
+  kind: "food" | "sets" | "weight" | "sleep" | "removed";
+  summary: string;
+  /** app route where the change shows up */
+  screen: string;
+  /** API paths to DELETE to undo it */
+  undo: string[];
+}
+
 export interface ChatMessage {
   id: number;
   role: "user" | "assistant";
   text: string;
   /** tools the assistant used to look at the user's data */
   tools_used: string[];
+  /** what the assistant added or removed */
+  actions: AssistantAction[];
   created_at: string;
 }
 

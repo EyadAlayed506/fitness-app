@@ -1,14 +1,17 @@
-"""The fitness assistant: a chat with an AI that can look at the user's own data through read-only tools.
+"""The fitness assistant: a chat with an AI that can look at, and add to, the user's own data through tools.
 
 Each tool calls the same code as the app's API (so answers match what the screens show) and only ever
-reads the logged-in user's data. Nothing is written except the conversation itself. The model is told
-to say when data is missing instead of guessing, and not to give medical advice.
+touches the logged-in user's data. Reading tools look things up; logging tools add food, workout sets,
+a weigh-in or a night of sleep when the user asks, and report each change as an "action" the app shows
+with a link to the right screen and an Undo. The model is told to say when data is missing instead of
+guessing, and not to give medical advice.
 
 Two backends answer the same way, with the same tools and rules:
 - ClaudeBackend: Claude through Anthropic's API (needs ANTHROPIC_API_KEY; every question costs money).
 - OllamaBackend: a free model running on the user's own PC through Ollama (weaker answers, data stays local).
 """
 
+import asyncio
 import datetime as dt
 import json
 import re
@@ -36,8 +39,8 @@ MAX_TOKENS = 16_000
 HISTORY_MESSAGES = 20  # earlier messages sent with each question (10 questions and answers)
 
 DISCLAIMER = (
-    "The assistant is an AI. It reads your logged data to answer, can make mistakes, and isn't a doctor: "
-    "for pain, injury or health worries, talk to a professional."
+    "The coach is an AI. It reads your data and can log things for you, but it can make mistakes (check what it "
+    "added, and use Undo), and it isn't a doctor: for pain, injury or health worries, talk to a professional."
 )
 
 # Stable text only (no dates or user data), so it can be cached between requests.
@@ -45,7 +48,8 @@ SYSTEM_PROMPT = """You are the coach inside a fitness app. You help one person w
 
 How to work:
 - Before answering anything about the user's own data, look it up with the tools. Quote the numbers and dates you used. If something isn't logged, say so plainly and suggest how to log it in the app; never invent values or fill gaps with guesses.
-- The app's own plan and rules come first: their training days and session types, the recommended calories, the sleep goal. Explain them and help the user follow them; if they want to change the plan, tell them where (Workouts > Edit plan, Profile, Sleep > Change goal). You can't change anything in the app yourself.
+- The app's own plan and rules come first: their training days and session types, the recommended calories, the sleep goal. Explain them and help the user follow them; if they want to change the plan, tell them where (Workouts > Edit plan, Profile, Sleep > Change goal). You can't change the plan or settings yourself.
+- You can log things for the user: food (log_food), workout sets (log_workout_sets), a weigh-in (log_weight) and a night of sleep (log_sleep), and remove a food entry (remove_food_entry). When the user asks you to add or log something, do it straight away with the right tool, without asking first. If they don't say how much, use one normal serving and say so. Log only what they asked for. Afterwards say exactly what was added (name, amount, meal or day); the app shows it with an Undo button.
 - General fitness knowledge is fine (technique, how progressive overload works, protein needs, sleep habits). Keep it practical and mainstream.
 - Rest days are part of training. Don't push extra sessions to make up missed ones, very low calories, or training through pain.
 - You are not a doctor. Don't diagnose, and don't advise on medication, injuries, eating disorders or medical conditions; for pain, injury, chest pain, dizziness, or anything that worries them, tell them to see a professional. In an emergency, tell them to contact emergency services.
@@ -55,15 +59,34 @@ How to work:
 
 
 @dataclass
+class Action:
+    """Something the assistant changed, shown under its answer with a link and an Undo."""
+
+    kind: str  # "food" | "sets" | "weight" | "sleep" | "removed"
+    summary: str  # e.g. "Banana, 1 serving (105 kcal) for breakfast"
+    screen: str  # app route to see it, e.g. "/food"
+    undo: list[str] = field(default_factory=list)  # API paths to DELETE to undo it
+
+
+@dataclass
 class ToolContext:
     session: Session
     user: User
     profile: Profile
     tz_offset: int | None
+    actions: list[Action] = field(default_factory=list)  # filled by the logging tools
 
     @property
     def today(self) -> dt.date:
         return local_today(self.tz_offset)
+
+    @property
+    def now(self) -> dt.datetime:
+        """The user's local clock time (no time zone)."""
+        utc = dt.datetime.now(dt.UTC)
+        if self.tz_offset is None:
+            return utc.astimezone().replace(tzinfo=None)
+        return (utc + dt.timedelta(minutes=self.tz_offset)).replace(tzinfo=None)
 
 
 @dataclass
@@ -202,6 +225,172 @@ def _points(ctx: ToolContext, _: dict) -> Any:
     return read_points(ctx.user, ctx.profile, ctx.session, ctx.tz_offset)
 
 
+# ---------- logging tools (write, current user only) ----------
+
+
+def _meal_for(ctx: ToolContext, meal: Any) -> str:
+    from app.models.food import Meal
+
+    if meal in {m.value for m in Meal}:
+        return str(meal)
+    hour = ctx.now.hour  # not given: go by the time of day
+    return "breakfast" if hour < 11 else "lunch" if hour < 16 else "dinner" if hour < 22 else "snack"
+
+
+def _search_online(query: str) -> list:
+    """USDA and Open Food Facts results for a food that isn't in the local database (best first)."""
+    from app.services import food_search
+
+    async def run():
+        async with httpx.AsyncClient(timeout=8) as client:
+            found = await asyncio.gather(
+                food_search.search_usda(client, query, 3), food_search.search_off(client, query, 3),
+                return_exceptions=True,
+            )
+        return [c for res in found if not isinstance(res, Exception) for c in res]
+
+    return asyncio.run(run())
+
+
+def _find_food(ctx: ToolContext, name: str):
+    """The best match for a food name: the user's foods and the built-in list first, then online."""
+    from sqlmodel import or_, select
+
+    from app.models.food import Food
+    from app.routers.foods import import_food
+    from app.services.food_search import search_local
+
+    foods = list(ctx.session.exec(select(Food).where(or_(Food.owner_id.is_(None), Food.owner_id == ctx.user.id))).all())
+    local = search_local(foods, name, limit=1)
+    if local:
+        return local[0]
+    online = _search_online(name)
+    if not online:
+        raise ToolError(f"Couldn't find '{name}' in the food database or online. Ask the user to add it in the Food tab.")
+    return import_food(online[0], ctx.user, ctx.session)
+
+
+def _log_food(ctx: ToolContext, args: dict) -> Any:
+    from app.models.food import FoodAddedVia, FoodLogIn
+    from app.routers.foods import log_food
+    from app.services.units import SERVING, units_for
+
+    name = str(args.get("food", "")).strip()
+    if not name:
+        raise ToolError("Say which food to log.")
+    food = _find_food(ctx, name)
+    allowed = units_for(food.is_liquid, bool(food.serving_size))
+    unit = str(args.get("unit") or "").strip().lower()
+    try:
+        quantity = float(args.get("quantity") or 1)
+    except (TypeError, ValueError):
+        quantity = 1.0
+    if unit not in allowed:  # "piece", "medium", "a", nothing...: one serving if the food has one
+        if SERVING not in allowed:
+            raise ToolError(f"{food.name} can be logged in: {', '.join(allowed)}. Pick one of those units.")
+        unit = SERVING
+    if not 0 < quantity <= 5000:
+        raise ToolError("The amount must be more than 0.")
+    entry = log_food(
+        FoodLogIn(food_id=food.id, date=_date(args.get("date"), ctx), meal=_meal_for(ctx, args.get("meal")),
+                  quantity=quantity, unit=unit, added_via=FoodAddedVia.search),
+        ctx.user, ctx.session,
+    )
+    amount = f"{quantity:g} {unit}{'s' if unit == SERVING and quantity != 1 else ''}"
+    when = "" if entry.date == ctx.today else f" on {entry.date.strftime('%a %d %b')}"
+    ctx.actions.append(Action(
+        "food", f"{food.name}, {amount} ({round(entry.calories)} kcal) for {entry.meal}{when}", "/food",
+        [f"/food-logs/{entry.id}"],
+    ))
+    return {"logged": entry, "food": food.name, "serving_size": food.serving_size, "serving_unit": food.serving_unit}
+
+
+def _remove_food(ctx: ToolContext, args: dict) -> Any:
+    from app.models.food import FoodLog
+    from app.routers.foods import delete_food_log
+
+    entry_id = _int(args.get("entry_id"), 0, 0, 2**31)
+    entry = ctx.session.get(FoodLog, entry_id)
+    if entry is None or entry.user_id != ctx.user.id:
+        raise ToolError("No food entry with that id. Look it up with get_food_day first.")
+    calories, meal, day = entry.calories, entry.meal, entry.date
+    delete_food_log(entry_id, ctx.user, ctx.session)
+    ctx.actions.append(Action("removed", f"Removed a {meal} entry ({round(calories)} kcal) on {day.strftime('%a %d %b')}", "/food"))
+    return {"removed": entry_id}
+
+
+def _log_sets(ctx: ToolContext, args: dict) -> Any:
+    from sqlmodel import select
+
+    from app.models.user import WeightUnit
+    from app.models.workout import WorkoutSession, WorkoutSessionIn, WorkoutSetIn
+    from app.routers.workouts import add_set, start_workout
+
+    exercise = _find_exercise(ctx, str(args.get("exercise", "")))
+    sets = _int(args.get("sets"), 1, 1, 10)
+    reps = _int(args.get("reps"), 0, 0, 1000)
+    if reps <= 0:
+        raise ToolError("Say how many reps.")
+    try:
+        weight = max(0.0, float(args.get("weight") or 0))
+    except (TypeError, ValueError):
+        weight = 0.0
+    unit = "lb" if str(args.get("unit", "")).lower() in ("lb", "lbs", "pounds") else (
+        "kg" if args.get("unit") else ("lb" if ctx.profile.unit_system == "imperial" else "kg"))
+    workout = ctx.session.exec(
+        select(WorkoutSession).where(WorkoutSession.user_id == ctx.user.id, WorkoutSession.ended_at.is_(None))
+        .order_by(WorkoutSession.started_at.desc())
+    ).first()
+    started = workout is None
+    workout_id = workout.id if workout else start_workout(WorkoutSessionIn(), ctx.user, ctx.session).id
+    added = [
+        add_set(workout_id, WorkoutSetIn(exercise_id=exercise.id, reps=reps, weight=weight, unit=WeightUnit(unit)),
+                ctx.user, ctx.session)
+        for _ in range(sets)
+    ]
+    load = f" x {weight:g} {unit}" if weight else ""
+    ctx.actions.append(Action(
+        "sets", f"{exercise.name}: {sets} set{'s' if sets > 1 else ''} of {reps}{load}"
+        + (" (started a workout)" if started else ""), "/workouts",
+        [f"/workouts/{workout_id}/sets/{s.id}" for s in added],
+    ))
+    return {"workout_id": workout_id, "started_new_workout": started, "sets": added}
+
+
+def _log_weight(ctx: ToolContext, args: dict) -> Any:
+    from app.models.user import WeightEntryIn, WeightUnit
+    from app.routers.me import log_weight
+
+    try:
+        value = float(args.get("weight"))
+    except (TypeError, ValueError):
+        raise ToolError("Say the weight as a number.")
+    unit = WeightUnit("lb" if str(args.get("unit", "")).lower() in ("lb", "lbs", "pounds") else "kg")
+    if args.get("unit") is None and ctx.profile.unit_system == "imperial":
+        unit = WeightUnit("lb")
+    entry = log_weight(WeightEntryIn(date=_date(args.get("date"), ctx), weight=value, unit=unit), ctx.profile, ctx.session)
+    ctx.actions.append(Action("weight", f"Weigh-in: {value:g} {unit.value} on {entry.date.strftime('%a %d %b')}", "/home",
+                              [f"/me/weight/{entry.id}"]))
+    return entry
+
+
+def _log_sleep(ctx: ToolContext, args: dict) -> Any:
+    from app.models.sleep import SleepEntryIn
+    from app.routers.sleep import log_sleep
+
+    try:
+        data = SleepEntryIn(bedtime=args.get("bedtime"), wake_time=args.get("wake_time"), quality=args.get("quality"))
+    except ValueError as e:
+        raise ToolError(f"Bad sleep times: {e}. Use YYYY-MM-DDTHH:MM for bedtime and wake_time.")
+    entry = log_sleep(data, ctx.user, ctx.session)
+    h, m = divmod(entry.duration_minutes, 60)
+    ctx.actions.append(Action(
+        "sleep", f"Sleep {data.bedtime:%H:%M}-{data.wake_time:%H:%M} ({h} h {m:02d} min), night to {entry.date:%a %d %b}",
+        "/sleep", [f"/sleep/{entry.id}"],
+    ))
+    return entry
+
+
 _DAYS = {"type": "integer", "description": "How many days back from today (1-90)."}
 _EXERCISE = {"type": "string", "description": "Exercise or machine name, e.g. 'leg press'."}
 
@@ -247,6 +436,38 @@ TOOLS = [
     Tool("get_points",
          "Wellness points: total, level, today's points with reasons, achievements, and how points are earned.",
          {}, _points),
+    Tool("log_food",
+         "Add a food to the user's food log right away. Finds the food by name (their foods, the built-in list, then "
+         "online databases). Units: 'serving' (one normal portion, e.g. one banana), or g/kg/oz/lb for solids, "
+         "ml/l/cup/fl_oz for drinks.",
+         {"food": {"type": "string", "description": "e.g. 'banana', 'greek yogurt'"},
+          "quantity": {"type": "number", "description": "How many units; default 1."},
+          "unit": {"type": "string", "description": "serving, g, kg, oz, lb, ml, l, cup...; default serving."},
+          "meal": {"type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"]},
+          "date": {"type": "string", "description": "YYYY-MM-DD; default today."}},
+         _log_food, required=["food"]),
+    Tool("remove_food_entry",
+         "Remove one entry from the food log, by its id from get_food_day. Only when the user asks.",
+         {"entry_id": {"type": "integer"}}, _remove_food, required=["entry_id"]),
+    Tool("log_workout_sets",
+         "Add sets of an exercise to the workout in progress (starts one if none is open).",
+         {"exercise": _EXERCISE,
+          "sets": {"type": "integer", "description": "How many sets with these reps and weight; default 1."},
+          "reps": {"type": "integer"},
+          "weight": {"type": "number", "description": "0 for bodyweight."},
+          "unit": {"type": "string", "enum": ["kg", "lb"]}},
+         _log_sets, required=["exercise", "reps"]),
+    Tool("log_weight",
+         "Record a weigh-in (one per day; a second one the same day replaces the first).",
+         {"weight": {"type": "number"}, "unit": {"type": "string", "enum": ["kg", "lb"]},
+          "date": {"type": "string", "description": "YYYY-MM-DD; default today."}},
+         _log_weight, required=["weight"]),
+    Tool("log_sleep",
+         "Record a night of sleep by hand. Times are the user's local clock times.",
+         {"bedtime": {"type": "string", "description": "YYYY-MM-DDTHH:MM, e.g. 2026-10-11T23:30"},
+          "wake_time": {"type": "string", "description": "YYYY-MM-DDTHH:MM, e.g. 2026-10-12T07:00"},
+          "quality": {"type": "integer", "description": "1 (very poor) to 5 (great), optional."}},
+         _log_sleep, required=["bedtime", "wake_time"]),
 ]
 TOOLS_BY_NAME = {t.name: t for t in TOOLS}
 TOOL_SCHEMAS = [t.schema() for t in TOOLS]
@@ -261,8 +482,10 @@ def run_tool(ctx: ToolContext, name: str, args: dict, max_chars: int = MAX_TOOL_
         data = tool.run(ctx, args if isinstance(args, dict) else {})
     except ToolError as e:
         return str(e), True
-    except HTTPException as e:  # e.g. "Exercise not found" from the API code
+    except HTTPException as e:  # e.g. "Exercise not found" or an overlapping sleep, from the API code
         return str(e.detail), True
+    except ValueError as e:  # invalid values the API models refuse
+        return f"Invalid input: {e}", True
     text = json.dumps(jsonable_encoder(data), separators=(",", ":"), ensure_ascii=False)
     if len(text) > max_chars:
         text = text[:max_chars] + " ... [cut short: ask for fewer days]"

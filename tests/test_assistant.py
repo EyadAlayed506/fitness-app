@@ -119,7 +119,10 @@ def test_tools_only_see_the_logged_in_user(client, auth, session, claude):
     assert nights == [None, None, None]  # the other user's night isn't visible
 
 
-@pytest.mark.parametrize("name", list(assistant.TOOLS_BY_NAME))
+READ_TOOLS = [n for n in assistant.TOOLS_BY_NAME if not n.startswith(("log_", "remove_"))]
+
+
+@pytest.mark.parametrize("name", READ_TOOLS)
 def test_every_tool_runs_on_a_fresh_account(client, auth, session, name):
     """No data logged yet: every tool still answers (empty, not an error), except exercise tools need a name."""
     user = session.exec(select(User)).one()
@@ -310,3 +313,129 @@ def test_which_ai_answers(monkeypatch):
     assert chosen_provider() == "claude"
     monkeypatch.setattr(s, "assistant_provider", "ollama")
     assert chosen_provider() == "ollama"
+
+
+# ---------- logging things for the user ----------
+
+
+def tool_ctx(session, tz_offset=0) -> assistant.ToolContext:
+    user = session.exec(select(User)).first()
+    return assistant.ToolContext(session=session, user=user, profile=session.get(Profile, user.id), tz_offset=tz_offset)
+
+
+def test_add_banana_to_breakfast(client, auth, session, claude):
+    """The example from the request: the food log has it straight away, with an action and an Undo."""
+    claude.replies = [
+        reply(tool_use("log_food", {"food": "banana", "quantity": 1, "unit": "piece", "meal": "breakfast"}), stop="tool_use"),
+        reply(text("Added 1 banana (105 kcal) to breakfast.")),
+    ]
+    body = ask(client, auth, "add banana in breakfast").json()
+    day = client.get(f"/api/food-logs?date={TODAY}", headers=auth).json()
+    entry = next(e for e in day["entries"] if e["food_name"] == "Banana")
+    assert entry["meal"] == "breakfast" and entry["unit"] == "serving" and entry["quantity"] == 1
+
+    action = body["answer"]["actions"][0]
+    assert action["kind"] == "food" and action["screen"] == "/food"
+    assert action["summary"].startswith("Banana, 1 serving (") and action["summary"].endswith("for breakfast")
+    assert action["undo"] == [f"/food-logs/{entry['id']}"]
+    # the action is kept with the conversation
+    saved = client.get("/api/assistant", headers=auth).json()["messages"][-1]
+    assert saved["actions"] == body["answer"]["actions"]
+    # Undo is a normal delete
+    assert client.delete(f"/api{action['undo'][0]}", headers=auth).status_code == 204
+    assert client.get(f"/api/food-logs?date={TODAY}", headers=auth).json()["entries"] == []
+
+
+def test_log_food_units_meals_and_unknown_foods(client, auth, session, monkeypatch):
+    ctx = tool_ctx(session)
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "white rice", "quantity": 200, "unit": "g", "meal": "lunch"})
+    assert not err
+    logged = json.loads(content)["logged"]
+    assert logged["amount_base"] == 200 and logged["meal"] == "lunch"
+    # a drink in ml
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "orange juice", "quantity": 250, "unit": "ml", "meal": "snack"})
+    assert not err and json.loads(content)["logged"]["amount_base"] == 250
+    # nothing local or online: a clear error for the model, nothing logged
+    monkeypatch.setattr(assistant, "_search_online", lambda q: [])
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "zzqx unicorn steak"})
+    assert err and "Couldn't find" in content
+    assert len(ctx.actions) == 2
+
+
+def test_log_food_from_online_search(client, auth, session, monkeypatch):
+    from app.models.food import FoodCandidate, FoodSource
+
+    candidate = FoodCandidate(name="Quinoa, cooked", source=FoodSource.usda, external_id="168917", is_liquid=False,
+                              serving_size=185, serving_unit="g", calories=120, protein_g=4.4, carbs_g=21.3, fat_g=1.9)
+    monkeypatch.setattr(assistant, "_search_online", lambda q: [candidate])
+    ctx = tool_ctx(session)
+    content, err = assistant.run_tool(ctx, "log_food", {"food": "quinoa", "meal": "dinner"})
+    assert not err, content
+    assert json.loads(content)["food"] == "Quinoa, cooked"
+    assert ctx.actions[0].summary.startswith("Quinoa, cooked, 1 serving (222 kcal)")
+
+
+def test_log_sets_starts_a_workout_and_adds_to_it(client, auth, session):
+    ctx = tool_ctx(session)
+    content, err = assistant.run_tool(ctx, "log_workout_sets", {"exercise": "bench press", "sets": 3, "reps": 8, "weight": 60})
+    assert not err, content
+    first = json.loads(content)
+    assert first["started_new_workout"] and len(first["sets"]) == 3
+    content, _ = assistant.run_tool(ctx, "log_workout_sets", {"exercise": "lat pulldown", "reps": 10, "weight": 50})
+    second = json.loads(content)
+    assert second["workout_id"] == first["workout_id"] and not second["started_new_workout"]
+    workout = client.get(f"/api/workouts/{first['workout_id']}", headers=auth).json()
+    assert workout["set_count"] == 4 and workout["ended_at"] is None
+    assert ctx.actions[0].summary == "Barbell Bench Press: 3 sets of 8 x 60 kg (started a workout)"
+    assert len(ctx.actions[0].undo) == 3 and ctx.actions[0].screen == "/workouts"
+
+
+def test_log_weight_and_sleep(client, auth, session):
+    ctx = tool_ctx(session)
+    content, err = assistant.run_tool(ctx, "log_weight", {"weight": 93.5})
+    assert not err and json.loads(content)["weight_kg"] == 93.5
+    yesterday = TODAY - dt.timedelta(days=1)
+    args = {"bedtime": f"{yesterday}T23:30", "wake_time": f"{TODAY}T07:00", "quality": 4}
+    content, err = assistant.run_tool(ctx, "log_sleep", args)
+    assert not err, content
+    assert json.loads(content)["duration_minutes"] == 450
+    assert ctx.actions[1].summary.startswith("Sleep 23:30-07:00 (7 h 30 min)")
+    # the same night again overlaps: refused with the app's own message
+    content, err = assistant.run_tool(ctx, "log_sleep", args)
+    assert err and "overlap" in content.lower()
+    content, err = assistant.run_tool(ctx, "log_sleep", {"bedtime": "late", "wake_time": "early"})
+    assert err
+
+
+def test_remove_food_entry_only_the_users_own(client, auth, session):
+    ctx = tool_ctx(session)
+    content, _ = assistant.run_tool(ctx, "log_food", {"food": "apple", "meal": "snack"})
+    entry_id = json.loads(content)["logged"]["id"]
+    other = signup_and_login(client, email="other@example.com")
+    client.put("/api/me/profile", json=PROFILE, headers=other)
+    other_user = session.exec(select(User).where(User.email == "other@example.com")).one()
+    other_ctx = assistant.ToolContext(session=session, user=other_user, profile=session.get(Profile, other_user.id), tz_offset=0)
+    content, err = assistant.run_tool(other_ctx, "remove_food_entry", {"entry_id": entry_id})
+    assert err  # can't touch someone else's log
+    content, err = assistant.run_tool(ctx, "remove_food_entry", {"entry_id": entry_id})
+    assert not err and ctx.actions[-1].kind == "removed"
+
+
+def test_actions_are_kept_when_the_answer_fails(client, auth, session, claude):
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    claude.replies = [
+        reply(tool_use("log_food", {"food": "banana", "meal": "breakfast"}), stop="tool_use"),
+        anthropic.APIConnectionError(request=request),
+    ]
+    r = ask(client, auth, "add a banana")
+    assert r.status_code == 200
+    answer = r.json()["answer"]
+    assert answer["text"].startswith("I added: Banana") and answer["actions"][0]["undo"]
+
+
+def test_default_meal_follows_the_time_of_day(session, client, auth):
+    ctx = tool_ctx(session)
+    for hour, meal in ((7, "breakfast"), (13, "lunch"), (19, "dinner"), (23, "snack")):
+        ctx_now = dt.datetime(2026, 10, 12, hour)
+        assert assistant._meal_for(type("C", (), {"now": ctx_now})(), None) == meal
+    assert assistant._meal_for(ctx, "dinner") == "dinner"

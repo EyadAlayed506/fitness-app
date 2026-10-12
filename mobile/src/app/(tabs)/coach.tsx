@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,13 +9,13 @@ import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
 import { tzOffset } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
-import type { AssistantStatus, ChatMessage, ChatReply } from "@/lib/types";
+import type { AssistantAction, AssistantStatus, ChatMessage, ChatReply } from "@/lib/types";
 
 const STARTERS = [
   "What should I train today?",
+  "Add a banana to breakfast",
   "How did I sleep this week?",
   "Am I eating to my plan?",
-  "How is my progress on my lifts?",
 ];
 
 // What each tool looked at, shown under an answer so the user knows where it came from
@@ -31,6 +31,11 @@ const TOOL_LABELS: Record<string, string> = {
   get_calorie_trend: "calories",
   get_weekly_summary: "weekly summary",
   get_points: "points",
+  log_food: "food log",
+  remove_food_entry: "food log",
+  log_workout_sets: "workout",
+  log_weight: "weigh-ins",
+  log_sleep: "sleep",
 };
 
 /** Chat with the assistant about your training, sleep and food. It reads your data; it can't change it. */
@@ -85,7 +90,7 @@ export default function Coach() {
                 Coach
               </Text>
               <Txt variant="tiny">
-                Ask about your training, sleep and food. It reads your logged data.
+                Ask about your training, sleep and food, or tell it what to log.
                 {status ? (status.provider === "ollama" ? ` Runs on your PC (${status.model}).` : " Runs on Claude.") : ""}
               </Txt>
             </View>
@@ -130,7 +135,7 @@ export default function Coach() {
             ))}
             {pending ? (
               <>
-                <Bubble message={{ id: -1, role: "user", text: pending, tools_used: [], created_at: "" }} />
+                <Bubble message={{ id: -1, role: "user", text: pending, tools_used: [], actions: [], created_at: "" }} />
                 <Row gap={8} style={{ paddingHorizontal: 4 }}>
                   <ActivityIndicator size="small" color={t.accent} />
                   <Txt variant="small">
@@ -217,11 +222,71 @@ function Bubble({ message: m }: { message: ChatMessage }) {
           {m.text}
         </Text>
       </View>
+      {m.actions.map((a, i) => (
+        <ActionCard key={`${m.id}-${i}`} action={a} />
+      ))}
       {sources.length ? (
         <Txt variant="tiny" style={{ marginTop: 3, marginLeft: 4 }}>
           Looked at: {sources.join(", ")}
         </Txt>
       ) : null}
+    </View>
+  );
+}
+
+const ACTION_ICON: Record<AssistantAction["kind"], keyof typeof Ionicons.glyphMap> = {
+  food: "restaurant-outline",
+  sets: "barbell-outline",
+  weight: "scale-outline",
+  sleep: "moon-outline",
+  removed: "trash-outline",
+};
+
+/** Something the coach added: where to see it, and an Undo. */
+function ActionCard({ action }: { action: AssistantAction }) {
+  const t = useTheme();
+  const [undone, setUndone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const undo = async () => {
+    setBusy(true);
+    try {
+      for (const path of action.undo) {
+        await api(path, { method: "DELETE" }).catch((e) => {
+          if ((e as { status?: number }).status !== 404) throw e; // already gone is fine
+        });
+      }
+      setUndone(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View
+      style={{
+        marginTop: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: t.border,
+        backgroundColor: undone ? t.surface2 : t.accentSoft,
+        padding: 10,
+        gap: 6,
+      }}
+    >
+      <Row gap={8} style={{ alignItems: "flex-start" }}>
+        <Ionicons name={undone ? "arrow-undo-outline" : ACTION_ICON[action.kind]} size={18} color={undone ? t.muted : t.accent} />
+        <Txt variant="small" style={{ flex: 1, color: undone ? t.muted : t.text, textDecorationLine: undone ? "line-through" : "none" }}>
+          {action.kind === "removed" ? "" : "Added: "}
+          {action.summary}
+        </Txt>
+      </Row>
+      {undone ? (
+        <Txt variant="tiny">Undone</Txt>
+      ) : (
+        <Row gap={14}>
+          <LinkButton title="Open" onPress={() => router.push(action.screen as never)} />
+          {action.undo.length ? <LinkButton title={busy ? "Undoing…" : "Undo"} onPress={undo} /> : null}
+        </Row>
+      )}
     </View>
   );
 }

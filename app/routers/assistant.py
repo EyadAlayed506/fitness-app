@@ -1,5 +1,7 @@
 import datetime as dt
+import json
 from collections.abc import Iterator
+from dataclasses import asdict
 from typing import Annotated
 
 import anthropic
@@ -51,6 +53,7 @@ def _public(m: ChatMessage) -> ChatMessagePublic:
     return ChatMessagePublic(
         id=m.id, role=m.role, text=m.text, created_at=m.created_at,
         tools_used=[t for t in m.tools_used.split(",") if t],
+        actions=json.loads(m.actions) if m.actions else [],
     )
 
 
@@ -111,11 +114,18 @@ def send_message(
     try:
         answer = backend.ask(ctx, history, data.text.strip())
     except assistant.AssistantError as e:
-        raise HTTPException(status_code=e.status, detail=e.detail)
+        if not ctx.actions:
+            raise HTTPException(status_code=e.status, detail=e.detail)
+        # it already changed something: keep the record (and the Undo) even though the answer failed
+        done = "; ".join(a.summary for a in ctx.actions)
+        answer = assistant.Answer(f"I added: {done}. Then something went wrong: {e.detail}", [])
 
     # saved only once there's an answer, so a failed request leaves no half conversation
     question = ChatMessage(user_id=user.id, role="user", text=data.text.strip())
-    reply = ChatMessage(user_id=user.id, role="assistant", text=answer.text, tools_used=",".join(dict.fromkeys(answer.tools_used)))
+    reply = ChatMessage(
+        user_id=user.id, role="assistant", text=answer.text, tools_used=",".join(dict.fromkeys(answer.tools_used)),
+        actions=json.dumps([asdict(a) for a in ctx.actions]) if ctx.actions else None,
+    )
     session.add(question)
     session.add(reply)
     session.commit()
