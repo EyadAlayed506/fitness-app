@@ -55,7 +55,8 @@ export function wordsToNumbers(text: string): string {
   return out.join(" ").replace(/(\d+) and a ½/g, (_, n) => `${n}.5`).replace(/(\d+)\s*½/g, (_, n) => `${n}.5`);
 }
 
-function normalise(text: string): string {
+/** Lower case, numbers as digits, units as "kg" / "lb", "reps" for repetitions. */
+export function normaliseSpeech(text: string): string {
   let t = ` ${text.toLowerCase().replace(/[,!?;:]/g, " ").replace(/\.(?!\d)/g, " ").replace(/(\d)\s*(kg|lb)s?\b/g, "$1 $2")} `;
   t = t.replace(/\b(kilograms?|kilos?|kgs)\b/g, "kg").replace(/\b(pounds?|lbs)\b/g, "lb");
   t = t.replace(/\b(repetitions?|reps|rep)\b/g, "reps").replace(/(\d)\s*x\s*(\d)/g, "$1 x $2");
@@ -65,7 +66,7 @@ function normalise(text: string): string {
 const NUM = String.raw`(\d+(?:\.\d+)?)`;
 
 export function parseSpokenSet(text: string): SpokenSet | null {
-  const t = normalise(text);
+  const t = normaliseSpeech(text);
   if (!t) return null;
   if (/\b(same( again| as (last|before)( time| set)?)?|again|repeat( that)?)\b/.test(t) && !/\d/.test(t)) return { kind: "same" };
   const unitOf = (u: string | undefined) => (u === "kg" ? "kg" : u === "lb" ? "lb" : null);

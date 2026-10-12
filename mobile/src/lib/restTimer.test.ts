@@ -101,3 +101,38 @@ test("format", () => {
   assert.equal(formatRest(5_001), "0:06");
   assert.equal(formatRest(0), "0:00");
 });
+
+test("voice: a one-off rest, extend, set the total", () => {
+  let s = r(initialRestTimer(90), { type: "configure", exerciseId: 1, exerciseName: "Leg Press", durationSec: 90 });
+  // "rest 30 seconds": this rest only, the usual 90 s stays
+  s = r(s, { type: "startFor", seconds: 30, now: 0 });
+  assert.equal(s.status, "running");
+  assert.equal(remainingMs(s, 0), 30_000);
+  assert.equal(s.durationSec, 90);
+  // "add 20 seconds": only the rest running now
+  s = r(s, { type: "extend", seconds: 20, now: 10_000 });
+  assert.equal(remainingMs(s, 10_000), 40_000);
+  assert.equal(s.durationSec, 90);
+  // "make the rest two minutes": 2:00 in total, counted from the start (10 s have gone)
+  s = r(s, { type: "setTotal", seconds: 120, now: 10_000 });
+  assert.equal(remainingMs(s, 10_000), 110_000);
+  assert.equal(s.countdownSec, 120);
+  // taking off more than is left ends it at once, never in the past
+  s = r(s, { type: "extend", seconds: -600, now: 20_000 });
+  assert.equal(remainingMs(s, 20_000), 0);
+  s = r(s, { type: "tick", now: 20_000 });
+  assert.equal(s.status, "done");
+  // nothing running: extend and set-total change nothing
+  const idle = initialRestTimer(90);
+  assert.deepEqual(r(idle, { type: "extend", seconds: 20, now: 0 }), idle);
+  assert.deepEqual(r(idle, { type: "setTotal", seconds: 60, now: 0 }), idle);
+});
+
+test("voice: paused rest can be extended or re-set too", () => {
+  let s = r(initialRestTimer(60), { type: "start", now: 0 });
+  s = r(s, { type: "pause", now: 20_000 }); // 40 s left
+  s = r(s, { type: "extend", seconds: 15, now: 25_000 });
+  assert.equal(s.remainingMs, 55_000);
+  s = r(s, { type: "setTotal", seconds: 90, now: 25_000 }); // 20 s gone of 90
+  assert.equal(s.remainingMs, 70_000);
+});

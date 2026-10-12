@@ -34,7 +34,16 @@ export type RestTimerAction =
   | { type: "restart"; now: number }
   | { type: "skip" }
   | { type: "adjust"; deltaSec: number; now: number }
-  | { type: "tick"; now: number };
+  | { type: "tick"; now: number }
+  /** a one-off rest of this length (the exercise's usual rest isn't changed) */
+  | { type: "startFor"; seconds: number; now: number }
+  /** add (or, if negative, take off) time on the rest running now; nothing when no rest is on */
+  | { type: "extend"; seconds: number; now: number }
+  /** the rest running now lasts this long in total, counted from when it started */
+  | { type: "setTotal"; seconds: number; now: number };
+
+/** The shortest one-off rest a voice command can ask for. */
+export const MIN_VOICE_REST = 5;
 
 export const clampRest = (sec: number) => Math.min(MAX_REST, Math.max(MIN_REST, Math.round(sec)));
 
@@ -108,5 +117,39 @@ export function restTimerReducer(state: RestTimerState, action: RestTimerAction)
         return { ...state, status: "done", endsAt: null, remainingMs: 0 };
       }
       return state;
+    case "startFor": {
+      const seconds = Math.min(MAX_REST, Math.max(MIN_VOICE_REST, Math.round(action.seconds)));
+      return {
+        ...state,
+        status: "running",
+        countdownFor: state.exerciseName,
+        countdownSec: seconds,
+        endsAt: action.now + seconds * 1000,
+        remainingMs: seconds * 1000,
+      };
+    }
+    case "extend": {
+      const ms = Math.round(action.seconds) * 1000;
+      if (state.status === "running" && state.endsAt != null) {
+        const endsAt = Math.max(action.now, state.endsAt + ms);
+        return { ...state, endsAt, countdownSec: Math.max(0, state.countdownSec + ms / 1000) };
+      }
+      if (state.status === "paused") {
+        return { ...state, remainingMs: Math.max(0, state.remainingMs + ms), countdownSec: Math.max(0, state.countdownSec + ms / 1000) };
+      }
+      return state;
+    }
+    case "setTotal": {
+      const totalMs = Math.min(MAX_REST, Math.max(MIN_VOICE_REST, Math.round(action.seconds))) * 1000;
+      if (state.status === "running" && state.endsAt != null) {
+        const startedAt = state.endsAt - state.countdownSec * 1000;
+        return { ...state, endsAt: Math.max(action.now, startedAt + totalMs), countdownSec: totalMs / 1000 };
+      }
+      if (state.status === "paused") {
+        const elapsed = state.countdownSec * 1000 - state.remainingMs;
+        return { ...state, remainingMs: Math.max(0, totalMs - elapsed), countdownSec: totalMs / 1000 };
+      }
+      return state;
+    }
   }
 }
