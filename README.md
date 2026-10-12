@@ -13,9 +13,16 @@ The design is in [ARCHITECTURE.md](ARCHITECTURE.md).
 |---|---|---|---|
 | ![Home](docs/screenshots/mobile-home.png) | ![Workouts](docs/screenshots/mobile-workouts.png) | ![Food](docs/screenshots/mobile-food.png) | ![Progress](docs/screenshots/mobile-progress.png) |
 
-## Run the backend on your PC
+## Try it on your PC
 
-You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.13 and all packages for you) and git.
+There are two parts to start: the **backend** (the server that stores your data) and the **app** (the screens). Start the backend first, then the app in a second terminal.
+
+You need:
+- [uv](https://docs.astral.sh/uv/) for the backend (it installs Python and all packages for you)
+- [Node.js 20 or newer](https://nodejs.org) (the LTS version) for the app
+- git
+
+### Part 1: the backend
 
 **1. Install uv** (once)
 
@@ -39,12 +46,29 @@ cd fitness-app
 ```bash
 uv sync
 uv run python -m app.demo
-uv run fastapi dev app/main.py
+uv run fastapi dev app/main.py --host 0.0.0.0
 ```
+Leave this terminal open: the backend runs as long as it does. (`--host 0.0.0.0` lets your phone connect too. On Windows, choose **Allow** if the firewall asks.)
 
-**4. Open http://localhost:8000** and log in with **demo@fitness.app / demo1234**, or sign up with your own email. This is the web preview.
+### Part 2: the app
 
-**5. The mobile app:** follow [mobile/README.md](mobile/README.md). In short, start the backend with `uv run fastapi dev app/main.py --host 0.0.0.0`, then in a second terminal `cd mobile`, `npm install`, `npx expo start`, and scan the QR code with Expo Go (or press `w` for the browser). You need Node.js 20+ for this part.
+**4. Open a second terminal** in the `fitness-app` folder and run:
+```bash
+cd mobile
+npm install
+npx expo start
+```
+The first `npm install` takes a minute or two; you only need it once.
+
+**5. Open the app**
+- **In your browser:** press `w` in that terminal. The app opens at http://localhost:8081.
+- **On your phone:** install the free **Expo Go** app, connect the phone to the **same Wi-Fi** as your PC, and scan the QR code shown in the terminal (on iPhone, scan it with the Camera app).
+
+**6. Log in** with **demo@fitness.app / demo1234**, or sign up with your own email.
+
+If the phone says it can't reach the server, or for more detail, see [mobile/README.md](mobile/README.md).
+
+**Quick look without the app:** the backend also serves a simple web preview at http://localhost:8000 (same demo login).
 
 The demo account has ten weeks of weigh-ins, workouts, food logs and measurements, so every chart has data. Running `uv run python -m app.demo` again resets it.
 
