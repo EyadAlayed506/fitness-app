@@ -8,6 +8,8 @@ import { useColorScheme } from "react-native";
  * - ink: primary actions and the most important numbers (near-black / near-white)
  * - accent (cobalt): progress, the active tab, links and selected options. One accent only.
  * - good / warn / critical: status only, always with text or an icon, never decoration
+ * - Text colours (text, text2, muted, accent, *Ink, critical) keep at least 4.5:1 contrast on bg, surface
+ *   and surface2 in both palettes. Check new colours before adding them.
  * - series: chart colours, a colour-blind-checked order. Use them in this order, for data only.
  */
 const light = {
@@ -18,7 +20,7 @@ const light = {
   border: "#e3e2dd", // hairlines
   text: "#121315",
   text2: "#53555b",
-  muted: "#85878d",
+  muted: "#67696f", // at least 4.5:1 on bg, surface and surface2
   ink: "#121315", // primary buttons
   inkText: "#ffffff",
   accent: "#2f64d8",
@@ -30,7 +32,7 @@ const light = {
   warn: "#d99211",
   warnInk: "#8a5a00",
   warnSoft: "#fbf0d9",
-  critical: "#d0393b",
+  critical: "#bf2f2f",
   criticalSoft: "#fbe5e5",
   grid: "#ebeae6",
   shadow: "rgba(18, 19, 21, 0.06)",
@@ -46,7 +48,7 @@ const dark: typeof light = {
   border: "#2b2c31",
   text: "#f2f2f0",
   text2: "#b8b9bf",
-  muted: "#83848b",
+  muted: "#8f9097",
   ink: "#f2f2f0",
   inkText: "#121315",
   accent: "#5b8cf5",

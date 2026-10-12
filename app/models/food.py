@@ -139,6 +139,28 @@ class FoodLogPublic(SQLModel):
     fat_g: float
 
 
+class RecentFood(SQLModel):
+    """A food the user logged before, with the amount and meal they used last time."""
+
+    food: FoodPublic
+    quantity: float
+    unit: str
+    meal: Meal
+    times: int  # how often it was logged in the period looked at
+    last_date: dt.date
+
+
+class RecentFoods(SQLModel):
+    recent: list[RecentFood]  # most recently logged first
+    frequent: list[RecentFood]  # most often logged first (only foods logged at least twice)
+
+
+class CopyMealIn(SQLModel):
+    from_date: dt.date
+    to_date: dt.date
+    meal: Meal | None = None  # None: every meal of that day
+
+
 class DayTotals(SQLModel):
     calories: float
     protein_g: float

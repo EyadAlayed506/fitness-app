@@ -21,7 +21,9 @@ from app.models.exercise import (
     RestSettingIn,
 )
 from app.models.user import Profile
+from app.models.workout import BestSet, ExerciseHistoryOut, LastSession, PastSet, WorkoutSession, WorkoutSet
 from app.services.alternatives import find_alternatives
+from app.services.calculations import estimated_1rm
 from app.services.qr import parse_qr_payload, qr_png
 from app.services.recognition import RecognitionError, Recognizer, image_type
 
@@ -149,6 +151,43 @@ def save_rest(exercise_id: int, data: RestSettingIn, user: CurrentUser, session:
         session.add(RestPreference(user_id=user.id, exercise_id=exercise.id, seconds=data.seconds))
     session.commit()
     return _rest_setting(session, user.id, exercise)
+
+
+@router.get("/{exercise_id}/history", response_model=ExerciseHistoryOut)
+def exercise_history(
+    exercise_id: int,
+    user: CurrentUser,
+    session: SessionDep,
+    exclude_workout_id: int | None = Query(default=None, description="leave out this workout (the one in progress)"),
+):
+    """The user's last session with this exercise and their best set, to pre-fill the next set and spot records."""
+    exercise = _get_exercise(session, exercise_id)
+    query = (
+        select(WorkoutSet, WorkoutSession)
+        .join(WorkoutSession, WorkoutSession.id == WorkoutSet.session_id)
+        .where(WorkoutSession.user_id == user.id, WorkoutSet.exercise_id == exercise.id)
+    )
+    if exclude_workout_id is not None:
+        query = query.where(WorkoutSession.id != exclude_workout_id)
+    rows = session.exec(query.order_by(WorkoutSession.started_at.desc(), WorkoutSet.id)).all()
+    if not rows:
+        return ExerciseHistoryOut(exercise_id=exercise.id, last=None, best=None)
+
+    last_workout = rows[0][1]
+    last = LastSession(
+        workout_id=last_workout.id,
+        started_at=last_workout.started_at,
+        sets=[PastSet(reps=s.reps, weight_kg=s.weight_kg, rpe=s.rpe) for s, w in rows if w.id == last_workout.id],
+    )
+    # highest estimated 1RM; for sets without weight, the most reps. Earliest wins a tie.
+    s, w = max(reversed(rows), key=lambda r: (estimated_1rm(r[0].weight_kg, r[0].reps), r[0].reps))
+    best = BestSet(
+        weight_kg=s.weight_kg,
+        reps=s.reps,
+        e1rm_kg=round(estimated_1rm(s.weight_kg, s.reps), 2),
+        started_at=w.started_at,
+    )
+    return ExerciseHistoryOut(exercise_id=exercise.id, last=last, best=best)
 
 
 # ---------- recognise a machine from a photo ----------

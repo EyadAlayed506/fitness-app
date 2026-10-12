@@ -5,6 +5,7 @@ from sqlmodel import Field, SQLModel, select
 
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
+from app.models.food import FoodLog
 from app.models.user import (
     MarketingUpdate,
     Profile,
@@ -15,6 +16,7 @@ from app.models.user import (
     WeightEntryIn,
     WeightEntryPublic,
 )
+from app.models.workout import WorkoutSession, WorkoutSet
 from app.services import calculations as calc
 from app.services.accounts import delete_user
 from app.services.activity import (
@@ -76,8 +78,8 @@ def read_profile(profile: CurrentProfile):
     return profile_public(profile)
 
 
-@router.put("/profile", response_model=ProfilePublic)
-def save_profile(data: ProfileIn, user: CurrentUser, session: SessionDep):
+def _validated_profile(data: ProfileIn) -> tuple[dict, float, float]:
+    """The profile fields to store (without training days), height in cm and weight in kg; 422 if out of range."""
     if data.birth_date >= date.today():
         raise HTTPException(status_code=422, detail="Birth date must be in the past")
     if not 13 <= calc.age_on(data.birth_date) <= 100:
@@ -89,13 +91,22 @@ def save_profile(data: ProfileIn, user: CurrentUser, session: SessionDep):
         raise HTTPException(status_code=422, detail="Height must be between 100 and 250 cm")
     if not 30 <= weight_kg <= 350:
         raise HTTPException(status_code=422, detail="Weight must be between 30 and 350 kg")
+    return values, height_cm, weight_kg
 
+
+def _validated_days(training_days: list[int]) -> list[int]:
+    try:
+        return validate_days(training_days)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.put("/profile", response_model=ProfilePublic)
+def save_profile(data: ProfileIn, user: CurrentUser, session: SessionDep):
+    values, height_cm, weight_kg = _validated_profile(data)
     profile = session.get(Profile, user.id)
     if data.training_days is not None:
-        try:
-            days = validate_days(data.training_days)
-        except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+        days = _validated_days(data.training_days)
         values["training_days"] = format_days(days)
         values["days_per_week"] = len(days)
         if profile is not None:  # keep the user's own session types and names for the days still in the plan
@@ -116,6 +127,62 @@ def save_profile(data: ProfileIn, user: CurrentUser, session: SessionDep):
     session.commit()
     session.refresh(profile)
     return profile_public(profile)
+
+
+class PlanPreviewOut(SQLModel):
+    plan: PlanOut
+    routine: Routine
+
+
+@router.post("/plan/preview", response_model=PlanPreviewOut)
+def preview_plan(data: ProfileIn, user: CurrentUser, session: SessionDep):
+    """The calorie plan and training routine these details would give, without saving anything.
+
+    Used while setting up a profile, so the user sees their numbers change as they answer.
+    """
+    values, height_cm, weight_kg = _validated_profile(data)
+    if data.training_days:
+        days = _validated_days(data.training_days)
+        values["training_days"] = format_days(days)
+        values["days_per_week"] = len(days)
+    else:
+        values["training_days"] = None
+    draft = Profile(user_id=user.id, height_cm=height_cm, weight_kg=weight_kg, **values)  # never added to the session
+    return PlanPreviewOut(plan=build_plan(draft), routine=user_routine(session, draft))
+
+
+class GettingStartedOut(SQLModel):
+    signed_up: date
+    days_since_signup: int
+    first_weigh_in: date | None  # setting up the profile records one
+    weighed_in: bool  # a weigh-in on a later day than the first one
+    logged_food: bool
+    finished_workout: bool  # a finished workout with at least one set
+    sleep_goal_set: bool
+
+
+@router.get("/getting-started", response_model=GettingStartedOut)
+def getting_started(user: CurrentUser, profile: CurrentProfile, session: SessionDep, tz_offset: TzOffset = None):
+    """What a new user has done so far, for the first-week checklist on the Today screen."""
+    signed_up = local_date(user.created_at, tz_offset)
+    weigh_ins = session.exec(
+        select(WeightEntry.date).where(WeightEntry.user_id == user.id).order_by(WeightEntry.date).limit(2)
+    ).all()
+    finished = session.exec(
+        select(WorkoutSession.id)
+        .join(WorkoutSet, WorkoutSet.session_id == WorkoutSession.id)
+        .where(WorkoutSession.user_id == user.id, WorkoutSession.ended_at.is_not(None))
+        .limit(1)
+    ).first()
+    return GettingStartedOut(
+        signed_up=signed_up,
+        days_since_signup=(local_today(tz_offset) - signed_up).days,
+        first_weigh_in=weigh_ins[0] if weigh_ins else None,
+        weighed_in=len(weigh_ins) >= 2,
+        logged_food=session.exec(select(FoodLog.id).where(FoodLog.user_id == user.id).limit(1)).first() is not None,
+        finished_workout=finished is not None,
+        sleep_goal_set=profile.sleep_goal_minutes is not None,
+    )
 
 
 def _upsert_weigh_in(session, user_id: int, day: date, weight_kg: float) -> WeightEntry:

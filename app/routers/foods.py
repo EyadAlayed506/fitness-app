@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
 
 import httpx
@@ -11,6 +11,7 @@ from app.database import SessionDep
 from app.deps import CurrentUser
 from app.models.food import (
     NUTRIENT_FIELDS,
+    CopyMealIn,
     DayTotals,
     Food,
     FoodAddedVia,
@@ -23,6 +24,8 @@ from app.models.food import (
     FoodLogUpdate,
     FoodPublic,
     FoodSearchResult,
+    RecentFood,
+    RecentFoods,
     FoodSource,
 )
 from app.models.user import Profile, User
@@ -219,6 +222,75 @@ def food_day(user: CurrentUser, session: SessionDep, day: date | None = Query(de
     profile = session.get(Profile, user.id)
     target = build_plan(profile).target_calories if profile else None
     return FoodDay(date=day, entries=entries, totals=totals, target_calories=target)
+
+
+RECENT_DAYS = 90
+
+
+@router.get("/food-logs/recent", response_model=RecentFoods)
+def recent_foods(user: CurrentUser, session: SessionDep, limit: int = Query(default=8, ge=1, le=30)):
+    """Foods the user logged in the last 90 days: the latest ones, and the ones they log most often.
+
+    Each comes with the amount, unit and meal from the last time, so logging it again is one tap.
+    """
+    since = date.today() - timedelta(days=RECENT_DAYS)
+    rows = session.exec(
+        select(FoodLog, Food)
+        .join(Food, Food.id == FoodLog.food_id)
+        .where(FoodLog.user_id == user.id, FoodLog.date >= since)
+        .order_by(FoodLog.date.desc(), FoodLog.created_at.desc())
+    ).all()
+    latest: dict[int, tuple[FoodLog, Food]] = {}
+    counts: dict[int, int] = {}
+    for entry, food in rows:
+        latest.setdefault(food.id, (entry, food))  # rows are newest first
+        counts[food.id] = counts.get(food.id, 0) + 1
+
+    def item(food_id: int) -> RecentFood:
+        entry, food = latest[food_id]
+        return RecentFood(
+            food=FoodPublic.model_validate(food),
+            quantity=entry.quantity,
+            unit=entry.unit,
+            meal=entry.meal,
+            times=counts[food_id],
+            last_date=entry.date,
+        )
+
+    order = list(latest)  # newest first
+    frequent = sorted((f for f in order if counts[f] >= 2), key=lambda f: -counts[f])  # stable: ties stay newest first
+    return RecentFoods(recent=[item(f) for f in order[:limit]], frequent=[item(f) for f in frequent[:limit]])
+
+
+@router.post("/food-logs/copy", response_model=list[FoodLogPublic], status_code=201)
+def copy_meal(data: CopyMealIn, user: CurrentUser, session: SessionDep):
+    """Log the same foods again: one meal (or a whole day) from one date onto another.
+
+    Calories are worked out from the food as it is now, like any new entry.
+    """
+    if data.from_date == data.to_date:
+        raise HTTPException(status_code=422, detail="Pick a different day to copy from")
+    query = select(FoodLog, Food).join(Food, Food.id == FoodLog.food_id).where(
+        FoodLog.user_id == user.id, FoodLog.date == data.from_date
+    )
+    if data.meal is not None:
+        query = query.where(FoodLog.meal == data.meal)
+    copies = []
+    for entry, food in session.exec(query.order_by(FoodLog.created_at)).all():
+        copy = FoodLog(
+            user_id=user.id,
+            food_id=food.id,
+            date=data.to_date,
+            meal=entry.meal,
+            added_via=entry.added_via,
+            **_compute_entry(food, entry.quantity, entry.unit),
+        )
+        session.add(copy)
+        copies.append((copy, food.name))
+    session.commit()
+    for copy, _ in copies:
+        session.refresh(copy)
+    return [_log_public(copy, name) for copy, name in copies]
 
 
 @router.patch("/food-logs/{log_id}", response_model=FoodLogPublic)

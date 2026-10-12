@@ -92,3 +92,40 @@ class WorkoutSessionPublic(SQLModel):
     def assume_utc(cls, value: datetime | None) -> datetime | None:
         # SQLite drops the timezone; times are stored in UTC
         return value.replace(tzinfo=UTC) if value and value.tzinfo is None else value
+
+
+# ---------- one exercise's history, for pre-filling the set form ----------
+
+class PastSet(SQLModel):
+    reps: int
+    weight_kg: float
+    rpe: float | None
+
+
+class LastSession(SQLModel):
+    workout_id: int
+    started_at: datetime
+    sets: list[PastSet]
+
+    @field_validator("started_at")
+    @classmethod
+    def assume_utc(cls, value: datetime) -> datetime:
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+class BestSet(SQLModel):
+    weight_kg: float
+    reps: int
+    e1rm_kg: float  # estimated 1-rep max (Epley); 0 for bodyweight sets
+    started_at: datetime
+
+    @field_validator("started_at")
+    @classmethod
+    def assume_utc(cls, value: datetime) -> datetime:
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value
+
+
+class ExerciseHistoryOut(SQLModel):
+    exercise_id: int
+    last: LastSession | None  # the most recent other workout with this exercise
+    best: BestSet | None  # best set ever (highest estimated 1RM; most reps if never with weight)
