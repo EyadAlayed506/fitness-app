@@ -1,8 +1,8 @@
 """Recognise a gym machine or exercise from a photo with a vision model running on this PC (Ollama).
 
-No model is trained: the vision model gets the photo and the app's exercise list and picks up to three
-exercises from that list. It can only answer with exercises that exist in the catalogue, and the user
-always confirms the guess. The photo isn't stored.
+The vision model gets the photo and the app's exercise list and picks up to three exercises from that
+list. It can only answer with exercises that exist in the catalogue, and the user always confirms the
+guess. (Learning from the user's own confirmed photos is in photo_match.py.)
 """
 
 import base64
@@ -115,7 +115,7 @@ class Recognizer:
         listing = "\n".join(
             f"{e.id}: {e.name} - {e.primary_muscles or e.muscle_group}, {e.category}" for e in catalogue
         )
-        answer = self._ask(image, PROMPT.format(catalogue=listing), ANSWER_FORMAT)
+        answer = self.ask(image, PROMPT.format(catalogue=listing), ANSWER_FORMAT)
 
         by_id = {e.id: e for e in catalogue}
         guesses: list[Guess] = []
@@ -135,7 +135,7 @@ class Recognizer:
     ) -> tuple[list[Guess], dict[str, float], str]:
         """Machines (from the catalogue) and other equipment the vision model sees in a photo of a gym."""
         listing = "\n".join(f"{e.id}: {e.name}" for e in machines)
-        answer = self._ask(
+        answer = self.ask(
             image, GYM_PROMPT.format(machines=listing, equipment_keys=", ".join(equipment_keys)), GYM_FORMAT
         )
         by_id = {e.id: e for e in machines}
@@ -160,7 +160,7 @@ class Recognizer:
                 equipment[key] = round(confidence, 2)
         return found, equipment, str(answer.get("seen") or "")[:200]
 
-    def _ask(self, image: bytes, prompt: str, answer_format: dict) -> dict:
+    def ask(self, image: bytes, prompt: str, answer_format: dict) -> dict:
         """One question about one photo; the answer as a dict (or RecognitionError)."""
         try:
             r = self.http.post(

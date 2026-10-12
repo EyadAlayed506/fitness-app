@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
@@ -5,7 +6,9 @@ from sqlmodel import Field, SQLModel, select
 
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
+from app.models.exercise import Exercise
 from app.models.food import FoodLog
+from app.models.snap import CustomDay, CustomDayIn
 from app.models.user import (
     MarketingUpdate,
     Profile,
@@ -331,6 +334,36 @@ def reset_schedule(profile: CurrentProfile, session: SessionDep):
     session.add(profile)
     session.commit()
     session.refresh(profile)
+    return user_routine(session, profile)
+
+
+# ---------- a training day with the user's own exercises (e.g. from a screenshot) ----------
+
+@router.put("/schedule/days/{weekday}", response_model=Routine)
+def save_custom_day(weekday: int, data: CustomDayIn, profile: CurrentProfile, session: SessionDep):
+    """Use these exercises on this training day instead of the generated ones."""
+    if weekday not in effective_training_days(profile):
+        raise HTTPException(status_code=422, detail="Pick one of your training days (change the days in Edit plan first).")
+    known = set(session.exec(select(Exercise.id)).all())
+    unknown = [x.exercise_id for x in data.exercises if x.exercise_id not in known]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown exercise id(s): {unknown}")
+    day = session.exec(select(CustomDay).where(CustomDay.user_id == profile.user_id, CustomDay.weekday == weekday)).first()
+    if day is None:
+        day = CustomDay(user_id=profile.user_id, weekday=weekday, title="", exercises="[]")
+    day.title = " ".join(data.title.split())
+    day.exercises = json.dumps([x.model_dump() for x in data.exercises])
+    session.add(day)
+    session.commit()
+    return user_routine(session, profile)
+
+
+@router.delete("/schedule/days/{weekday}", response_model=Routine)
+def remove_custom_day(weekday: int, profile: CurrentProfile, session: SessionDep):
+    """Back to the generated exercises for this day."""
+    for day in session.exec(select(CustomDay).where(CustomDay.user_id == profile.user_id, CustomDay.weekday == weekday)).all():
+        session.delete(day)
+    session.commit()
     return user_routine(session, profile)
 
 

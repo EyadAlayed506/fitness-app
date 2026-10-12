@@ -59,6 +59,7 @@ class RoutineDay:
     custom_name: bool  # the title is a name the user gave the day
     exercises: list[RoutineExercise] = field(default_factory=list)
     cardio_minutes: int = 0
+    custom_exercises: bool = False  # the user's own exercises (e.g. from a screenshot), not generated
 
 
 @dataclass

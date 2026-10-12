@@ -5,6 +5,7 @@ Workouts are stored with UTC timestamps; the app sends its UTC offset (minutes e
 """
 
 import datetime as dt
+import json
 from dataclasses import dataclass, field
 from typing import Annotated
 
@@ -13,11 +14,12 @@ from sqlmodel import Session, select
 
 from app.models.exercise import Exercise
 from app.models.sleep import SleepEntry
+from app.models.snap import CustomDay
 from app.models.user import Profile
 from app.models.workout import WorkoutSession, WorkoutSet
 from app.services.calculations import age_on, recommended_sleep_hours
 from app.services.plan import build_plan
-from app.services.routine import Routine, generate_routine
+from app.services.routine import Routine, RoutineExercise, generate_routine
 from app.services.schedule import effective_training_days, parse_day_choices
 
 # Query parameter the app sends: -new Date().getTimezoneOffset(). Without it, the server's own time zone is used.
@@ -108,7 +110,7 @@ def sleep_goal(profile: Profile | None) -> SleepGoal:
 
 def user_routine(session: Session, profile: Profile) -> Routine:
     catalogue = list(session.exec(select(Exercise)).all())
-    return generate_routine(
+    routine = generate_routine(
         catalogue,
         effective_training_days(profile),
         profile.minutes_per_session,
@@ -116,6 +118,31 @@ def user_routine(session: Session, profile: Profile) -> Routine:
         build_plan(profile).direction,
         parse_day_choices(profile.day_plan),
     )
+    apply_custom_days(session, profile.user_id, routine, catalogue)
+    return routine
+
+
+def apply_custom_days(session: Session, user_id: int, routine: Routine, catalogue: list[Exercise]) -> None:
+    """Training days with the user's own exercises (e.g. imported from a screenshot) use those instead."""
+    custom = {c.weekday: c for c in session.exec(select(CustomDay).where(CustomDay.user_id == user_id)).all()}
+    if not custom:
+        return
+    by_id = {e.id: e for e in catalogue}
+    rest = 60 if routine.reps == "10-15" else 90
+    for day in routine.days:
+        c = custom.get(day.weekday_index)
+        if c is None:
+            continue
+        items = []
+        for x in json.loads(c.exercises):
+            ex = by_id.get(x.get("exercise_id"))
+            if ex is not None:
+                items.append(RoutineExercise(ex.id, ex.name, ex.muscle_group, int(x.get("sets", 3)), str(x.get("reps", routine.reps)), ex.default_rest_seconds or rest))
+        if items:
+            day.exercises = items
+            day.title = c.title
+            day.custom_name = True
+            day.custom_exercises = True
 
 
 def planned_days(training_days: list[int], start: dt.date, end: dt.date) -> list[dt.date]:

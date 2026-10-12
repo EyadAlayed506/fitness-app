@@ -7,6 +7,7 @@ from app.models.gym import Gym, MachinePhoto, MachineSetting
 from app.models.measurement import BodyMeasurement
 from app.models.points import PointAward
 from app.models.sleep import SleepEntry
+from app.models.snap import CustomDay
 from app.models.user import Profile, User, WeightEntry
 from app.models.whoop import WhoopConnection
 from app.models.workout import WorkoutSession, WorkoutSet
@@ -30,5 +31,6 @@ def delete_user(session: Session, user: User) -> None:
     session.exec(delete(MachinePhoto).where(MachinePhoto.user_id == user.id))
     session.exec(delete(MachineSetting).where(MachineSetting.user_id == user.id))
     session.exec(delete(Gym).where(Gym.user_id == user.id))
+    session.exec(delete(CustomDay).where(CustomDay.user_id == user.id))
     session.delete(user)
     session.commit()

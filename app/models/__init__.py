@@ -5,12 +5,13 @@ from app.models.gym import Gym, MachinePhoto, MachineSetting
 from app.models.measurement import BodyMeasurement
 from app.models.points import PointAward
 from app.models.sleep import SleepEntry
+from app.models.snap import CustomDay
 from app.models.user import Profile, User, WeightEntry
 from app.models.whoop import WhoopConnection
 from app.models.workout import WorkoutSession, WorkoutSet
 
 __all__ = [
-    "ChatMessage",
+    "ChatMessage", "CustomDay",
     "BodyMeasurement", "Exercise", "Gym", "MachinePhoto", "MachineSetting", "PointAward", "RestPreference", "Food", "FoodLog", "Profile",
     "SleepEntry", "User", "WeightEntry", "WhoopConnection", "WorkoutSession", "WorkoutSet",
 ]
