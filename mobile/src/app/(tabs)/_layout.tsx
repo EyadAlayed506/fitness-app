@@ -13,6 +13,7 @@ const TABS: { name: string; title: string; icon: IconName }[] = [
   { name: "workouts", title: "Workouts", icon: "barbell-outline" },
   { name: "food", title: "Food", icon: "restaurant-outline" },
   { name: "progress", title: "Progress", icon: "stats-chart-outline" },
+  { name: "coach", title: "Coach", icon: "chatbubbles-outline" },
   { name: "profile", title: "Profile", icon: "person-outline" },
 ];
 

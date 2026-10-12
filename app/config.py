@@ -28,8 +28,12 @@ class Settings(BaseSettings):
     whoop_client_secret: str = ""
     whoop_redirect_uri: str = "http://localhost:8000/api/whoop/callback"
     whoop_base_url: str = "https://api.prod.whoop.com"  # only changed for testing against a fake WHOOP
+    # Assistant (optional): an API key from https://console.anthropic.com. Every question costs money.
+    anthropic_api_key: str = ""
+    assistant_model: str = "claude-opus-5-5"
+    assistant_daily_limit: int = 50  # questions per user per 24 hours, to keep the bill predictable
 
-    @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri")
+    @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri", "anthropic_api_key")
     @classmethod
     def _strip(cls, v: str) -> str:
         # keys pasted with a stray space or quotes still work

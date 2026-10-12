@@ -12,6 +12,7 @@ from app.config import PROJECT_ENV, get_settings
 from app.database import create_db_and_tables, engine
 from app.routers import (
     analytics,
+    assistant,
     auth,
     exercises,
     foods,
@@ -39,6 +40,10 @@ async def lifespan(app: FastAPI):
         log.info("WHOOP: on (redirect URL %s)", s.whoop_redirect_uri)
     else:
         log.warning("WHOOP: off. To turn it on, put WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET in %s and restart", PROJECT_ENV)
+    if s.anthropic_api_key:
+        log.info("Assistant: on (%s)", s.assistant_model)
+    else:
+        log.warning("Assistant: off. To turn it on, put ANTHROPIC_API_KEY in %s and restart", PROJECT_ENV)
     yield
 
 
@@ -51,7 +56,7 @@ app.add_middleware(
 )
 
 api = APIRouter(prefix="/api")
-for module in (auth, me, exercises, workouts, foods, measurements, sleep, whoop, analytics, points, marketing):
+for module in (auth, me, exercises, workouts, foods, measurements, sleep, whoop, analytics, points, assistant, marketing):
     api.include_router(module.router)
 app.include_router(api)
 

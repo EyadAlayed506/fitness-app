@@ -107,6 +107,21 @@ Why the app says "WHOOP isn't set up on this server yet": WHOOP only lets regist
 
 The app imports the last 30 days, then syncs again when you open Home or the Sleep screen (at most every 15–30 minutes) or tap **Sync now**. WHOOP nights replace nights you typed in by hand for the same time.
 
+### Coach (AI chatbot)
+
+The **Coach** tab is a chat assistant for training, sleep and food. It runs on Claude (Anthropic's AI) and answers from your own logged data: it can read your profile and calorie plan, training plan, today's suggestions, workouts, lift history, the exercise library, sleep, food logs, weekly summary and points. It can't change anything in the app.
+
+To turn it on:
+1. Create an API key at https://console.anthropic.com (add a payment method; the API is pay-as-you-go).
+2. Put it in `.env` as `ANTHROPIC_API_KEY=...` and restart the backend. Its console says `Assistant: on`.
+
+Settings: `ASSISTANT_MODEL` (default `claude-opus-5-5`) and `ASSISTANT_DAILY_LIMIT` (default 50 questions per user per 24 hours).
+
+Good to know:
+- **Cost:** every question is billed by Anthropic. With the default model a question usually costs a few US cents (more when it reads a lot of data). The daily limit keeps the bill predictable.
+- **Privacy:** to answer, the parts of your data the assistant looks at (sleep, food, workouts, profile) are sent to Anthropic's API. Don't turn it on for other people without telling them.
+- **It can be wrong.** It's told to quote your numbers, say when data is missing and not give medical advice, but it's still an AI.
+
 ## Project layout
 
 ```

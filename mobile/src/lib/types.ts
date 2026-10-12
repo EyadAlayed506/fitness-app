@@ -439,3 +439,26 @@ export interface WeeklySummary {
   history: { week_start: string; planned: number; completed: number }[];
   notes: string[];
 }
+
+export interface ChatMessage {
+  id: number;
+  role: "user" | "assistant";
+  text: string;
+  /** tools the assistant used to look at the user's data */
+  tools_used: string[];
+  created_at: string;
+}
+
+export interface AssistantStatus {
+  configured: boolean;
+  model: string;
+  messages_left_today: number;
+  messages: ChatMessage[];
+  disclaimer: string;
+}
+
+export interface ChatReply {
+  question: ChatMessage;
+  answer: ChatMessage;
+  messages_left_today: number;
+}

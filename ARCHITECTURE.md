@@ -556,6 +556,7 @@ Each phase is usable on its own.
 | Email provider | **Later.** Opt-in and unsubscribe are built; sending is added when a provider is picked (Brevo's free plan is the front runner). |
 | Sleep data | **Manual log or WHOOP**, the user chooses. Health Connect / Apple Health later. |
 | Suggestions | **Rules, not AI.** Small, readable rules with reasons; no LLM or ML model. |
+| Chatbot | **Optional, Claude-based** (section 20): off unless the server has an Anthropic API key; the rule-based features don't depend on it. |
 | Equipment recognition | **Deferred.** No model is trained or bundled; see section 19 for where it plugs in. |
 
 ## 18. Sleep from trackers
@@ -592,3 +593,13 @@ All rule-based, all from data the user recorded. Shared reads (the user's local 
 **Sleep dashboard.** See the sleep rows in sections 7 and 12. Sleep stages are only shown for tracker nights; nothing is estimated for manual logs. Bedtime / wake-up consistency is the typical distance from the middle time over the last 7 nights (needs 3+ nights), shown as plain numbers without health claims.
 
 **Equipment recognition (deferred).** Not built and no model is trained. Where it would plug in: a `POST /exercises/recognize` endpoint that takes a photo and returns catalogue exercise ids with confidence. It feeds the same `SetForm` as QR and name search (`added_via` would get a new value), and the same alternatives and rest timer, so nothing else changes.
+
+## 20. Coach (AI chatbot)
+
+A chat assistant over the user's own data (`app/services/assistant.py`, `app/routers/assistant.py`, table `CHAT_MESSAGE`, mobile tab `coach.tsx`). Unlike everything in section 19, this part uses an LLM: Claude through the official `anthropic` Python SDK.
+
+- **Tools, read-only.** Each tool calls the same code as an API endpoint (profile and plan, training plan, today's suggestions, recent workouts, exercise history, exercise info and alternatives, sleep, a day's food, calorie trend, weekly summary, points), so answers match the screens. Tools only see the logged-in user; nothing is written except the conversation.
+- **Loop.** Up to 8 model calls per question; tool problems go back to the model as `is_error` results. `effort: medium`, server-side refusal fallbacks (`fallbacks: "default"`), the system prompt is static and cached, today's date and units go in a note after the question.
+- **Conversation.** One per user, stored as plain text; the last 20 messages are sent with each question. A message is saved only once an answer arrives. Deleting the account deletes it; the trash button clears it.
+- **Limits.** `ASSISTANT_DAILY_LIMIT` questions per user per 24 hours; API errors become 429 / 502 with a readable message; without `ANTHROPIC_API_KEY` the endpoint returns 503 and the tab shows how to set it up.
+- **Tests** use a scripted fake client (`tests/test_assistant.py`): no network, no cost.
