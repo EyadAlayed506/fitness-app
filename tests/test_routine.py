@@ -9,7 +9,6 @@ from app.services.schedule import (
     FOCUS_MUSCLES,
     DayChoice,
     back_to_back_pairs,
-    cycle_order,
     plan_warnings,
     recommend_focus,
     validate_day_choices,
