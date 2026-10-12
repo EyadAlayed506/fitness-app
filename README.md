@@ -86,12 +86,17 @@ Also useful:
 | Health plan | BMI + category, healthy weight range, kg to lose/gain for BMI 22, resting and maintenance calories, light / normal / extreme diet with calorie difference, kg per week and weeks to goal |
 | Routine | Pick the **weekdays you train** (e.g. Sun / Tue / Thu); sessions go on those days only, the rest are rest days. The app recommends a session for each day (1–3 days: full body every day) and says why. **Edit plan** lets you pick any session type per day (e.g. Full, Full, Upper) and give each day your own name; "Use recommended" goes back |
 | Today (Home) | Rule-based suggestions with their reasons: today's session or a rest day, "consider going lighter" after a short night or low WHOOP recovery, missed sessions (never "make them up"), when to add weight. Your plan is never changed for you |
-| Workouts | Start a workout, add exercises by **typing the name** (typos are fine) or **scanning the machine's QR code**, log reps, weight (kg or lb), RPE and notes. Each exercise has how-to steps and **alternatives** from the library ("similar movement" or "different movement") |
-| Rest timer | Starts by itself after every set with that exercise's rest time; pause, resume, skip, restart, ±15 s (remembered per exercise); vibrates (or beeps in the browser) at zero |
+| Workouts | Start a workout, add exercises by **typing the name** (typos are fine), **scanning the machine's QR code** or **from a photo**, log reps, weight (kg or lb), RPE and notes. Each exercise has how-to steps and **alternatives** from the library ("similar movement" or "different movement") |
+| Guided sessions | "Start today's session" turns the day's plan into a checklist (done, up next). Each exercise opens with **last time's numbers** filled in and a suggested target ("Try 102.5 kg × 8: you hit the top of the range"), **steppers** for reps and weight, "Same as last set", a "Next exercise" button and a **New best** banner. Sets can be edited or deleted (with **Undo**). A bar above the tabs shows the workout and rest time on every other tab |
+| Rest timer | Starts by itself after every set with that exercise's rest time; pause, resume, skip, restart, ±15 s (remembered per exercise); vibrates (or beeps in the browser) at zero, and a **notification** says so when the app is in the background |
+| Smart gym | **The app learns your machines**: a photo you've confirmed once is recognised from your earlier photos next time ("Matched from your earlier photo"), otherwise the AI on your PC guesses ("Best guess"). **Gyms**: keep several (one is the default); **machine settings** (seat, pins, notes) are saved per machine per gym and shown when you log it. **Machine taken?** swaps in an alternative for this workout only. **Photograph a gym** (e.g. a hotel gym): tick what's there and get today's session using only that. Profile → Gyms lists the saved photos (delete any) and the photo model's status |
+| Snap and say | **Workout from a screenshot** (Instagram, TikTok…): the exercises, sets and reps are read and matched to the library; you check them, then start it now or save it as a day of your plan. **Weight from a photo**: the pin in a weight stack, a loaded bar or a dumbbell; always shown for you to confirm. **Hands-free sets**: hold the mic and say "8 reps at 60" or "same again"; the app answers out loud and says the next set when the rest is over (headphones work) |
+| Insights | Progress → Insights: patterns in your own data (sleep and strength, sleep after training days, which training days happen, food logging and weight). Each shows how many nights or sessions it rests on and whether the difference is clear or could be chance; it only appears when there's enough data, and never claims one thing causes the other |
 | Weekly summary | Progress tab → Week: sessions done vs planned, each lift against last time, records, sleep, weight goal and points, compared with the week before; planned vs done for 8 weeks |
 | Wellness points | Points for finished workouts, a full planned week, reaching your sleep goal, eating to plan and weekly weigh-ins; levels and achievements. Never taken away, no penalties for rest days |
 | QR stickers | Workouts tab → "Print QR stickers" shows a printable code for every machine |
-| Food | Search the built-in list, **USDA FoodData Central** and **Open Food Facts**; units change with the food (g/kg/oz/lb for solids, ml/l/cup/gallon… for drinks, or servings); create custom foods by hand with all macros and sub-macros |
+| Food | Search the built-in list, **USDA FoodData Central** and **Open Food Facts**; units change with the food (g/kg/oz/lb for solids, ml/l/cup/gallon… for drinks, or servings); create custom foods by hand with all macros and sub-macros. **Recent and frequent** foods come first (one tap logs your usual portion), "Copy yesterday's lunch", edit or remove an entry with **Undo**. **Scan a menu** at a restaurant: dishes ranked by how well they fit what's left today, every number labelled as an estimate |
+| Setup and settings | Setup in 4 short steps with your calorie plan updating as you type; a **first-week checklist** on Today; Profile → Appearance (system, light or dark) |
 | Progress | Weight trend, projected weight per diet option, calories vs target, macros, lift progress (estimated 1RM), weekly volume per body region, sleep per night (mobile app), month-to-month body measurements with body-fat estimate |
 | Sleep (mobile app) | Choose how to track: **type it in** or **connect WHOOP** (sleep, stages, sleep performance and recovery imported automatically). Log bedtime, wake-up time, quality and notes; set a sleep goal (or use the amount recommended for your age); last night against the goal, sleep stages for WHOOP nights, a 7-night chart with the goal line, this week vs the week before, and bedtime / wake-up consistency. Overlapping entries are refused so a night isn't counted twice |
 | Emails | Opt in/out on the Profile screen (the avatar at the top of Today); every user has a one-click unsubscribe link (`/api/marketing/unsubscribe/{token}`) |
@@ -130,6 +135,30 @@ Why the app says "WHOOP isn't set up on this server yet": WHOOP only lets regist
 5. In the app: Sleep → **Connect WHOOP**. Do this from the browser on your PC (press `w` in Expo), because the WHOOP login sends you back to `localhost`. The connection belongs to your account, so the phone app syncs too afterwards.
 
 The app imports the last 30 days, then syncs again when you open Home or the Sleep screen (at most every 15–30 minutes) or tap **Sync now**. WHOOP nights replace nights you typed in by hand for the same time.
+
+### Smart gym and snap and say: what runs where
+
+Everything here works **without a graphics card**. What each part needs:
+
+| Feature | Runs on | Without it |
+|---|---|---|
+| Recognising a machine from **your earlier photos** | A small image model (CLIP ViT-B/32, 351 MB) on the processor | The AI guess (Ollama), or search by name |
+| AI guesses: a machine, a gym's equipment, a screenshot, a weight, a menu | The vision model in Ollama (`qwen3-vl:8b`) | The app says Ollama isn't running and offers the manual way: search, tick the equipment, type the weight |
+| Hands-free sets | Whisper (speech to text) on the processor, and the phone's own voice for the answers | Tap to log as usual |
+| Insights, gyms, machine settings, "Machine taken?" | The backend only | (always available) |
+
+**Download the photo model** once (or tap **Download** in Profile → Gyms):
+```
+uv run python -m app.services.photo_match
+```
+It goes into `models/` next to the database. Confirmed photos are kept in `data/photos/` on your PC and never leave it; deleting your account deletes them.
+
+**What was measured** (on a 4-core laptop processor, no graphics card):
+
+- Photo model: loads in 3–6 s; about 50 ms per photo; comparing a photo with 1,000 saved ones takes under 1 ms.
+- Accuracy: 12 scenes saved with one photo each, then 72 simulated re-takes of them (cropped, tilted, brighter or darker, blurred). The right scene came first for all 72. At the threshold used (0.90 similarity), 53 of the 72 were matched from memory with none wrong, and none of 6 photos of scenes never saved was matched by mistake; the other 19 fall back to the AI guess. A real second photo from another angle (a motorcycle) scored 0.98. A lower threshold (0.88) matched more (64 of 72) but also matched one scene that was never saved, so 0.90 is the default (`PHOTO_MATCH_THRESHOLD` in `.env`).
+- Limits: these were test pictures, not gym machines, and no real gym photos were available to test with. Machines that look alike (two cable stations) may need a few confirmed photos each before they're told apart.
+- The vision model (Ollama) wasn't timed here: the test machine has no graphics card, so it was replaced by a stand-in. Expect it to be much faster with a graphics card than on a processor alone. Its readings of screenshots, weights and menus are estimates: the app always shows them for you to check.
 
 ### Coach (AI chatbot), voice and photos
 
@@ -170,12 +199,14 @@ fitness-app/
 │   ├── security.py      # password hashing (Argon2) and login tokens (JWT)
 │   ├── deps.py          # CurrentUser / CurrentProfile dependencies
 │   ├── models/          # SQLModel tables and request/response schemas
-│   ├── routers/         # one file per area: auth, me, exercises, workouts, foods, measurements, sleep, whoop, analytics, points, marketing
-│   ├── services/        # formulas, training days + routine, alternatives, suggestions, weekly summary, points, units, food search, WHOOP, QR codes
+│   ├── routers/         # one file per area: auth, me, exercises, workouts, gyms, snap, foods, measurements, sleep, whoop, analytics, points, assistant, marketing
+│   ├── services/        # formulas, training days + routine, alternatives, suggestions, weekly summary, points, units, food search, WHOOP, QR codes,
+│   │                    # photo matching (photo_match.py), gym equipment, snap and say (snap.py), insights
 │   ├── seed/            # starter machine catalogue (48 exercises) and 38 common foods
 │   ├── static/          # web preview (HTML, CSS, JS, Chart.js), served at /
 │   └── demo.py          # demo account
-└── tests/               # pytest: formulas, units, training days, routine, suggestions, points, weekly summary, sleep, WHOOP, every API area
+└── tests/               # pytest: formulas, units, training days, routine, suggestions, points, weekly summary, sleep, WHOOP, every API area;
+                         # the photo model and the vision model are replaced by fakes, so the tests need neither
 ```
 
 Not built yet (see the build phases in ARCHITECTURE.md): Health Connect / Apple Health, food photos and label scanning, sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.

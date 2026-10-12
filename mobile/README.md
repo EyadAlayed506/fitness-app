@@ -53,6 +53,13 @@ If the phone and the PC can't be on the same Wi-Fi, run `npx expo start --tunnel
 
 Workouts → **Start workout** → **Scan QR**. The first time, allow the camera. Print the stickers from Workouts → "Print QR stickers for the machines" (easiest from the browser on your PC). Each sticker also shows its code (e.g. `leg-press`), which can be typed in instead.
 
+## Phone features: what to expect
+
+- **Hands-free sets**: in a set, hold **Hold to say your set**, say "8 reps at 60" (or "10 reps at 22.5 kilos", "same again") and let go. A quick tap starts listening and a second tap saves, which also works with screen readers. The app answers out loud ("Saved: 8 reps at 60 kilos") and says the next set when the rest is over. It speaks through headphones (wired or Bluetooth) when they're connected, and a Bluetooth headset's microphone is used for listening. Music from other apps is turned down while it speaks. Speech-to-text runs on your PC (Whisper), so the backend must be reachable.
+- **Rest notifications**: when the app is in the background, a notification says the rest is over. Local notifications work in Expo Go; nothing is sent through a push server.
+- **Photos** (machines, gyms, screenshots, weights, menus) are sent to your own backend only. Choose one from the gallery or take one with the camera.
+- **Haptics**: a light tap for choices, a stronger one for a saved set (phones only). They follow the phone's own vibration setting.
+
 ## Commands
 
 ```bash
@@ -60,7 +67,7 @@ npx expo start          # start the dev server (phone + browser)
 npx expo start --web    # open straight in the browser
 npm run typecheck       # TypeScript check
 npx expo lint           # lint
-npm test                # rest timer logic tests (Node built-in test runner)
+npm test                # rest timer, progression (targets, records) and spoken-set parser tests
 npx expo install <pkg>  # add a package (picks the version that matches the Expo SDK)
 ```
 
@@ -75,9 +82,13 @@ mobile/
 │   │   ├── index.tsx      # sends you to login, profile setup or Home
 │   │   ├── login.tsx  signup.tsx  onboarding.tsx  qr-stickers.tsx  sleep.tsx  points.tsx
 │   │   └── (tabs)/        # Today, Workouts, Food, Progress, Coach (+ Profile, opened from the avatar on Today)
-│   ├── components/        # UI kit, charts, profile form + day picker, workout parts, exercise info,
-│   │                      # rest timer, Today card, points, weekly summary, sleep dashboard, food parts
-│   └── lib/               # API client, login state, units/formatting, theme, types, rest timer logic (+ tests)
+│   ├── components/        # UI kit, charts, profile form + day picker, workout parts + session provider (rest timer,
+│   │                      # guided plan, mini bar), exercise info, gym parts, set helpers (hands-free, weight photo),
+│   │                      # snap parts (screenshot import, menu scanner), insights, Today card, points, weekly summary,
+│   │                      # sleep dashboard, food parts, first-week checklist
+│   └── lib/               # API client, cached server data (TanStack Query: query.ts, data.ts), login state,
+│                          # units/formatting, theme + appearance, types, rest timer, progression, spoken-set parser
+│                          # (+ tests), voice recording, speech, photos, haptics, notifications
 ```
 
 **Design system.** Colours, spacing, radii, type sizes, control sizes and motion durations live in `src/lib/theme.ts` (light and dark palettes are chosen separately, not inverted). `src/components/ui.tsx` builds every control from those tokens: buttons, fields, chips, segmented tabs, cards, list rows, sheets, toasts, skeletons and empty states. New screens should use these rather than their own colours or sizes. One accent colour (blue) marks progress and selection; near-black "ink" is for primary actions; green/amber/red are only for status, always with a label or icon. Chart colours are a separate, colour-blind-checked series palette. Animations are short, and skipped when the phone's "reduce motion" setting is on.
