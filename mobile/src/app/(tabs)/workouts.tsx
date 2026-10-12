@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Pressable, View } from "react-native";
 
 import { ExerciseInfo } from "@/components/ExerciseInfo";
+import { ExercisePhoto } from "@/components/ExercisePhoto";
 import { RestTimerPanel, useRestTimer } from "@/components/RestTimer";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
 import { Badge, Button, Card, CardHead, Field, IconButton, LinkButton, ListRow, Row, Screen, Section, Sheet, Txt, useToast } from "@/components/ui";
@@ -17,7 +18,8 @@ import type { Points, Routine, Workout } from "@/lib/types";
 type SheetState =
   | { kind: "search" }
   | { kind: "scan" }
-  | { kind: "set"; exercise: PickedExercise; via: "name" | "qr" }
+  | { kind: "photo" }
+  | { kind: "set"; exercise: PickedExercise; via: "name" | "qr" | "photo" }
   | { kind: "info"; exercise: PickedExercise }
   | { kind: "plan" }
   | { kind: "history"; id: number }
@@ -56,7 +58,7 @@ export default function Workouts() {
     setSheet(null);
     load().catch(() => {});
   };
-  const logExercise = (exercise: PickedExercise, via: "name" | "qr") => {
+  const logExercise = (exercise: PickedExercise, via: "name" | "qr" | "photo") => {
     if (!active) {
       toast("Start a workout first, then tap an exercise to log it");
       return;
@@ -74,8 +76,9 @@ export default function Workouts() {
             {plural(active.set_count, "set")} · {u.weight(active.volume_kg, 0)} volume
           </Txt>
           <Row style={{ marginTop: 12 }}>
-            <Button title="Type exercise" icon="search" onPress={() => setSheet({ kind: "search" })} style={{ flex: 1 }} />
-            <Button title="Scan QR" icon="qr-code" kind="soft" onPress={() => setSheet({ kind: "scan" })} style={{ flex: 1 }} />
+            <Button title="Search" icon="search" onPress={() => setSheet({ kind: "search" })} style={{ flex: 1 }} />
+            <Button title="QR" icon="qr-code" kind="soft" onPress={() => setSheet({ kind: "scan" })} style={{ flex: 1 }} />
+            <Button title="Photo" icon="camera" kind="soft" onPress={() => setSheet({ kind: "photo" })} style={{ flex: 1 }} />
           </Row>
           {sheet?.kind !== "set" ? <RestTimerPanel timer={timer} compact /> : null}
           <View style={{ marginTop: 14 }}>
@@ -114,7 +117,7 @@ export default function Workouts() {
       ) : (
         <Card>
           <Txt variant="small" style={{ textAlign: "center", marginBottom: 12 }}>
-            Ready to train? Start a workout and add exercises by name or by scanning the machine’s QR code.
+            Ready to train? Start a workout and add exercises by name, by scanning the machine’s QR code, or from a photo.
           </Txt>
           <Button
             title="Start workout"
@@ -228,6 +231,11 @@ export default function Workouts() {
       <Sheet visible={sheet?.kind === "scan"} title="Scan machine QR code" onClose={closeSheet}>
         {sheet?.kind === "scan" ? (
           <QrScanner onFound={(e) => logExercise({ id: e.id, name: e.name }, "qr")} />
+        ) : null}
+      </Sheet>
+      <Sheet visible={sheet?.kind === "photo"} title="What machine is this?" onClose={closeSheet}>
+        {sheet?.kind === "photo" ? (
+          <ExercisePhoto onPick={(e) => logExercise(e, "photo")} onSearch={() => setSheet({ kind: "search" })} />
         ) : null}
       </Sheet>
       <Sheet visible={sheet?.kind === "set"} title={sheet?.kind === "set" ? sheet.exercise.name : ""} onClose={closeSheet}>

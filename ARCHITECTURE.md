@@ -557,7 +557,7 @@ Each phase is usable on its own.
 | Sleep data | **Manual log or WHOOP**, the user chooses. Health Connect / Apple Health later. |
 | Suggestions | **Rules, not AI.** Small, readable rules with reasons; no LLM or ML model. |
 | Chatbot | **Optional** (section 20): a free local model through Ollama by default, or Claude with an API key; the rule-based features don't depend on it. |
-| Equipment recognition | **Deferred.** No model is trained or bundled; see section 19 for where it plugs in. |
+| Equipment recognition | **A vision model on the PC, not a trained model** (section 20): it picks from the catalogue and the user confirms. |
 
 ## 18. Sleep from trackers
 
@@ -592,7 +592,7 @@ All rule-based, all from data the user recorded. Shared reads (the user's local 
 
 **Sleep dashboard.** See the sleep rows in sections 7 and 12. Sleep stages are only shown for tracker nights; nothing is estimated for manual logs. Bedtime / wake-up consistency is the typical distance from the middle time over the last 7 nights (needs 3+ nights), shown as plain numbers without health claims.
 
-**Equipment recognition (deferred).** Not built and no model is trained. Where it would plug in: a `POST /exercises/recognize` endpoint that takes a photo and returns catalogue exercise ids with confidence. It feeds the same `SetForm` as QR and name search (`added_via` would get a new value), and the same alternatives and rest timer, so nothing else changes.
+**Equipment recognition.** Built on the `chatbot-assistant` branch with a vision model on the PC instead of a trained model: see "Photo of a machine" in section 20.
 
 ## 20. Coach (AI chatbot)
 
@@ -607,7 +607,11 @@ A chat assistant over the user's own data (`app/services/assistant.py`, `app/rou
 
 `ASSISTANT_PROVIDER` picks one (`auto`: Claude when `ANTHROPIC_API_KEY` is set, otherwise Ollama). Each backend reports what's missing (`problem`): no API key, Ollama not running, or the model not pulled, with the command to fix it; the tab shows it.
 
-- **Tools, read-only.** Each tool calls the same code as an API endpoint (profile and plan, training plan, today's suggestions, recent workouts, exercise history, exercise info and alternatives, sleep, a day's food, calorie trend, weekly summary, points), so answers match the screens. Tools only see the logged-in user; nothing is written except the conversation.
+- **Tools.** Each tool calls the same code as an API endpoint, so answers match the screens and only the logged-in user's data is touched. Reading: profile and plan, training plan, today's suggestions, recent workouts, exercise history, exercise info and alternatives, sleep, a day's food, calorie trend, weekly summary, points. Logging (only when the user asks, without asking back): `log_food` (finds the food in the user's foods / built-in list, then USDA / Open Food Facts; unknown units become one serving; the meal follows the time of day when not given), `remove_food_entry`, `log_workout_sets` (adds to the open workout or starts one), `log_weight`, `log_sleep`.
+- **Actions.** Every change is returned as an action (summary, the screen it shows on, the API paths to DELETE to undo it), stored with the answer and shown in the Coach with Open and Undo. If the AI fails after changing something, the change is still reported with its Undo.
+- **Voice** (`services/speech.py`, `POST /assistant/transcribe`): the app records with `expo-audio` (AAC on phones, Opus/webm in the browser) and uploads it; faster-whisper turns it into text on the PC and the text goes into the message box to check. The model downloads once; CPU int8 by default. PyAV is pinned below 17 because faster-whisper 1.2 uses an option newer versions removed; a test decodes both recording formats.
 - **Loop.** Up to 8 model calls per question; tool problems go back to the model as errors. Ollama tool arguments sent as a JSON string are parsed; `<think>` blocks are removed from local models' answers.
 - **Conversation.** One per user, stored as plain text. A message is saved only once an answer arrives. Deleting the account deletes it; the trash button clears it.
 - **Tests** use a scripted fake Claude client and a fake Ollama (`httpx.MockTransport`) in `tests/test_assistant.py`: no network, no cost.
+
+**Photo of a machine** (`services/recognition.py`, `POST /exercises/recognize`, `ExercisePhoto.tsx`). A vision model on the PC (Ollama, `OLLAMA_VISION_MODEL`, default `qwen3-vl:8b`) gets the photo and the catalogue (id, name, muscles, equipment) and must answer in a fixed JSON format (`format` = JSON schema, temperature 0) with up to 3 exercise ids and a confidence. Ids that aren't in the catalogue and duplicates are dropped, so it can only suggest real exercises. The app shows the guesses as "Very likely / Likely / Maybe"; the user taps one (the set is saved with `added_via = photo`) or searches by name. Only JPEG, PNG and WebP up to 15 MB are accepted, and the photo isn't stored. No model is trained.

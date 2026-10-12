@@ -107,20 +107,28 @@ Why the app says "WHOOP isn't set up on this server yet": WHOOP only lets regist
 
 The app imports the last 30 days, then syncs again when you open Home or the Sleep screen (at most every 15–30 minutes) or tap **Sync now**. WHOOP nights replace nights you typed in by hand for the same time.
 
-### Coach (AI chatbot)
+### Coach (AI chatbot), voice and photos
 
-The **Coach** tab is a chat assistant for training, sleep and food. It answers from your own logged data: it can read your profile and calorie plan, training plan, today's suggestions, workouts, lift history, the exercise library, sleep, food logs, weekly summary and points. It can't change anything in the app.
+The **Coach** tab is a chat assistant for training, sleep and food. It answers from your own logged data (profile and calorie plan, training plan, today's suggestions, workouts, lift history, the exercise library, sleep, food, weekly summary, points) and **logs things for you**: say "add a banana to breakfast" and it's in the Food tab straight away. It can log food, workout sets, a weigh-in and a night of sleep; every change shows under its answer with **Open** and **Undo**. You can also **talk to it**: tap the microphone, speak, tap again; the words appear in the box to check and send.
 
-It can run on two kinds of AI. `ASSISTANT_PROVIDER=auto` (the default) uses Claude when `ANTHROPIC_API_KEY` is set, otherwise Ollama.
+In **Workouts**, the **Photo** button recognises a machine from a photo and suggests up to 3 exercises from the library; you tap the right one.
+
+It can run on two kinds of AI. `ASSISTANT_PROVIDER=auto` (the default) uses Claude when `ANTHROPIC_API_KEY` is set, otherwise Ollama. Voice and photos always run on your PC.
 
 **Free, on your PC (Ollama)**, the default:
 1. Install Ollama from https://ollama.com and leave it running.
-2. Download a model once: `ollama pull qwen3:8b` (about 5 GB; fits a 12 GB graphics card such as an RTX 4070 Super).
+2. Download the models once:
+   ```
+   ollama pull qwen3:8b       # the coach (about 5 GB)
+   ollama pull qwen3-vl:8b    # photos of machines (about 6 GB)
+   ```
+   Both fit a 12 GB graphics card such as an RTX 4070 Super, one at a time: Ollama switches between them by itself, so the first answer after switching is slower.
 3. Start the backend. Its console says `Coach: Ollama on this PC (qwen3:8b ...)`.
+4. Voice messages use Whisper. It downloads by itself the first time you send one (about 500 MB, needs internet once) and runs on the processor. With NVIDIA's CUDA libraries installed you can set `WHISPER_DEVICE=cuda` and `WHISPER_COMPUTE_TYPE=float16` for speed. `WHISPER_LANGUAGE=en` (or `ar`, ...) skips language detection.
 
-To try another model: `ollama pull <name>`, then set `OLLAMA_MODEL=<name>` in `.env` and restart. It needs a model that supports tools (e.g. `qwen3:8b`, `llama3.1:8b`). `OLLAMA_NUM_CTX` (default 16384) is how much text the model can look at once; lower it if your graphics card runs out of memory.
+To try other models: `ollama pull <name>`, then set `OLLAMA_MODEL` (must support tools, e.g. `llama3.1:8b`) or `OLLAMA_VISION_MODEL` (must read images, e.g. `gemma3:12b`) in `.env` and restart. `OLLAMA_NUM_CTX` (default 16384) is how much text the coach can look at once; lower it if your graphics card runs out of memory.
 
-Good to know: free, no daily limit, and your data stays on your PC. Answers are weaker than Claude's (it can misread numbers), and the first answer after starting is slow while the model loads. The backend and Ollama must be running for the phone app's Coach to work.
+Good to know: free, no daily limit, and your data, voice and photos stay on your PC. Answers and photo guesses are weaker than Claude's, so check what it logged and use Undo when it's wrong. The backend and Ollama must be running for the phone app's Coach and Photo to work.
 
 **Paid, online (Claude):** create an API key at https://console.anthropic.com, put `ANTHROPIC_API_KEY=...` in `.env` and restart. Better answers; a question usually costs a few US cents and `ASSISTANT_DAILY_LIMIT` (default 50 per user per 24 hours) keeps the bill predictable. The data the assistant reads is sent to Anthropic. `ASSISTANT_MODEL` defaults to `claude-opus-5-5`.
 
@@ -146,6 +154,6 @@ fitness-app/
 └── tests/               # pytest: formulas, units, training days, routine, suggestions, points, weekly summary, sleep, WHOOP, every API area
 ```
 
-Not built yet (see the build phases in ARCHITECTURE.md): Health Connect / Apple Health, image features (including equipment recognition), sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.
+Not built yet (see the build phases in ARCHITECTURE.md): Health Connect / Apple Health, food photos and label scanning, sending marketing emails (provider chosen later), database migrations, publishing the app to the App Store / Google Play.
 
 The calculations are standard estimates (Mifflin–St Jeor, 7,700 kcal per kg, Epley, U.S. Navy body fat), not medical advice.

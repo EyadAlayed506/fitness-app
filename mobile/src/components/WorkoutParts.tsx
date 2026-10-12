@@ -52,7 +52,7 @@ export function SetsList({
                 {s.rpe ? ` · RPE ${s.rpe}` : ""}
                 {s.notes ? <Txt variant="muted"> · {s.notes}</Txt> : null}
               </Txt>
-              {s.added_via === "qr" ? <Badge label="QR" /> : null}
+              {s.added_via === "qr" ? <Badge label="QR" /> : s.added_via === "photo" ? <Badge label="Photo" /> : null}
               {onDelete ? <IconButton icon="close" label="Delete set" onPress={() => onDelete(s)} /> : null}
             </Row>
           ))}
@@ -167,7 +167,7 @@ export function SetForm({
 }: {
   workoutId: number;
   exercise: PickedExercise;
-  addedVia: "name" | "qr";
+  addedVia: "name" | "qr" | "photo";
   /** The workout screen's single rest timer: it starts by itself after each saved set. */
   timer: RestTimer;
   onSaved: (msg: string) => void;
@@ -241,7 +241,7 @@ export function SetForm({
           <SetsList sets={previous} />
         </>
       ) : (
-        <Txt variant="small">{addedVia === "qr" ? "Found by QR code. " : ""}Log your first set.</Txt>
+        <Txt variant="small">{addedVia === "qr" ? "Found by QR code. " : addedVia === "photo" ? "Picked from your photo. " : ""}Log your first set.</Txt>
       )}
       <Row>
         <Field label="Reps" value={reps} onChangeText={setReps} keyboardType="number-pad" style={{ flex: 1 }} />

@@ -1,7 +1,12 @@
-from fastapi import APIRouter, HTTPException, Query, Response
+from collections.abc import Iterator
+from typing import Annotated
+
+import httpx
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from rapidfuzz import fuzz
 from sqlmodel import select
 
+from app.config import get_settings
 from app.database import SessionDep
 from app.deps import CurrentUser
 from app.models.exercise import (
@@ -9,6 +14,8 @@ from app.models.exercise import (
     AlternativesOut,
     Exercise,
     ExercisePublic,
+    RecognitionOut,
+    RecognizedExercise,
     RestPreference,
     RestSetting,
     RestSettingIn,
@@ -16,6 +23,7 @@ from app.models.exercise import (
 from app.models.user import Profile
 from app.services.alternatives import find_alternatives
 from app.services.qr import parse_qr_payload, qr_png
+from app.services.recognition import RecognitionError, Recognizer, image_type
 
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
@@ -141,3 +149,44 @@ def save_rest(exercise_id: int, data: RestSettingIn, user: CurrentUser, session:
         session.add(RestPreference(user_id=user.id, exercise_id=exercise.id, seconds=data.seconds))
     session.commit()
     return _rest_setting(session, user.id, exercise)
+
+
+# ---------- recognise a machine from a photo ----------
+
+MAX_PHOTO_BYTES = 15 * 1024 * 1024
+
+
+def get_recognizer() -> Iterator[Recognizer]:
+    """The vision model on this PC (Ollama). Tests replace this with a fake."""
+    s = get_settings()
+    with httpx.Client() as http:
+        yield Recognizer(http, s.ollama_url, s.ollama_vision_model)
+
+
+@router.post("/recognize", response_model=RecognitionOut)
+def recognize_exercise(
+    _: CurrentUser, session: SessionDep, recognizer: Annotated[Recognizer, Depends(get_recognizer)],
+    image: UploadFile = File(...),
+):
+    """Up to three exercises from the catalogue that match a photo of a machine, best first.
+
+    The user picks the right one (or searches by name). The photo is only used for this and isn't saved.
+    """
+    data = image.file.read(MAX_PHOTO_BYTES + 1)
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=413, detail="The photo is too big. Take it again at a lower quality.")
+    if image_type(data) is None:
+        raise HTTPException(status_code=415, detail="That isn't a photo the app can read (use JPEG, PNG or WebP).")
+    problem = recognizer.problem()
+    if problem:
+        raise HTTPException(status_code=503, detail=problem)
+    catalogue = list(session.exec(select(Exercise).order_by(Exercise.id)).all())
+    try:
+        guesses, seen = recognizer.recognize(data, catalogue)
+    except RecognitionError as e:
+        raise HTTPException(status_code=e.status, detail=e.detail)
+    return RecognitionOut(
+        guesses=[RecognizedExercise(exercise=g.exercise, confidence=g.confidence) for g in guesses],
+        seen=seen,
+        model=recognizer.model,
+    )

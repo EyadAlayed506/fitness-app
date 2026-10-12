@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:8b"
     ollama_num_ctx: int = 16384  # context size; more fits more data but needs more GPU memory
+    ollama_vision_model: str = "qwen3-vl:8b"  # looks at photos of machines (Workouts > Photo)
     # Voice messages: speech to text on this PC with Whisper (downloads once, about 500 MB for "small")
     whisper_model: str = "small"  # tiny, base, small, medium, large-v3 (bigger = better and slower)
     whisper_device: str = "cpu"  # "cuda" for an NVIDIA GPU (needs the CUDA libraries)

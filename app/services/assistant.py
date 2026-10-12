@@ -603,6 +603,22 @@ OLLAMA_TOOLS = [{"type": "function", "function": {
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
+def ollama_problem(http: httpx.Client, url: str, model: str) -> str | None:
+    """Why Ollama can't run `model` right now (not running, model not pulled), or None when it can."""
+    try:
+        r = http.get(f"{url.rstrip('/')}/api/tags", timeout=3)
+        r.raise_for_status()
+        names = {m.get("name") for m in r.json().get("models", [])}
+    except (httpx.HTTPError, ValueError):
+        return (
+            f"Ollama isn't running on this PC (nothing answered at {url}). Start the Ollama app, "
+            "or install it from ollama.com, then try again."
+        )
+    if model not in names and f"{model}:latest" not in names:
+        return f"The model {model} isn't downloaded yet. Open a terminal and run: ollama pull {model}"
+    return None
+
+
 class OllamaBackend:
     """A model running on this PC through Ollama (https://ollama.com): free and private, weaker than Claude."""
 
@@ -616,18 +632,7 @@ class OllamaBackend:
         self.num_ctx = num_ctx
 
     def problem(self) -> str | None:
-        try:
-            r = self.http.get(f"{self.url}/api/tags", timeout=3)
-            r.raise_for_status()
-            names = {m.get("name") for m in r.json().get("models", [])}
-        except (httpx.HTTPError, ValueError):
-            return (
-                f"Ollama isn't running on this PC (nothing answered at {self.url}). Start the Ollama app, "
-                "or install it from ollama.com, then try again."
-            )
-        if self.model not in names and f"{self.model}:latest" not in names:
-            return f"The model {self.model} isn't downloaded yet. Open a terminal and run: ollama pull {self.model}"
-        return None
+        return ollama_problem(self.http, self.url, self.model)
 
     def ask(self, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
         messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]

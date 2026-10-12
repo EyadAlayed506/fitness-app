@@ -107,6 +107,17 @@ class AlternativePublic(SQLModel):
     differences: list[str]
 
 
+class RecognizedExercise(SQLModel):
+    exercise: ExercisePublic
+    confidence: float  # 0 to 1, the vision model's own estimate
+
+
+class RecognitionOut(SQLModel):
+    guesses: list[RecognizedExercise]  # best first; empty when nothing in the catalogue matched
+    seen: str  # what the model says the photo shows
+    model: str
+
+
 class AlternativesOut(SQLModel):
     exercise: ExercisePublic
     equipment: str | None

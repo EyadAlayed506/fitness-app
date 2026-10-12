@@ -10,6 +10,7 @@ from app.models.user import WeightUnit, utcnow
 class AddedVia(StrEnum):
     name = "name"
     qr = "qr"
+    photo = "photo"
 
 
 class WorkoutSession(SQLModel, table=True):
