@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Chart, ChartCard, type ChartSeries } from "@/components/charts";
 import { InsightsView } from "@/components/Insights";
+import { PlanCards } from "@/components/PlanCards";
 import { SleepChart } from "@/components/SleepParts";
 import { WeeklySummaryCard } from "@/components/WeeklySummary";
 import {
@@ -48,14 +50,14 @@ interface Data {
   sleep: SleepAnalytics;
 }
 
-type View_ = "week" | "body" | "food" | "strength" | "sleep" | "insights";
+type View_ = "week" | "body" | "food" | "strength" | "sleep";
+// Five tabs fit a phone's width; patterns (insights) sit under the week
 const VIEWS: { value: View_; label: string }[] = [
   { value: "week", label: "Week" },
   { value: "body", label: "Body" },
   { value: "food", label: "Food" },
   { value: "strength", label: "Strength" },
   { value: "sleep", label: "Sleep" },
-  { value: "insights", label: "Insights" },
 ];
 
 const hasValues = (series: { data: (number | null)[] }[]) => series.some((s) => s.data.some((v) => v != null && v !== 0));
@@ -68,6 +70,17 @@ export default function Progress() {
   const [months, setMonths] = useState<string[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<View_>("week");
+  // Other screens can open a tab here, e.g. Today's "Your plan" opens Body
+  const { view: requested } = useLocalSearchParams<{ view?: string }>();
+  const [handled, setHandled] = useState<string | undefined>(undefined);
+  if (requested !== handled) {
+    setHandled(requested);
+    const match = VIEWS.find((v) => v.value === requested);
+    if (match) setView(match.value);
+  }
+  useEffect(() => {
+    if (requested) router.setParams({ view: undefined }); // so the same link works again later
+  }, [requested]);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadCompare = (m: string[] | null) =>
@@ -174,11 +187,18 @@ export default function Progress() {
       <Segmented options={VIEWS} value={view} onChange={setView} style={{ marginBottom: 16 }} />
       <ErrorText message={error} />
 
-      {view === "week" ? <WeeklySummaryCard /> : null}
-      {view === "insights" ? <InsightsView /> : null}
+      {view === "week" ? (
+        <>
+          <WeeklySummaryCard />
+          <Section title="Patterns" />
+          <InsightsView />
+        </>
+      ) : null}
 
       {view === "body" ? (
         <FadeIn key="body">
+          <PlanCards />
+          <Section title="Weight" />
           <ChartCard
             title={`Body weight (${u.w})`}
             subtitle="Each weigh-in, the 7-day average and your BMI 22 target"

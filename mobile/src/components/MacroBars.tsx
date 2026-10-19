@@ -36,3 +36,33 @@ export function MacroBars({ totals, targetKcal, stacked = false }: { totals: Tot
     </View>
   );
 }
+
+/** a space a line never breaks at */
+const NBSP = String.fromCharCode(160);
+
+/**
+ * "9 g protein  47 g carbs  5 g fat" for one food, each with a dot in the same colour as its bar.
+ * Text (not views), so it can sit inside a line of text such as a list row's subtitle.
+ */
+export function MacroText({ protein, carbs, fat }: { protein: number; carbs: number; fat: number }) {
+  const t = useTheme();
+  const parts = [
+    { label: "protein", grams: protein, color: t.series[0] },
+    { label: "carbs", grams: carbs, color: t.series[1] },
+    { label: "fat", grams: fat, color: t.series[2] },
+  ];
+  return (
+    <>
+      {parts.map((p) => (
+        <Txt key={p.label} variant="small" style={{ color: t.muted }}>
+          {"  "}
+          <Txt variant="small" style={{ color: p.color }}>
+            ●
+          </Txt>
+          {/* no-break spaces: a line only wraps between nutrients, never inside "5 g fat" */}
+          {["", fmt(p.grams), "g", p.label].join(NBSP)}
+        </Txt>
+      ))}
+    </>
+  );
+}

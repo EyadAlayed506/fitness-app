@@ -11,6 +11,7 @@ import { radius, space, useTheme } from "@/lib/theme";
 import type { FoodLogEntry, Meal, MenuDish, MenuScan, Routine, RoutineDay, ScreenshotRoutine } from "@/lib/types";
 
 import { MEALS } from "./FoodParts";
+import { MacroText } from "./MacroBars";
 import { Badge, Button, Chips, ErrorText, Field, IconButton, LinkButton, Row, Stepper, Txt, useToast } from "./ui";
 import { ExerciseSearch } from "./WorkoutParts";
 
@@ -426,8 +427,8 @@ export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry
                   </View>
                 </Row>
                 <Txt variant="small" style={{ marginTop: space.xs, fontVariant: ["tabular-nums"] }}>
-                  ≈ {fmt(d.calories)} kcal · P {fmt(d.protein_g)} · C {fmt(d.carbs_g)} · F {fmt(d.fat_g)} g (estimate
-                  {d.portion_g ? `, about ${fmt(d.portion_g)} g` : ""})
+                  ≈ {fmt(d.calories)} kcal (estimate{d.portion_g ? `, about ${fmt(d.portion_g)} g` : ""})
+                  <MacroText protein={d.protein_g} carbs={d.carbs_g} fat={d.fat_g} />
                 </Txt>
                 <Txt variant="tiny">{d.verdict}</Txt>
               </Pressable>

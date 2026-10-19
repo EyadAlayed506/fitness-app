@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "fastapi", "dev", "app/main.py", "--host", "0.0.0.0"],
+      "port": 8000
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web", "--port", "8081"],
+      "cwd": "mobile",
+      "port": 8081
+    }
+  ]
+}

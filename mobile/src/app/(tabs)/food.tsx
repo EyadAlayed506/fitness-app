@@ -4,7 +4,7 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { CustomFoodForm, FoodDetail, FoodSearch, MEALS } from "@/components/FoodParts";
-import { MacroBars } from "@/components/MacroBars";
+import { MacroBars, MacroText } from "@/components/MacroBars";
 import { MenuScanner } from "@/components/SnapParts";
 import {
   Button,
@@ -174,7 +174,12 @@ export default function FoodLog() {
                     key={e.id}
                     first={i === 0}
                     title={e.food_name}
-                    subtitle={`${fmt(e.quantity, 2)} ${unitLabel(e.unit)} · P ${fmt(e.protein_g)} · C ${fmt(e.carbs_g)} · F ${fmt(e.fat_g)} g`}
+                    subtitle={
+                      <>
+                        {fmt(e.quantity, 2)} {unitLabel(e.unit)}
+                        <MacroText protein={e.protein_g} carbs={e.carbs_g} fat={e.fat_g} />
+                      </>
+                    }
                     onPress={e.id > 0 ? () => setSheet({ kind: "edit", entry: e }) : undefined}
                     right={
                       <Row gap={space.sm}>

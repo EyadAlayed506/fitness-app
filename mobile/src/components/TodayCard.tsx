@@ -65,7 +65,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
 
       <View style={{ flexDirection: "row", gap: space.sm, marginTop: rest.length ? space.xs : space.lg }}>
         <Button
-          title={training ? "Start workout" : "Open workouts"}
+          title={training ? "Start workout" : "See this week's plan"}
           icon={training ? "play" : undefined}
           kind={training ? "primary" : "soft"}
           onPress={() => router.navigate(training ? { pathname: "/workouts", params: { start: "today" } } : "/workouts")}
@@ -107,11 +107,12 @@ export function TodayCard({ data }: { data: Recommendations }) {
               <Txt variant="tiny">Based on: {r.sources.join(", ")}</Txt>
             </View>
           ))}
+          {/* With the reasons rather than under the card every day: it's read where it matters */}
+          <Txt variant="tiny" style={{ marginTop: space.xs }}>
+            {data.disclaimer}
+          </Txt>
         </View>
       ) : null}
-      <Txt variant="tiny" style={{ marginTop: space.md }}>
-        {data.disclaimer}
-      </Txt>
     </Card>
   );
 }

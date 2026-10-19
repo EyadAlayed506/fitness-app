@@ -242,9 +242,10 @@ export function Button({
   const t = useTheme();
   const [busy, setBusy] = useState(false);
   const colors: Record<ButtonKind, { bg: string; fg: string; border: string }> = {
-    primary: { bg: t.ink, fg: t.inkText, border: t.ink },
+    // Actions carry the accent, so a button never reads as switched off (grey) or as plain text
+    primary: { bg: t.accent, fg: t.accentInk, border: t.accent },
     ghost: { bg: "transparent", fg: t.text, border: t.border },
-    soft: { bg: t.surface2, fg: t.text, border: t.surface2 },
+    soft: { bg: t.accentSoft, fg: t.accentText, border: t.accentSoft },
     danger: { bg: "transparent", fg: t.critical, border: t.criticalSoft },
     destructive: { bg: t.critical, fg: t.criticalText, border: t.critical },
   };
@@ -521,7 +522,7 @@ export function Segmented<T extends string>({
 }) {
   const t = useTheme();
   // many tabs: tighter padding so they fit a phone's width (it scrolls only on very narrow screens)
-  const padding = options.length > 5 ? 5 : space.md;
+  const padding = options.length > 4 ? space.sm : space.md;
   return (
     <View style={[{ backgroundColor: t.surface2, borderRadius: radius.md, padding: 3 }, style]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, gap: 2 }} accessibilityRole="tablist">
@@ -694,7 +695,8 @@ export function ListRow({
   icon,
 }: {
   title: string;
-  subtitle?: string;
+  /** plain text, or text with styled parts (nested Txt) */
+  subtitle?: ReactNode;
   right?: ReactNode;
   onPress?: () => void;
   first?: boolean;

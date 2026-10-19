@@ -8,8 +8,9 @@ import { AppearanceContext } from "./appearance";
  * so the app stays consistent and dark mode is a separate, deliberately chosen palette.
  *
  * Colour roles:
- * - ink: primary actions and the most important numbers (near-black / near-white)
- * - accent (cobalt): progress, the active tab, links and selected options. One accent only.
+ * - ink: the most important numbers and the avatar (near-black / near-white)
+ * - accent (cobalt): buttons (solid for the main action, soft for the others), progress, the active tab,
+ *   links and selected options. One accent only.
  * - good / warn / critical: status only, always with text or an icon, never decoration
  * - Text colours (text, text2, muted, accent, *Ink, critical) keep at least 4.5:1 contrast on bg, surface
  *   and surface2 in both palettes. Check new colours before adding them.
@@ -29,6 +30,7 @@ const light = {
   accent: "#2f64d8",
   accentInk: "#ffffff",
   accentSoft: "#e6edfb",
+  accentText: "#2856bd", // accent-coloured text on accentSoft (soft buttons)
   good: "#1f8a3c",
   goodInk: "#16672c",
   goodSoft: "#e4f3e7",
@@ -58,6 +60,7 @@ const dark: typeof light = {
   accent: "#5b8cf5",
   accentInk: "#0d0e10",
   accentSoft: "#1b2640",
+  accentText: "#8fb0f8",
   good: "#3fb45f",
   goodInk: "#6fd38a",
   goodSoft: "#14291b",
