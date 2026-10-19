@@ -9,4 +9,4 @@ __pycache__/
 # machine classifier: downloaded and prepared images, training runs (the scripts recreate them)
 /ml/machine_classifier/data/
 /ml/machine_classifier/runs/
-/ml/machine_classifier/.venv/
+/ml/machine_classifier/.venv
