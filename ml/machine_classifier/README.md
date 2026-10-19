@@ -202,6 +202,16 @@ on the CPU of a desktop PC (Ryzen 5 7600, TFLite with 4 threads, onnxruntime on 
 inside the model). Resize the short side to 256 px and crop the centre 224×224. The output is 6 softmax
 probabilities in `labels.txt` order.
 
+## Try it on your own photos
+
+```bash
+python predict.py photo.jpg [more.jpg ...]   # top 3 guesses per photo
+python predict.py some_folder                # every .jpg/.jpeg/.png in the folder
+```
+
+It uses `model/gym_machines_float16.tflite` with the same preprocessing as the evaluation, and it says "not sure" when
+the top guess is under 50 %. Put one pair of quotes around a path that contains spaces.
+
 ## How to reproduce
 
 ```bash
