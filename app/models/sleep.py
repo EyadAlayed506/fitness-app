@@ -1,7 +1,7 @@
 import datetime as dt
 from enum import StrEnum
 
-from pydantic import NaiveDatetime, field_validator, model_validator
+from pydantic import AwareDatetime, NaiveDatetime, field_validator, model_validator
 from sqlmodel import Field, SQLModel
 
 from app.models.user import utcnow
@@ -12,7 +12,11 @@ MAX_SLEEP_HOURS = 20
 class SleepSource(StrEnum):
     manual = "manual"
     whoop = "whoop"
-    # Planned (see ARCHITECTURE.md): health_connect, apple_health
+    health_connect = "health_connect"  # Android Health Connect, sent by the phone app
+    # Planned (see ARCHITECTURE.md): apple_health
+
+
+SOURCE_NAMES = {SleepSource.manual: "you", SleepSource.whoop: "WHOOP", SleepSource.health_connect: "Health Connect"}
 
 
 class SleepEntry(SQLModel, table=True):
@@ -28,7 +32,7 @@ class SleepEntry(SQLModel, table=True):
     notes: str = ""
     source: SleepSource = SleepSource.manual
     created_at: dt.datetime = Field(default_factory=utcnow)
-    # Filled in by trackers (WHOOP)
+    # Filled in by trackers (WHOOP, Health Connect)
     external_id: str | None = Field(default=None, index=True)
     light_minutes: int | None = None
     deep_minutes: int | None = None
@@ -88,3 +92,32 @@ class SleepEntryPublic(SQLModel):
     awake_minutes: int | None = None
     performance_pct: float | None = None
     recovery_score: float | None = None
+
+
+class HealthConnectStage(SQLModel):
+    start_time: AwareDatetime
+    end_time: AwareDatetime
+    stage: int  # Health Connect's SleepStageType: 1 awake, 2 sleeping, 3 out of bed, 4 light, 5 deep, 6 REM
+
+
+class HealthConnectSession(SQLModel):
+    """One SleepSessionRecord as the phone app reads it from Health Connect."""
+
+    id: str = Field(min_length=1, max_length=100)  # Health Connect's record id
+    start_time: AwareDatetime
+    end_time: AwareDatetime
+    # Time zone the sleep was recorded in; the phone sends its own when Health Connect has none
+    zone_offset_seconds: int = Field(default=0, ge=-18 * 3600, le=18 * 3600)
+    stages: list[HealthConnectStage] = Field(default_factory=list, max_length=500)
+    app: str = Field(default="", max_length=200)  # the app that wrote it, e.g. com.sec.android.app.shealth
+
+
+class HealthConnectImport(SQLModel):
+    sessions: list[HealthConnectSession] = Field(max_length=400)
+
+
+class HealthConnectImportResult(SQLModel):
+    imported: int = 0
+    updated: int = 0
+    replaced_manual: int = 0
+    skipped: int = 0  # unusable, or the night is already in the log from WHOOP or another app

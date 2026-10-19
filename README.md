@@ -99,7 +99,7 @@ Also useful:
 | Food | Search the built-in list, **USDA FoodData Central** and **Open Food Facts**; units change with the food (g/kg/oz/lb for solids, ml/l/cup/gallon… for drinks, or servings); create custom foods by hand with all macros and sub-macros. **Recent and frequent** foods come first (one tap logs your usual portion), "Copy yesterday's lunch", edit or remove an entry with **Undo**. **Scan a menu** at a restaurant: dishes ranked by how well they fit what's left of the day you're looking at, every number labelled as an estimate; log ½, 1, 1½ or 2 portions |
 | Setup and settings | Setup in 4 short steps with your calorie plan updating as you type; a **first-week checklist** on Today; Profile → Appearance (system, light or dark) |
 | Progress | Weight trend, projected weight per diet option, calories vs target, macros, lift progress (estimated 1RM), weekly volume per body region, sleep per night (mobile app), month-to-month body measurements with body-fat estimate |
-| Sleep (mobile app) | Choose how to track: **type it in** or **connect WHOOP** (sleep, stages, sleep performance and recovery imported automatically). Log bedtime, wake-up time, quality and notes; set a sleep goal (or use the amount recommended for your age); last night against the goal, sleep stages for WHOOP nights, a 7-night chart with the goal line, this week vs the week before, and bedtime / wake-up consistency. Overlapping entries are refused so a night isn't counted twice |
+| Sleep (mobile app) | Choose how to track: **type it in**, **connect Health Connect** on Android (sleep and stages from whatever watch, ring or sleep app saves to it) or **connect WHOOP** (sleep, stages, sleep performance and recovery imported automatically). Log bedtime, wake-up time, quality and notes; set a sleep goal (or use the amount recommended for your age); last night against the goal, sleep stages for WHOOP nights, a 7-night chart with the goal line, this week vs the week before, and bedtime / wake-up consistency. Overlapping entries are refused so a night isn't counted twice |
 | Emails | Opt in/out on the Profile screen (the avatar at the top of Today); every user has a one-click unsubscribe link (`/api/marketing/unsubscribe/{token}`) |
 
 **Scanning QR codes:** on a PC with a webcam it works at `http://localhost:8000`. To test, open the QR sticker page on your phone and hold it up to the webcam, or type the code printed under the sticker (e.g. `leg-press`).
@@ -136,6 +136,19 @@ Why the app says "WHOOP isn't set up on this server yet": WHOOP only lets regist
 5. In the app: Sleep → **Connect WHOOP**. Do this from the browser on your PC (press `w` in Expo), because the WHOOP login sends you back to `localhost`. The connection belongs to your account, so the phone app syncs too afterwards.
 
 The app imports the last 30 days, then syncs again when you open Home or the Sleep screen (at most every 15–30 minutes) or tap **Sync now**. WHOOP nights replace nights you typed in by hand for the same time.
+
+### Connecting Health Connect (Android)
+
+[Health Connect](https://developer.android.com/health-and-fitness/guides/health-connect) is where Android keeps health data from watches, rings and apps: Samsung Health, Fitbit, Garmin, Oura, Sleep as Android and others save sleep there. No developer account or keys are needed; each user just allows the app to read sleep. It's built into Android 14 and newer; on Android 9–13 the user installs the Health Connect app from Google Play.
+
+The phone reads the sleep and sends it to `POST /api/sleep/health-connect`, so nothing changes on the backend. Health Connect is a native Android part that **Expo Go doesn't include**, so to use it you install the app's own build on an Android phone once (in Expo Go and the browser the Sleep screen says so and everything else works as before). Either:
+
+- **On your PC** (needs [Android Studio](https://developer.android.com/studio) with the Android SDK, about 10 GB of disk): turn on USB debugging on the phone, plug it in, then in `mobile/` run `npx expo run:android`. It builds and installs the app, then loads the code from your PC like Expo Go does.
+- **In the cloud with EAS** (free Expo account, nothing big to install): in `mobile/` run `npx expo install expo-dev-client`, then `npx eas-cli@latest build --profile development --platform android` (the first time it asks a few questions and creates `eas.json`). Open the link it gives you on the phone to install the app, then start the code with `npx expo start` and open it from that app.
+
+Then in the app: Sleep → **Connect Health Connect** → allow **Sleep**. The app imports the last 30 days, then the last week each time you open Home or the Sleep screen (at most every 15–30 minutes) or tap **Sync now**. No watch? To try it, log a night in an app that saves to Health Connect (for example Samsung Health or Sleep as Android) and tap **Sync now**.
+
+Which night counts: Health Connect nights replace nights you typed in by hand for the same time. If two apps saved the same night, the one with sleep stages is kept. WHOOP wins over Health Connect, so a night is never counted twice if you use both. **Disconnect** stops importing on that phone; the permission itself is removed in Health Connect (**Manage in Health Connect**). To publish the app on Google Play later, Google asks you to declare the health data you read in the Play Console.
 
 ### Smart gym and snap and say: what runs where
 
@@ -201,12 +214,12 @@ fitness-app/
 │   ├── deps.py          # CurrentUser / CurrentProfile dependencies
 │   ├── models/          # SQLModel tables and request/response schemas
 │   ├── routers/         # one file per area: auth, me, exercises, workouts, gyms, snap, foods, measurements, sleep, whoop, analytics, points, assistant, marketing
-│   ├── services/        # formulas, training days + routine, alternatives, suggestions, weekly summary, points, units, food search, WHOOP, QR codes,
+│   ├── services/        # formulas, training days + routine, alternatives, suggestions, weekly summary, points, units, food search, WHOOP, Health Connect, QR codes,
 │   │                    # photo matching (photo_match.py), gym equipment, snap and say (snap.py), insights
 │   ├── seed/            # starter machine catalogue (48 exercises) and 38 common foods
 │   ├── static/          # web preview (HTML, CSS, JS, Chart.js), served at /
 │   └── demo.py          # demo account
-└── tests/               # pytest: formulas, units, training days, routine, suggestions, points, weekly summary, sleep, WHOOP, every API area;
+└── tests/               # pytest: formulas, units, training days, routine, suggestions, points, weekly summary, sleep, WHOOP, Health Connect, every API area;
                          # the photo model and the vision model are replaced by fakes, so the tests need neither
 ```
 

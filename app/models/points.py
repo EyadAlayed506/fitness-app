@@ -21,7 +21,7 @@ class PointAward(SQLModel, table=True):
     points: int
     day: dt.date  # the user's day the points count for
     reason: str
-    data_source: str  # "manual" (entered by the user) or "whoop" (from a connected tracker)
+    data_source: str  # "manual" (entered by the user), or a connected tracker: "whoop", "health_connect"
     created_at: dt.datetime = Field(default_factory=utcnow)
 
 

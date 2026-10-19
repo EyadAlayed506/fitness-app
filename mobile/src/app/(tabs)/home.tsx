@@ -39,8 +39,9 @@ import {
   useWhoopAutoSync,
   useWhoopStatus,
 } from "@/lib/data";
-import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, units } from "@/lib/format";
+import { cap, clockOf, fmt, hoursMinutes, shortDate, todayISO, trackerName, units } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useHealthConnectAutoSync, useHealthConnectStatus } from "@/lib/healthConnect";
 import { profilePayload } from "@/lib/profile";
 import { derivedKeys, errorMessage, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
@@ -68,8 +69,10 @@ export default function Home() {
   const pointsQuery = usePoints();
   const whoop = useWhoopStatus();
   const gettingStarted = useGettingStarted();
+  const healthConnect = useHealthConnectStatus();
   useRefreshOnFocus([qk.foodDay(todayISO()), qk.sleep, qk.recommendations, qk.points, qk.whoop, qk.gettingStarted]);
   useWhoopAutoSync(!!whoop.data?.connected, 30);
+  useHealthConnectAutoSync(!!healthConnect.data?.connected, 30);
   const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -79,7 +82,7 @@ export default function Home() {
   const sleepStats = sleepStatsQuery.data ?? null;
   const today = recommendations.data ?? null;
   const points = pointsQuery.data ?? null;
-  const whoopConnected = !!whoop.data?.connected;
+  const trackerConnected = !!whoop.data?.connected || !!healthConnect.data?.connected;
   const loaded = !foodDay.isPending && !sleepList.isPending;
   const error = errorMessage(foodDay.error ?? sleepList.error);
   const load = async () => {
@@ -199,7 +202,7 @@ export default function Home() {
                         </Txt>
                       </Txt>
                       <Row gap={6}>
-                        {lastSleep.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : null}
+                        {lastSleep.source !== "manual" ? <Badge label={trackerName(lastSleep.source) ?? ""} tone="info" /> : null}
                         {lastSleep.quality ? <Badge label={qualityLabel(lastSleep.quality) ?? ""} /> : null}
                       </Row>
                     </Row>
@@ -218,14 +221,14 @@ export default function Home() {
                   </>
                 ) : (
                   <Txt variant="small" style={{ marginTop: space.sm }}>
-                    No sleep logged yet. Add last night by hand, or connect WHOOP to import it automatically.
+                    No sleep logged yet. Add last night by hand, or connect a tracker to import it automatically.
                   </Txt>
                 )}
               </Pressable>
-              {whoopConnected ? null : (
+              {trackerConnected ? null : (
                 <Row style={{ marginTop: space.lg }}>
                   <Button title="Log sleep" icon="moon" kind="soft" small onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
-                  <Button title="Connect WHOOP" kind="ghost" small onPress={() => router.push("/sleep")} style={{ flex: 1 }} />
+                  <Button title="Connect a tracker" kind="ghost" small onPress={() => router.push("/sleep")} style={{ flex: 1 }} />
                 </Row>
               )}
             </Card>

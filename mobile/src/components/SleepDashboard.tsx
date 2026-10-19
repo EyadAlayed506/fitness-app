@@ -2,14 +2,14 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { api } from "@/lib/api";
-import { WEEKDAYS_SHORT, clockOf, hoursMinutes, longDate, parseISO, todayISO } from "@/lib/format";
+import { WEEKDAYS_SHORT, clockOf, hoursMinutes, longDate, parseISO, todayISO, trackerName } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
 import type { SleepAnalytics, SleepNight } from "@/lib/types";
 
 import { Badge, Button, Card, CardHead, Chips, ErrorText, LinkButton, Meter, Row, Stat, Txt } from "./ui";
 
 const sourceBadge = (n: SleepNight) =>
-  n.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : <Badge label="Logged by you" />;
+  n.source !== "manual" ? <Badge label={trackerName(n.source) ?? ""} tone="info" /> : <Badge label="Logged by you" />;
 
 /** "8 h" for whole hours, otherwise "7 h 30 min" */
 export const goalHours = (m: number) => (m % 60 ? hoursMinutes(m) : `${m / 60} h`);
@@ -51,7 +51,7 @@ export function LastNightCard({ data, onEditGoal }: { data: SleepAnalytics; onEd
             Bed {clockOf(night.bedtime)} · up {clockOf(night.wake_time)}
             {night.minutes !== night.main_minutes ? ` · includes ${hoursMinutes(night.minutes - night.main_minutes)} of naps` : ""}
           </Txt>
-          {night.stages ? <Stages stages={night.stages} /> : null}
+          {night.stages ? <Stages stages={night.stages} from={trackerName(night.source)} /> : null}
           {night.source === "manual" ? (
             <Txt variant="tiny" style={{ marginTop: 6 }}>
               Sleep stages are only shown for nights measured by a tracker.
@@ -59,7 +59,7 @@ export function LastNightCard({ data, onEditGoal }: { data: SleepAnalytics; onEd
           ) : null}
         </>
       ) : (
-        <Txt variant="small">Not logged yet. Log last night, or connect WHOOP to bring it in automatically.</Txt>
+        <Txt variant="small">Not logged yet. Log last night, or connect a tracker to bring it in automatically.</Txt>
       )}
       <Row style={{ marginTop: 10, justifyContent: "space-between" }}>
         <Txt variant="tiny" style={{ flex: 1 }}>
@@ -71,7 +71,7 @@ export function LastNightCard({ data, onEditGoal }: { data: SleepAnalytics; onEd
   );
 }
 
-function Stages({ stages }: { stages: NonNullable<SleepNight["stages"]> }) {
+function Stages({ stages, from }: { stages: NonNullable<SleepNight["stages"]>; from: string | null }) {
   const t = useTheme();
   const parts = [
     { label: "Light", value: stages.light, color: t.series[0] },
@@ -83,7 +83,7 @@ function Stages({ stages }: { stages: NonNullable<SleepNight["stages"]> }) {
   if (!total) return null;
   return (
     <View style={{ marginTop: 12 }} accessibilityLabel={`Sleep stages: ${parts.map((p) => `${p.label} ${p.value ?? "unknown"} minutes`).join(", ")}`}>
-      <Txt variant="label">Stages (from WHOOP)</Txt>
+      <Txt variant="label">Stages{from ? ` (from ${from})` : ""}</Txt>
       <View style={{ flexDirection: "row", height: 12, borderRadius: 99, overflow: "hidden", marginTop: 6, gap: 2 }}>
         {parts.map((p) => (p.value ? <View key={p.label} style={{ flex: p.value, backgroundColor: p.color }} /> : null))}
       </View>
@@ -110,7 +110,7 @@ export function SleepWeekCard({ data }: { data: SleepAnalytics }) {
   const scaleMax = Math.max(goal + 120, ...nights.map((n) => n.night?.minutes ?? 0));
   const H = 140;
   const goalY = (goal / scaleMax) * H;
-  const color = (n: SleepNight) => (n.source === "whoop" ? t.series[0] : t.series[2]);
+  const color = (n: SleepNight) => (n.source !== "manual" ? t.series[0] : t.series[2]);
   const prev = data.average_hours_prev_7d;
   const avg = data.average_hours_7d;
 
@@ -135,7 +135,7 @@ export function SleepWeekCard({ data }: { data: SleepAnalytics }) {
             <View key={date} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", height: H }}>
               {night ? (
                 <View
-                  accessibilityLabel={`${longDate(date)}: ${hoursMinutes(night.minutes)}, ${night.source === "whoop" ? "from WHOOP" : "logged by you"}`}
+                  accessibilityLabel={`${longDate(date)}: ${hoursMinutes(night.minutes)}, ${night.source !== "manual" ? `from ${trackerName(night.source)}` : "logged by you"}`}
                   style={{ width: "70%", maxWidth: 28, height: Math.max(4, (night.minutes / scaleMax) * H), backgroundColor: color(night), borderTopLeftRadius: 5, borderTopRightRadius: 5 }}
                 />
               ) : (
@@ -158,7 +158,7 @@ export function SleepWeekCard({ data }: { data: SleepAnalytics }) {
         </View>
       </View>
       <Row style={{ marginTop: 8, flexWrap: "wrap" }} gap={12}>
-        <Legend color={t.series[0]} label="WHOOP" />
+        <Legend color={t.series[0]} label="From a tracker" />
         <Legend color={t.series[2]} label="Logged by you" />
         <Legend color="transparent" dashed label="Not logged" />
         <Row gap={4}>
@@ -223,7 +223,7 @@ export function SleepConsistencyCard({ data }: { data: SleepAnalytics }) {
                     bottom: 0,
                     left: `${(timelinePos(night.bedtime, date) / WINDOW) * 100}%`,
                     width: `${((timelinePos(night.wake_time, date) - timelinePos(night.bedtime, date)) / WINDOW) * 100}%`,
-                    backgroundColor: night.source === "whoop" ? t.series[0] : t.series[2],
+                    backgroundColor: night.source !== "manual" ? t.series[0] : t.series[2],
                     borderRadius: 7,
                   }}
                 />

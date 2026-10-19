@@ -53,7 +53,7 @@ def test_week_compared_with_the_week_before(client, auth, session):
 
     sleep = s["sleep"]
     assert sleep["nights_logged"] == 2 and sleep["average_minutes"] == 390
-    assert (sleep["from_whoop"], sleep["logged_by_hand"]) == (1, 1)
+    assert (sleep["from_whoop"], sleep["from_health_connect"], sleep["logged_by_hand"]) == (1, 0, 1)
     assert sleep["previous_average_minutes"] is None  # no nights the week before: no comparison
     assert s["weight"]["latest_kg"] == 94 and s["weight"]["change_kg"] is None
     assert len(s["history"]) == 8 and s["history"][-1] == {"week_start": str(LAST_WEEK), "planned": 2, "completed": 2}

@@ -3,7 +3,7 @@ import { View } from "react-native";
 
 import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
-import { addDays, clockOf, clockText, hoursMinutes, longDate, parseClock, shortDate, todayISO } from "@/lib/format";
+import { addDays, clockOf, clockText, hoursMinutes, longDate, parseClock, shortDate, todayISO, trackerName } from "@/lib/format";
 import { useTheme } from "@/lib/theme";
 import type { SleepAnalytics, SleepEntry } from "@/lib/types";
 
@@ -44,11 +44,12 @@ function TrackerDetails({ entry }: { entry: SleepEntry }) {
     ["REM", entry.rem_minutes],
     ["Awake", entry.awake_minutes],
   ];
+  const whoop = entry.source === "whoop";
   return (
     <View>
       <Row style={{ justifyContent: "space-between" }}>
         <Txt style={{ fontWeight: "700" }}>{longDate(entry.date)}</Txt>
-        <Badge label="From WHOOP" tone="info" />
+        <Badge label={`From ${trackerName(entry.source)}`} tone="info" />
       </Row>
       <Txt variant="small" style={{ marginTop: 4 }}>
         {clockOf(entry.bedtime)} → {clockOf(entry.wake_time)} · {hoursMinutes(entry.duration_minutes)} asleep
@@ -61,15 +62,19 @@ function TrackerDetails({ entry }: { entry: SleepEntry }) {
         </Row>
       ) : (
         <Txt variant="tiny" style={{ marginTop: 8 }}>
-          WHOOP hasn&apos;t scored this sleep yet. Stages appear after the next sync.
+          {whoop
+            ? "WHOOP hasn't scored this sleep yet. Stages appear after the next sync."
+            : "The app that recorded this sleep didn't save sleep stages."}
         </Txt>
       )}
-      <Row style={{ marginTop: 8 }} gap={6}>
-        <Stat label="Sleep performance" value={entry.performance_pct != null ? `${Math.round(entry.performance_pct)} %` : "–"} />
-        <Stat label="Recovery" value={entry.recovery_score != null ? `${Math.round(entry.recovery_score)} %` : "–"} />
-      </Row>
+      {whoop ? (
+        <Row style={{ marginTop: 8 }} gap={6}>
+          <Stat label="Sleep performance" value={entry.performance_pct != null ? `${Math.round(entry.performance_pct)} %` : "–"} />
+          <Stat label="Recovery" value={entry.recovery_score != null ? `${Math.round(entry.recovery_score)} %` : "–"} />
+        </Row>
+      ) : null}
       <Txt variant="tiny" style={{ marginTop: 8 }}>
-        Times come from WHOOP and update on every sync. You can still change the quality and add notes.
+        Times come from {trackerName(entry.source)} and update on every sync. You can still change the quality and add notes.
       </Txt>
     </View>
   );
@@ -158,7 +163,8 @@ export function SleepForm({ entry, onSaved }: { entry?: SleepEntry; onSaved: (me
           kind="danger"
           style={{ marginTop: 10 }}
           onPress={async () => {
-            const note = fromTracker ? " It may come back on the next WHOOP sync if WHOOP still has it." : "";
+            const from = trackerName(entry.source);
+            const note = fromTracker ? ` It may come back on the next ${from} sync if ${from} still has it.` : "";
             if (!(await confirm("Delete this sleep?", `${longDate(entry.date)} · ${hoursMinutes(entry.duration_minutes)}.${note}`, "Delete"))) return;
             await api(`/sleep/${entry.id}`, { method: "DELETE" });
             onSaved("Sleep deleted");

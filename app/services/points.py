@@ -49,7 +49,7 @@ RULES = {
         PointsRule("full_week", 30, "Full week", "Every planned session done in a week (Monday to Sunday)."),
         PointsRule(
             "sleep_goal", 10, "Sleep goal",
-            "A night of at least your sleep goal, from WHOOP or logged by hand within 2 days of waking up.",
+            "A night of at least your sleep goal, from WHOOP or Health Connect, or logged by hand within 2 days of waking up.",
         ),
         PointsRule(
             "nutrition", 10, "Eating to plan",
@@ -143,8 +143,7 @@ def candidate_awards(
             days=MANUAL_SLEEP_GRACE_DAYS
         ):
             continue  # logged long after the night: not counted
-        source = "whoop" if night.source == "whoop" else "manual"
-        add(_award("sleep_goal", str(day), day, f"Slept {_hm(night.duration_minutes)} (goal {_hm(goal.minutes)})", source, uid))
+        add(_award("sleep_goal", str(day), day, f"Slept {_hm(night.duration_minutes)} (goal {_hm(goal.minutes)})", str(night.source), uid))
 
     # Eating to plan, for finished days only
     target = build_plan(profile).target_calories

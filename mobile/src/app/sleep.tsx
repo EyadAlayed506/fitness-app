@@ -5,12 +5,15 @@ import { ScrollView } from "react-native";
 
 import { LastNightCard, SleepConsistencyCard, SleepGoalForm, SleepWeekCard } from "@/components/SleepDashboard";
 import { QUALITY, SleepChart, SleepForm, qualityLabel, trackerSummary } from "@/components/SleepParts";
+import { HealthConnectCard } from "@/components/HealthConnectCard";
 import { Badge, Card, EmptyState, ListRow, Loading, Section, Sheet, SkeletonCards, Txt, useToast } from "@/components/ui";
 import { WhoopCard, syncSummary } from "@/components/WhoopCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { clockOf, hoursMinutes, longDate, tzOffset } from "@/lib/format";
+import { clockOf, hoursMinutes, longDate, trackerName, tzOffset } from "@/lib/format";
 import { useWhoopAutoSync, useWhoopStatus } from "@/lib/data";
+import { useHealthConnectAutoSync, useHealthConnectStatus } from "@/lib/healthConnect";
+import { syncSummary as healthConnectSummary } from "@/lib/healthConnectSessions";
 import { derivedKeys, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { space, useTheme } from "@/lib/theme";
 import type { SleepAnalytics, SleepEntry } from "@/lib/types";
@@ -47,11 +50,16 @@ function SleepScreen() {
   useWhoopAutoSync(!!whoopQuery.data?.connected, 15, (r) => {
     if (!r.skipped && (r.imported || r.replaced_manual)) toast(syncSummary(r));
   });
+  const healthConnectQuery = useHealthConnectStatus();
+  // and from Health Connect (Android)
+  useHealthConnectAutoSync(!!healthConnectQuery.data?.connected, 15, (r) => {
+    if (r.imported || r.replaced_manual) toast(healthConnectSummary(r));
+  });
   const entries = screen.data?.list ?? [];
   const stats = screen.data?.analytics ?? null;
   const whoop = whoopQuery.data ?? null;
   const load = async () => {
-    invalidate(qk.sleep, qk.whoop, ...derivedKeys);
+    invalidate(qk.sleep, qk.whoop, qk.healthConnect, ...derivedKeys);
   };
 
   const saved = async (message: string) => {
@@ -66,6 +74,8 @@ function SleepScreen() {
       {stats ? <LastNightCard data={stats} onEditGoal={() => setSheet({ kind: "goal" })} /> : null}
       {stats ? <SleepWeekCard data={stats} /> : null}
       {stats ? <SleepConsistencyCard data={stats} /> : null}
+
+      <HealthConnectCard status={healthConnectQuery.data ?? null} onChanged={load} toast={toast} />
 
       <WhoopCard
         status={whoop}
@@ -94,7 +104,7 @@ function SleepScreen() {
               ]
                 .filter(Boolean)
                 .join(" · ")}
-              right={e.source === "whoop" ? <Badge label="WHOOP" tone="info" /> : undefined}
+              right={e.source !== "manual" ? <Badge label={trackerName(e.source) ?? ""} tone="info" /> : undefined}
               onPress={() => setSheet({ kind: "edit", entry: e })}
             />
           ))
@@ -102,7 +112,7 @@ function SleepScreen() {
           <EmptyState
             icon="moon-outline"
             title="No sleep logged yet"
-            text="Log last night by hand, or connect WHOOP to import it."
+            text="Log last night by hand, or connect Health Connect or WHOOP to import it."
             action="Log sleep"
             onAction={() => setSheet({ kind: "new" })}
           />

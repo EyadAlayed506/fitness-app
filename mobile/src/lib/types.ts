@@ -272,6 +272,9 @@ export interface MeasurementCompare {
   rows: { field: string; label: string; first: number | null; second: number | null; difference: number | null }[];
 }
 
+/** where a sleep came from: typed in, WHOOP, or Android Health Connect */
+export type SleepSource = "manual" | "whoop" | "health_connect";
+
 export interface SleepEntry {
   id: number;
   date: string;
@@ -280,14 +283,22 @@ export interface SleepEntry {
   duration_minutes: number;
   quality: number | null;
   notes: string;
-  source: "manual" | "whoop";
-  // from WHOOP
+  source: SleepSource;
+  // from a tracker (WHOOP, Health Connect)
   light_minutes?: number | null;
   deep_minutes?: number | null;
   rem_minutes?: number | null;
   awake_minutes?: number | null;
   performance_pct?: number | null;
   recovery_score?: number | null;
+}
+
+export interface HealthConnectImportResult {
+  imported: number;
+  updated: number;
+  replaced_manual: number;
+  /** unusable, or the night is already in the log from WHOOP or another app */
+  skipped: number;
 }
 
 export interface WhoopStatus {
@@ -314,7 +325,7 @@ export interface SleepNight {
   main_minutes: number;
   bedtime: string;
   wake_time: string;
-  source: "manual" | "whoop";
+  source: SleepSource;
   quality: number | null;
   /** only when a tracker measured them; never estimated for manual logs */
   stages: { light: number | null; deep: number | null; rem: number | null; awake: number | null } | null;
@@ -363,8 +374,8 @@ export interface PointAward {
   points: number;
   day: string;
   reason: string;
-  /** "manual": entered by the user; "whoop": from a connected tracker */
-  data_source: "manual" | "whoop";
+  /** "manual": entered by the user; otherwise the connected tracker it came from */
+  data_source: SleepSource;
 }
 
 export interface Achievement {
@@ -426,6 +437,7 @@ export interface WeeklySummary {
     goal_minutes: number;
     nights_meeting_goal: number;
     from_whoop: number;
+    from_health_connect: number;
     logged_by_hand: number;
     previous_average_minutes: number | null;
     previous_nights_logged: number;

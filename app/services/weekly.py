@@ -63,6 +63,7 @@ class SleepWeek:
     goal_minutes: int
     nights_meeting_goal: int
     from_whoop: int
+    from_health_connect: int
     logged_by_hand: int
     previous_average_minutes: int | None  # None when last week has no nights
     previous_nights_logged: int
@@ -202,7 +203,8 @@ def weekly_summary(
             goal_minutes=goal.minutes,
             nights_meeting_goal=sum(n.duration_minutes >= goal.minutes for n in this_nights),
             from_whoop=sum(n.source == "whoop" for n in this_nights),
-            logged_by_hand=sum(n.source != "whoop" for n in this_nights),
+            from_health_connect=sum(n.source == "health_connect" for n in this_nights),
+            logged_by_hand=sum(n.source == "manual" for n in this_nights),
             previous_average_minutes=_avg([n.duration_minutes for n in prev_nights]),
             previous_nights_logged=len(prev_nights),
         )

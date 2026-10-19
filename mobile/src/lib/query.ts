@@ -37,6 +37,7 @@ export const qk = {
   sleepList: (limit: number) => ["sleep", "list", limit] as const,
   sleepAnalytics: (days: number) => ["sleep", "analytics", days] as const,
   whoop: ["whoop"] as const,
+  healthConnect: ["health-connect"] as const,
   recommendations: ["recommendations"] as const,
   points: ["points"] as const,
   gettingStarted: ["getting-started"] as const,

@@ -254,17 +254,19 @@ def sync(http: httpx.Client, session: Session, conn: WhoopConnection) -> WhoopSy
             entry.sqlmodel_update(fields)
             entry.notes = notes
             result.updated += 1
-        # WHOOP replaces nights the user typed in by hand, so a night is never counted twice
-        for manual in session.exec(
+        # WHOOP replaces nights the user typed in by hand or that came from Health Connect,
+        # so a night is never counted twice
+        for other in session.exec(
             select(SleepEntry).where(
                 SleepEntry.user_id == conn.user_id,
-                SleepEntry.source == SleepSource.manual,
+                SleepEntry.source != SleepSource.whoop,
                 SleepEntry.bedtime < fields["wake_time"],
                 SleepEntry.wake_time > fields["bedtime"],
             )
         ).all():
-            session.delete(manual)
-            result.replaced_manual += 1
+            session.delete(other)
+            if other.source == SleepSource.manual:
+                result.replaced_manual += 1
         session.add(entry)
 
     conn.last_sync_at = now

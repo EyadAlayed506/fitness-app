@@ -4,6 +4,9 @@ from sqlmodel import Session, select
 from app.database import SessionDep
 from app.deps import CurrentUser
 from app.models.sleep import (
+    SOURCE_NAMES,
+    HealthConnectImport,
+    HealthConnectImportResult,
     SleepEntry,
     SleepEntryIn,
     SleepEntryPublic,
@@ -12,6 +15,7 @@ from app.models.sleep import (
     check_times,
 )
 from app.models.user import User
+from app.services import health_connect
 
 router = APIRouter(prefix="/sleep", tags=["sleep"])
 
@@ -55,6 +59,12 @@ def log_sleep(data: SleepEntryIn, user: CurrentUser, session: SessionDep):
     return entry
 
 
+@router.post("/health-connect", response_model=HealthConnectImportResult)
+def import_health_connect(data: HealthConnectImport, user: CurrentUser, session: SessionDep):
+    """Sleep sessions the phone app read from Android Health Connect. Sending the same session again updates it."""
+    return health_connect.import_sessions(session, user.id, data.sessions)
+
+
 @router.get("", response_model=list[SleepEntryPublic])
 def list_sleep(user: CurrentUser, session: SessionDep, limit: int = Query(default=30, ge=1, le=365)):
     return session.exec(
@@ -69,7 +79,7 @@ def list_sleep(user: CurrentUser, session: SessionDep, limit: int = Query(defaul
 def update_sleep(entry_id: int, data: SleepEntryUpdate, user: CurrentUser, session: SessionDep):
     entry = _get_owned(session, entry_id, user)
     if entry.source != SleepSource.manual and ({"bedtime", "wake_time"} & data.model_fields_set):
-        raise HTTPException(status_code=409, detail=f"The times of this sleep come from {entry.source.upper()} and can't be changed")
+        raise HTTPException(status_code=409, detail=f"The times of this sleep come from {SOURCE_NAMES[entry.source]} and can't be changed")
     # quality can be cleared with null; null for the other fields means "leave as is"
     changes = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None or k == "quality"}
     bedtime = changes.get("bedtime") or entry.bedtime

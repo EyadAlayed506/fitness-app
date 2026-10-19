@@ -1,4 +1,8 @@
-import type { UnitSystem } from "./types";
+import type { SleepSource, UnitSystem } from "./types";
+
+/** "WHOOP" or "Health Connect"; null for sleep the user typed in */
+export const trackerName = (source: SleepSource): string | null =>
+  source === "whoop" ? "WHOOP" : source === "health_connect" ? "Health Connect" : null;
 
 export const KG_PER_LB = 0.45359237;
 export const CM_PER_IN = 2.54;

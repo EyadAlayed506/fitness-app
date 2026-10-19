@@ -85,7 +85,7 @@ function PointsBody({ data }: { data: Points }) {
         </View>
         <Txt variant="tiny" style={{ marginTop: 10 }}>
           Points are never taken away and there are no penalties for missed days. Only recorded data counts; awards
-          show whether the data came from WHOOP or was logged by you.
+          show whether the data came from a tracker (WHOOP, Health Connect) or was logged by you.
         </Txt>
       </Card>
     </>

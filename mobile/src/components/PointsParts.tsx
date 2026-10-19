@@ -2,13 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { View } from "react-native";
 
-import { fmt } from "@/lib/format";
+import { fmt, trackerName } from "@/lib/format";
 import { radius, space, useTheme } from "@/lib/theme";
 import type { PointAward, Points } from "@/lib/types";
 
 import { Card, Meter, Row, Txt } from "./ui";
 
-export const sourceLabel = (a: PointAward) => (a.data_source === "whoop" ? "WHOOP" : "Logged by you");
+export const sourceLabel = (a: PointAward) => trackerName(a.data_source) ?? "Logged by you";
 
 /** Level, progress to the next one, and what earned points today. */
 export function LevelMeter({ data }: { data: Points }) {

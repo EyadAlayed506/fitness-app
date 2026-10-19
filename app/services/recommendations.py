@@ -12,7 +12,7 @@ import datetime as dt
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from app.models.sleep import SleepEntry
+from app.models.sleep import SOURCE_NAMES, SleepEntry
 from app.services.activity import DoneWorkout, SleepGoal
 from app.services.routine import Routine, RoutineDay
 from app.services.schedule import WEEKDAY_NAMES
@@ -79,7 +79,7 @@ def _hm(minutes: int) -> str:
 
 
 def _sleep_source(entry: SleepEntry) -> str:
-    return "Sleep from WHOOP" if entry.source == "whoop" else "Sleep you logged"
+    return "Sleep you logged" if entry.source == "manual" else f"Sleep from {SOURCE_NAMES[entry.source]}"
 
 
 def _next_session(ctx: Context) -> RoutineDay | None:

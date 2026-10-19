@@ -18,7 +18,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.eyadalayed.fitnessapp"
+      "package": "com.eyadalayed.fitnessapp",
+      "permissions": [
+        "android.permission.health.READ_SLEEP"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -49,6 +52,15 @@
           "photosPermission": "The app uses a photo you choose to recognise gym machines.",
           "cameraPermission": false,
           "microphonePermission": false
+        }
+      ],
+      "react-native-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
         }
       ]
     ],

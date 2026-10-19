@@ -126,7 +126,11 @@ export function WeeklySummaryCard() {
                 {s.sleep.previous_average_minutes != null
                   ? `Last week: ${hoursMinutes(s.sleep.previous_average_minutes)} over ${plural(s.sleep.previous_nights_logged, "night")}. `
                   : "No sleep logged the week before, so there's nothing to compare. "}
-                {[s.sleep.from_whoop ? `${s.sleep.from_whoop} from WHOOP` : "", s.sleep.logged_by_hand ? `${s.sleep.logged_by_hand} logged by hand` : ""]
+                {[
+                  s.sleep.from_whoop ? `${s.sleep.from_whoop} from WHOOP` : "",
+                  s.sleep.from_health_connect ? `${s.sleep.from_health_connect} from Health Connect` : "",
+                  s.sleep.logged_by_hand ? `${s.sleep.logged_by_hand} logged by hand` : "",
+                ]
                   .filter(Boolean)
                   .join(", ")}
               </Txt>
