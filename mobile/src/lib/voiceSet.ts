@@ -57,8 +57,9 @@ export function wordsToNumbers(text: string): string {
 
 /** Lower case, numbers as digits, units as "kg" / "lb", "reps" for repetitions. */
 export function normaliseSpeech(text: string): string {
-  let t = ` ${text.toLowerCase().replace(/[,!?;:]/g, " ").replace(/\.(?!\d)/g, " ").replace(/(\d)\s*(kg|lb)s?\b/g, "$1 $2")} `;
-  t = t.replace(/\b(kilograms?|kilos?|kgs)\b/g, "kg").replace(/\b(pounds?|lbs)\b/g, "lb");
+  let t = ` ${text.toLowerCase().replace(/[,!?;:"“”]/g, " ").replace(/\.(?!\d)/g, " ").replace(/([a-z])-([a-z])/g, "$1 $2").replace(/(\d)\s*(kg|lb)s?\b/g, "$1 $2")} `;
+  // units as people say (and speech-to-text spells) them: "kilos", "killos", "kilo's", "kilogrammes", "pounds"
+  t = t.replace(/\b(kilogrammes?|kilograms?|kill?os?|kilo's|kgs?|kgs)\b/g, "kg").replace(/\b(pounds?|lbs?)\b/g, "lb");
   t = t.replace(/\b(repetitions?|reps|rep)\b/g, "reps").replace(/(\d)\s*x\s*(\d)/g, "$1 x $2");
   return wordsToNumbers(t.replace(/\s+/g, " ").trim());
 }

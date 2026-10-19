@@ -11,7 +11,7 @@ export type Unit = "kg" | "lb";
 
 export type Command =
   /** a set; any part can be missing (the executor asks for what's needed) */
-  | { intent: "log_set"; exercise: string | null; setNumber: number | null; count: number; reps: number | null; weight: number | null; unit: Unit | null; bodyweight: boolean }
+  | { intent: "log_set"; exercise: string | null; setNumber: number | null; count: number; reps: number | null; weight: number | null; unit: Unit | null; bodyweight: boolean; extra?: boolean }
   | { intent: "same_again" }
   /** ready for the next set: ends the rest and says the target */
   | { intent: "next_set" }
@@ -72,12 +72,17 @@ const ORDINALS: Record<string, number> = {
   first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10,
   "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5, "6th": 6, "7th": 7, "8th": 8, "9th": 9, "10th": 10,
 };
-const ORDINAL_RE = new RegExp(`\\b(?:(${Object.keys(ORDINALS).join("|")}) set|set (?:number )?(\\d+))\\b`);
+// "first set", "set 3", "set number 3" (but not "set 12 reps": that 12 is the reps)
+const ORDINAL_RE = new RegExp(`\\b(?:(${Object.keys(ORDINALS).join("|")}) set|set (?:number )?(\\d+)(?! ?(?:reps|kg|lb|x|times|at|with)\\b))\\b`);
+/** "another set", "one more set of", "an extra set": add a set even when the plan's sets are done */
+const EXTRA_RE = /\b(?:another|1 more|one more|an extra|extra|additional|bonus) sets?(?: of)?\b/;
 
 /** Words that can come before a set without being an exercise name ("log 12 reps", "I did 10"). */
 const FILLER = new Set([
-  "log", "add", "record", "save", "put", "i", "did", "do", "just", "done", "finished", "got", "and", "then", "for", "of",
-  "a", "the", "my", "set", "sets", "on", "with", "at", "okay", "ok", "so", "now", "that", "was", "it", "please", "um", "uh",
+  "log", "add", "record", "save", "put", "i", "i'm", "im", "did", "do", "just", "done", "finished", "got", "and", "then",
+  "for", "of", "a", "an", "the", "my", "set", "sets", "on", "with", "at", "okay", "ok", "so", "now", "that", "was", "it",
+  "please", "um", "uh", "make", "give", "me", "weight", "reps", "kg", "lb", "times", "x", "using", "this", "time", "went",
+  "managed", "hit", "completed", "another", "more", "extra", "new", "yeah", "right", "alright", "let's", "lets", "go",
 ]);
 
 function exerciseWords(text: string): string | null {
@@ -86,15 +91,58 @@ function exerciseWords(text: string): string | null {
   return name.length >= 3 ? name : null;
 }
 
-/** Reps, weight and unit from a normalised phrase; any of them can be missing. */
-function setValues(t: string): { reps: number | null; weight: number | null; unit: Unit | null; bodyweight: boolean } {
+/**
+ * Reps, weight and unit from a normalised phrase, in any order people say them: "12 reps at 25 kg",
+ * "25 kg 12 reps", "add 12 reps 25 kilos", "12 times 25", "25 kg x 12", "60 for 8", "weight 25 reps 12",
+ * "twelve twenty five". Each number is labelled from the words around it; what's left is filled in by
+ * elimination, then by order (reps first). Any of them can be missing.
+ */
+export function setValues(t: string): { reps: number | null; weight: number | null; unit: Unit | null; bodyweight: boolean } {
   const bodyweight = /\b(bodyweight|body weight|no weight|no weights)\b/.test(t);
-  const spoken = parseSpokenSet(t);
-  if (spoken?.kind === "set") return { reps: spoken.reps, weight: spoken.weight, unit: spoken.unit, bodyweight: bodyweight || spoken.weight === 0 };
-  // a weight without reps: "at 25 kg", "with 60", "25 kg"
-  const w = /\b(?:at|with)\s*(\d+(?:\.\d+)?)\s*(kg|lb)?\b/.exec(t) ?? /\b(\d+(?:\.\d+)?)\s*(kg|lb)\b/.exec(t);
-  if (w) return { reps: null, weight: Number(w[1]), unit: (w[2] as Unit) ?? null, bodyweight };
-  return { reps: null, weight: null, unit: null, bodyweight };
+  const words = t.split(" ").filter(Boolean);
+  type Num = { i: number; v: number; role: "reps" | "weight" | null; unit: Unit | null };
+  const nums: Num[] = [];
+  words.forEach((w, i) => {
+    if (!/^\d+(\.\d+)?$/.test(w)) return;
+    if (/^(seconds?|secs?|s|minutes?|mins?)$/.test(words[i + 1] ?? "")) return; // a time, not a set
+    nums.push({ i, v: Number(w), role: null, unit: null });
+  });
+  const at = (i: number) => nums.find((n) => n.i === i);
+  for (const n of nums) {
+    const next = words[n.i + 1] ?? "";
+    const prev = words[n.i - 1] ?? "";
+    if (next === "kg" || next === "lb") [n.role, n.unit] = ["weight", next];
+    else if (/^(reps?|times|repetitions?)$/.test(next)) n.role = "reps";
+    else if (/^reps?$/.test(prev) && !/^\d/.test(words[n.i - 2] ?? "")) n.role = "reps"; // "reps 12" (not "12 reps 25")
+    else if (prev === "weight" || prev === "weighing") n.role = "weight";
+  }
+  // "A x B": weight x reps (unless a unit says the other way round)
+  words.forEach((w, i) => {
+    const [a, b] = [at(i - 1), at(i + 1)];
+    if (w !== "x" || !a || !b) return;
+    if (a.role === "reps" || b.role === "weight") [a.role, b.role] = ["reps", "weight"];
+    else [a.role, b.role] = ["weight", "reps"];
+  });
+  // "A for B": weight for reps ("60 kg for 8")
+  words.forEach((w, i) => {
+    const [a, b] = [at(i - 1), at(i + 1)];
+    if (w !== "for" || !a || !b) return;
+    a.role ??= b.role === "weight" ? "reps" : "weight";
+    b.role ??= a.role === "weight" ? "reps" : "weight";
+  });
+  // "at / with / on / using 25": a weight
+  for (const n of nums) if (!n.role && /^(at|with|on|using|plus)$/.test(words[n.i - 1] ?? "")) n.role = "weight";
+  let reps = nums.find((n) => n.role === "reps") ?? null;
+  let weight = nums.find((n) => n.role === "weight") ?? null;
+  const free = nums.filter((n) => !n.role);
+  if (!reps && weight && free.length) reps = free.shift()!;
+  if (!weight && reps && free.length) weight = free.shift()!;
+  if (!reps && !weight && free.length) {
+    reps = free.shift()!; // "12" alone is reps; "twelve twenty five" is reps then weight
+    weight = free.shift() ?? null;
+  }
+  if (bodyweight && !weight) return { reps: reps?.v ?? null, weight: 0, unit: null, bodyweight };
+  return { reps: reps?.v ?? null, weight: weight?.v ?? null, unit: weight?.unit ?? null, bodyweight: bodyweight || weight?.v === 0 };
 }
 
 // ---------- the parser ----------
@@ -160,6 +208,10 @@ export function parseCommand(raw: string): Command {
 
   // "chest press, first set, 15 reps at 20 kg" / "3 sets of 10 at 60" / "12 reps at 25"
   let rest = ` ${t} `;
+  const extraMatch = EXTRA_RE.exec(rest);
+  const extra = !!extraMatch;
+  if (extraMatch) rest = rest.replace(extraMatch[0], " ");
+  rest = rest.replace(/\ba set of\b/, " ");
   let setNumber: number | null = null;
   const ord = ORDINAL_RE.exec(rest);
   if (ord) {
@@ -178,7 +230,7 @@ export function parseCommand(raw: string): Command {
   const name = exerciseWords(before.replace(/\b(reps?|kg|lb)\b/g, " ").replace(/\s+/g, " ").trim());
   const hasValues = values.reps != null || values.weight != null || values.bodyweight;
   if (hasValues || (setNumber != null && name)) {
-    return { intent: "log_set", exercise: name, setNumber, count: Math.min(10, Math.max(1, count)), ...values };
+    return { intent: "log_set", exercise: name, setNumber, count: Math.min(10, Math.max(1, count)), ...values, ...(extra ? { extra } : {}) };
   }
 
   // "switch to lat pulldown", "now leg press", "next is leg press", "doing lat pulldown"

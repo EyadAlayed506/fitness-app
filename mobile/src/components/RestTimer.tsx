@@ -4,6 +4,7 @@ import { Platform, Text, Vibration, View } from "react-native";
 import { api } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
 import {
+  clampRest,
   formatRest,
   initialRestTimer,
   remainingMs,
@@ -21,7 +22,7 @@ export interface RestTimer {
   now: number;
   dispatch: (a: RestTimerAction) => void;
   /** Load the rest time for an exercise (the user's own or the default) and show it. */
-  loadExercise: (exerciseId: number, exerciseName: string) => Promise<void>;
+  loadExercise: (exerciseId: number, exerciseName: string) => Promise<number>;
   /** Change the rest time by some seconds and remember it for this exercise. */
   adjust: (deltaSec: number) => void;
 }
@@ -72,6 +73,7 @@ export function useRestTimer(onDone: (exerciseName: string, late: boolean) => vo
   const loadExercise = useCallback(async (exerciseId: number, exerciseName: string) => {
     const setting = await api<RestSetting>(`/exercises/${exerciseId}/rest`).catch(() => ({ seconds: 90 }));
     dispatch({ type: "configure", exerciseId, exerciseName, durationSec: setting.seconds });
+    return clampRest(setting.seconds); // the rest time now in use
   }, []);
 
   const adjust = useCallback(

@@ -54,7 +54,7 @@ interface HandsFreeValue {
   setWakeWord: (w: string) => void;
   /** the exercise short commands ("12 reps at 25") are for */
   current: ExerciseRef | null;
-  setCurrent: (e: { id: number; name: string }) => void;
+  setCurrent: (e: { id: number; name: string }) => Promise<number | void>;
   /** what was heard and answered, newest first */
   log: Exchange[];
   error: string | null;
@@ -120,12 +120,13 @@ export function HandsFreeProvider({ children }: { children: ReactNode }) {
   });
 
   const bodyweight = useRef(new Map<number, boolean>());
-  const setCurrent = useCallback((e: { id: number; name: string }) => {
+  /** Make this the current exercise; resolves with its rest time once loaded. */
+  const setCurrent = useCallback((e: { id: number; name: string }): Promise<number | void> => {
     const workoutId = live.current.active?.id;
-    if (workoutId == null) return;
+    if (workoutId == null) return Promise.resolve();
     const exercise: ExerciseRef = { id: e.id, name: e.name, bodyweight: bodyweight.current.get(e.id) };
     setChosen({ workoutId, exercise });
-    live.current.session.timer.loadExercise(e.id, e.name).catch(() => {});
+    const rest = live.current.session.timer.loadExercise(e.id, e.name).catch(() => undefined);
     if (!bodyweight.current.has(e.id)) {
       api<Exercise>(`/exercises/${e.id}`)
         .then((x) => {
@@ -134,6 +135,7 @@ export function HandsFreeProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => {});
     }
+    return rest;
   }, []);
 
   // the assistant reads the app through `live` (always the latest values); made once, after the first render

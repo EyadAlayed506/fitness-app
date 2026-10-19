@@ -60,7 +60,7 @@ export interface VoiceDeps {
   /** the catalogue's best match for a spoken name; `sure` when every spoken word is in its name */
   findExercise(spoken: string): Promise<{ exercise: ExerciseRef; sure: boolean } | null>;
   /** make this the exercise being done (and load its rest time) */
-  setCurrent(exercise: ExerciseRef): void;
+  setCurrent(exercise: ExerciseRef): void | Promise<number | void>;
   timer: {
     startUsual(): void;
     startFor(seconds: number): void;
@@ -466,14 +466,26 @@ export class VoiceAssistant {
       this.pending = { kind: "need", field: "exercise", command: c };
       return { say: "Which exercise?", ok: true };
     }
+    // The current exercise's planned sets are all done: a set without a name is for the next exercise in the
+    // plan ("another set" / "one more set" keeps it on this one)
+    let moved = "";
+    if (!exercise && !c.exercise && !c.extra) {
+      const planned = s.plan.find((p) => p.id === ex!.id);
+      const next = planned && this.done(ex.id) >= planned.sets ? this.nextPlanned(ex) : null;
+      if (next) {
+        moved = `${ex.name} is done. `;
+        ex = next;
+      }
+    }
+    if (moved && (c.reps == null || (c.weight == null && !c.bodyweight && !ex.bodyweight))) void this.deps.setCurrent(ex); // asking first: show it now
     if (c.reps == null) {
       this.pending = { kind: "need", field: "reps", command: { ...c, exercise: ex.name } };
-      return { say: "How many reps?", ok: true };
+      return { say: `${moved}${moved ? `${ex.name}: how many reps?` : "How many reps?"}`, ok: true };
     }
     const bodyweight = c.bodyweight || (c.weight == null && !!ex.bodyweight);
     if (c.weight == null && !bodyweight) {
       this.pending = { kind: "need", field: "weight", command: { ...c, exercise: ex.name } };
-      return { say: "At what weight?", ok: true };
+      return { say: `${moved}${moved ? `${ex.name}: at what weight?` : "At what weight?"}`, ok: true };
     }
     const values: SetValues = { reps: c.reps, weight: bodyweight ? 0 : c.weight!, unit: c.unit ?? s.unit };
     const bad = this.invalid(values);
@@ -487,10 +499,10 @@ export class VoiceAssistant {
       this.pending = { kind: "confirm", question, command: { ...c, ...values, bodyweight }, exercise: ex, replace: old };
       return { say: question, ok: true };
     }
-    return this.saveSet({ ...c, ...values, bodyweight }, ex, null);
+    return this.saveSet({ ...c, ...values, bodyweight }, ex, null, moved);
   }
 
-  private async saveSet(c: LogSet, ex: ExerciseRef, replace: VoiceSet | null): Promise<Reply> {
+  private async saveSet(c: LogSet, ex: ExerciseRef, replace: VoiceSet | null, lead = ""): Promise<Reply> {
     const s = this.deps.state();
     const values: SetValues = { reps: c.reps!, weight: c.weight!, unit: c.unit ?? s.unit };
     if (replace) {
@@ -502,9 +514,12 @@ export class VoiceAssistant {
       return { say: `Set ${c.setNumber} changed to ${setWords(values.reps, values.weight, values.unit)}.`, ok: true };
     }
     // what the workout had before this set (the app's state changes as soon as a set is saved)
-    const before = [...s.sets];
-    const usual = s.rest.usualSec;
-    if (s.current?.id !== ex.id) this.deps.setCurrent(ex);
+    const earlier = [...s.sets];
+    let usual = s.rest.usualSec;
+    if (s.current?.id !== ex.id) {
+      const loaded = await this.deps.setCurrent(ex); // wait for its rest time, so the timer and the reply use it
+      if (typeof loaded === "number") usual = loaded;
+    }
     let saved = 0;
     for (let k = 0; k < c.count; k++) {
       try {
@@ -515,13 +530,13 @@ export class VoiceAssistant {
       }
     }
     if (!saved) return { say: "Your connection failed. The set wasn't saved.", ok: false };
-    const number = before.filter((x) => x.exercise_id === ex.id).length + saved;
+    const number = earlier.filter((x) => x.exercise_id === ex.id).length + saved;
     this.deps.timer.startUsual(); // only after a saved set
-    const after = { ...s, sets: [...before, ...Array.from({ length: saved }, (_, i) => ({ id: -1 - i, exercise_id: ex.id, exercise_name: ex.name, reps: values.reps, weight_kg: toKg(values.weight, values.unit) }))] };
+    const after = { ...s, sets: [...earlier, ...Array.from({ length: saved }, (_, i) => ({ id: -1 - i, exercise_id: ex.id, exercise_name: ex.name, reps: values.reps, weight_kg: toKg(values.weight, values.unit) }))] };
     this.deps.announceAfterRest(this.afterRestText(ex, after, values));
     const what = saved > 1 ? `${saved} sets of ${ex.name}, ${setWords(values.reps, values.weight, values.unit)}` : `Set ${number} of ${ex.name}, ${setWords(values.reps, values.weight, values.unit)}`;
     const failed = saved < c.count ? ` The other ${c.count - saved} weren't saved.` : "";
-    return { say: `${what}. Resting ${durationWords(usual)}.${failed}`, ok: failed === "" };
+    return { say: `${lead}${what}. Resting ${durationWords(usual)}.${failed}`, ok: failed === "" };
   }
 
   // ---------- plan helpers ----------

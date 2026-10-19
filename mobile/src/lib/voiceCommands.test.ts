@@ -99,3 +99,37 @@ test("anything else is unknown, never a guessed set", () => {
   assert.equal(p("").intent, "unknown");
   assert.equal(p("thank you for watching").intent, "unknown"); // a classic Whisper mishearing of silence
 });
+
+test("sets in everyday words, any order", () => {
+  const sets: [string, number, number, string | null][] = [
+    ["add 25 kilos 12 reps", 12, 25, "kg"],
+    ["Add 25 killos, 12 reps.", 12, 25, "kg"],
+    ["add 12 reps 25 kilos", 12, 25, "kg"],
+    ["log 12 reps 25 kilos", 12, 25, "kg"],
+    ["12 times 25 kilos", 12, 25, "kg"],
+    ["25 kilos 12 times", 12, 25, "kg"],
+    ["twelve reps twenty five kilos", 12, 25, "kg"],
+    ["twelve repetitions twenty-five kilos", 12, 25, "kg"],
+    ["put 25 kilos and 12 reps", 12, 25, "kg"],
+    ["I just did 12 reps on 25", 12, 25, null],
+    ["12 reps, weight 25", 12, 25, null],
+    ["weight 25 kilos reps 12", 12, 25, "kg"],
+    ["12 reps 25", 12, 25, null],
+    ["12 x 25 kg", 12, 25, "kg"],
+    ["25 kg x 12", 12, 25, "kg"],
+    ["make it 12 reps at 25 kilos", 12, 25, "kg"],
+    ["did twelve at twenty five", 12, 25, null],
+    ["100 pounds for 10", 10, 100, "lb"],
+  ];
+  for (const [text, reps, weight, unit] of sets) {
+    const c = p(text);
+    assert.ok(c.intent === "log_set", text);
+    assert.deepEqual([c.exercise, c.reps, c.weight, c.unit], [null, reps, weight, unit], text);
+  }
+  const extra = p("another set 12 reps 25 kilos");
+  assert.ok(extra.intent === "log_set" && extra.extra && extra.reps === 12 && extra.weight === 25 && extra.setNumber === null);
+  const more = p("one more set of 10 at 30");
+  assert.ok(more.intent === "log_set" && more.extra && more.reps === 10 && more.weight === 30);
+  const rest = p("12 reps at 25 kilos then rest 90 seconds");
+  assert.ok(rest.intent === "log_set" && rest.reps === 12 && rest.weight === 25);
+});

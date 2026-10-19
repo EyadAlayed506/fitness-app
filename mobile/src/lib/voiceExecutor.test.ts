@@ -308,3 +308,51 @@ test("no workout: sets and notes need one", async () => {
   assert.equal((await t.say("12 reps at 25 kilos"))?.say, "Start a workout first.");
   assert.equal((await t.say("rest 30 seconds"))?.say, "Resting 30 seconds."); // the timer works anyway
 });
+
+test("when an exercise's planned sets are done, the next set goes to the next exercise", async () => {
+  const t = setup();
+  for (const reps of [12, 11, 10]) await t.say(`${reps} reps at 100 kilos`);
+  assert.equal(t.state.sets.filter((s) => s.exercise_id === LEG_PRESS.id).length, 3); // Leg Press: 3 of 3
+  const r = await t.say("add 25 kilos 12 reps");
+  assert.equal(r?.say, "Leg Press is done. Set 1 of Machine Chest Press, 12 reps at 25 kilos. Resting 1 minute 30.");
+  assert.equal(t.state.current?.name, "Machine Chest Press");
+  assert.equal(t.state.sets.at(-1)?.exercise_name, "Machine Chest Press");
+  // the next one stays on Chest Press (its sets aren't done)
+  await t.say("12 reps 25 kilos");
+  assert.equal(t.state.sets.filter((s) => s.exercise_id === CHEST_PRESS.id).length, 2);
+});
+
+test("'one more set' or naming the exercise keeps a finished exercise", async () => {
+  const t = setup();
+  for (const reps of [12, 11, 10]) await t.say(`${reps} reps at 100 kilos`);
+  assert.equal((await t.say("one more set, 8 reps at 100 kilos"))?.say, "Set 4 of Leg Press, 8 reps at 100 kilos. Resting 1 minute 30.");
+  assert.equal((await t.say("leg press 6 reps at 100 kilos"))?.say, "Set 5 of Leg Press, 6 reps at 100 kilos. Resting 1 minute 30.");
+  assert.equal(t.state.current?.name, "Leg Press");
+});
+
+test("moving on, with a missing value: the question names the next exercise", async () => {
+  const t = setup();
+  for (const reps of [12, 11, 10]) await t.say(`${reps} reps at 100 kilos`);
+  assert.equal((await t.say("12 reps"))?.say, "Leg Press is done. Machine Chest Press: at what weight?");
+  await t.say("25 kilos", false);
+  assert.equal(t.state.sets.at(-1)?.exercise_name, "Machine Chest Press");
+});
+
+test("the last planned exercise done: an extra set stays on it", async () => {
+  const t = setup({ current: { id: 4, name: "Lat Pulldown" } });
+  for (const id of [1, 2]) for (let k = 0; k < 3; k++) t.state.sets.push({ id: 900 + id * 10 + k, exercise_id: id, exercise_name: id === 1 ? "Leg Press" : "Machine Chest Press", reps: 10, weight_kg: 50 });
+  for (const reps of [12, 11, 10]) await t.say(`${reps} reps at 40 kilos`);
+  assert.equal((await t.say("9 reps at 40 kilos"))?.say, "Set 4 of Lat Pulldown, 9 reps at 40 kilos. Resting 1 minute 30.");
+});
+
+test("moving to the next exercise uses its own rest time (loaded before the timer starts)", async () => {
+  const t = setup();
+  const plain = t.deps.setCurrent;
+  t.deps.setCurrent = async (ex) => {
+    plain(ex);
+    t.state.rest = { ...t.state.rest, usualSec: 75 };
+    return 75; // Chest Press rests 1:15
+  };
+  for (const reps of [12, 11, 10]) await t.say(`${reps} reps at 100 kilos`);
+  assert.equal((await t.say("12 reps 25 kilos"))?.say, "Leg Press is done. Set 1 of Machine Chest Press, 12 reps at 25 kilos. Resting 1 minute 15.");
+});

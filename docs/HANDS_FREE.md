@@ -16,10 +16,11 @@ The wake word can be changed in the panel ("Wake word: Chat").
 
 | Say | Does |
 |---|---|
-| "12 reps at 25 kilos", "twelve at sixty", "10 reps with 45 pounds", "60 kg for 8" | logs a set of the current exercise |
+| "12 reps at 25 kilos", "add 25 kilos 12 reps", "12 times 25", "twelve twenty five", "25 kg x 12", "60 kg for 8", "weight 25, reps 12" | logs a set of the current exercise (reps and weight in any order; "kilos", "kg", "pounds") |
 | "Chest press, first set, 15 reps at 20 kilograms" | logs a set of that exercise (and makes it the current one) |
 | "3 sets of 10 at 60" | logs three sets |
 | "Same again" | repeats the last set |
+| "One more set, 8 reps at 100", "another set 12 reps 25 kilos" | an extra set of the current exercise, even when its planned sets are done |
 | "12 reps" / "at 25 kilos" | asks for the missing weight / reps; "bodyweight" or "same weight" are answers too |
 | "Rest 30 seconds", "start the timer" | starts a rest (a one-off length, or the exercise's usual one) |
 | "Make the rest two minutes" | the rest running now lasts 2:00 in total |
@@ -36,7 +37,7 @@ The wake word can be changed in the panel ("Wake word: Chat").
 | "Finish the workout" | asks first, then finishes it |
 | "Stop listening" | turns hands-free off |
 
-"Current exercise" is the one you last named or tapped; with a plan, it starts with the plan's next unfinished exercise.
+"Current exercise" is the one you last named or tapped; with a plan, it starts with the plan's next unfinished exercise. When all the planned sets of the current exercise are done, a set without an exercise name goes to the **next exercise in the plan** (the app says so: "Leg Press is done. Set 1 of Seated Leg Curl, …"). Say "one more set" or the exercise's name to add to the finished one instead.
 
 ## How it works
 
