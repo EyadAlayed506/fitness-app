@@ -1,0 +1,647 @@
+{
+ "source": "Open Images V7 (images CC BY 2.0, labels CC BY 4.0), https://storage.googleapis.com/openimages/web/index.html",
+ "how": "photos with exactly one of these labels (human-verified, or machine-generated with confidence >= 0.7), then checked by eye: kept when the machine is the main subject of the photo",
+ "class_map": {
+  "Treadmill": "treadmill",
+  "Stationary bicycle": "bicycle",
+  "Indoor rower": "rowing"
+ },
+ "images": {
+  "treadmill": [
+   {
+    "open_images_id": "027334818e73ce50",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "0408c66b47d543af",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "073bf8cc12799060",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "073fd6bbc744c0d1",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "074655db3f0f7af6",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "10e2c10c4966b053",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "13a1ddbcb63cb218",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "15189190810cc5fb",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1b7d72fffd853a14",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1bf81f2479f17f6d",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1dcd4765268022ea",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1e675828bd640293",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1efd1996b5c03469",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1f4f5e4c506bdeff",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1fe20a78edb58abc",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "21cd03f7269a6b36",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "23df7eaab5ed7c3a",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "25932b9c273ab7d5",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "2611d5dd93629348",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "28cff90cf89170a9",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "2a1eb121a81ce609",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "2e9ce0bc855c2766",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "31c1a78852c779c9",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "358a5ff5d767a66d",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "36dfcd2db96f27dc",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "3d8d5522e59da833",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "3e92430853ab3484",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "3f8c8202c198e4b1",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "3fccc274d91c12c1",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "41041356304171ee",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "46738c2cdcb0dde2",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "46ec828a65c31451",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "4a08fbd5b47c2ee7",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "4a4c1074dabcc2e2",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "4b44b8e150be9a52",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "4c7a579e4741b042",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "4e6bc44c804d36a7",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "4f4b71b7d0d4e3d9",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "513113b84dda4ba8",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "554936ab6c8deffb",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "5c8aca9febc670f2",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "5eb380503d1bc771",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "63e0ab8f2d8e15a3",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "6488f8395ab9c2c3",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "6924a48410539b13",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "6b416ebdfee23c2f",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "7121bf94b07c7368",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "7a385c74d9e62bbc",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "7ef6ead4453f102f",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "8381e03e69af0a4a",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "854022403cb59ff0",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "8da216eea0015d74",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "900eaf477597c45f",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "935c2998916b609f",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "962c44357e77bbd9",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "96c73de009db222a",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "a12294195c79200f",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "ac1f443f90d19254",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "add0c32088198e6a",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "ae17d8bdc3b591b0",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "b133cd0731df632d",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "b4d279ca5bdfa5ad",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "bb68cedd9f466f99",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "bfa8dd6b7a851d39",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "c7f34c3089a150cf",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "c9060e59861219a4",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "d4ac8e33b20c848d",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "d8dcd85a1b3ba94b",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "db5b8da6e336c2b7",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "dc0a50d0899dd9e8",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "ed1d10deb04fdd10",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "f513f13f949aa971",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "f7735b588cbb26eb",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "fc4f138d17095599",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "fdce94dfc0f3d6ee",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "ff3630e3791890e3",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "ff449133a9c253cd",
+    "split": "train",
+    "label_source": "human"
+   }
+  ],
+  "bicycle": [
+   {
+    "open_images_id": "0d091fc6f29eb76f",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1343195556ac8ca6",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "1e1c4b6812471c2d",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "1e688fd4c90bf62d",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "1f717c24b794cea1",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "29c4e440a262d91f",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "39dabf44b31cc631",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "3b238a98cf96fc80",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "3bbf0cd72c5988af",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "3f02b26f1f282711",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "438e8e883df1c563",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "43b920e4dd233182",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "5680593743943915",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "5f3bc9da8130b723",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "5fd5910243bfe909",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "60a25292aa785360",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "6977869209f1ec47",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "6fa6786a7fa217f9",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "704487e358fd313d",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "705e668a17ca0e0d",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "71207677113ae69e",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "779f2317d7b56d22",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "782c7784689335b5",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "85c1b0d9dc5ec3f2",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "898af8619cef3b01",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "8b60cdd4096d2aea",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "91fa65b474ced7c6",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "924aa7c32d946dc6",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "9f425f49e21e8f58",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "a9eba195adce321c",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "ac6d5bc7604753e8",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "c139343de6319221",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "c5a9c8524a27a7a2",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "c600025576a731e5",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "c9e8f2720cbf49d2",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "dd499ab8e5bda8a7",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "df1d8818eacc1d56",
+    "split": "train",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "e5f0493655f3aedc",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "e79d0a262f330d79",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "f2889d00dff82b29",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "f2f181da674fc7ae",
+    "split": "train",
+    "label_source": "machine"
+   }
+  ],
+  "rowing": [
+   {
+    "open_images_id": "4a97d05412165b93",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "55ec18116038839a",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "5bcab7ff2b2aefc0",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "8cc778dfedc1c044",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "9916e8b968179118",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "aa5e76012139ba18",
+    "split": "test",
+    "label_source": "human"
+   },
+   {
+    "open_images_id": "d547841864c2c450",
+    "split": "train",
+    "label_source": "machine"
+   },
+   {
+    "open_images_id": "dfec16f4ce89bb64",
+    "split": "train",
+    "label_source": "machine"
+   }
+  ]
+ }
+}
