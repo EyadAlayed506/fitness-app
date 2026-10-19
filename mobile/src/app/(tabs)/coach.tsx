@@ -21,6 +21,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
 import { afterCoachActions, useAssistant } from "@/lib/data";
+import { parseCoachText, type Span } from "@/lib/coachText";
 import { tzOffset } from "@/lib/format";
 import { errorMessage, qk, queryClient, useRefreshOnFocus } from "@/lib/query";
 import { useVoiceMessage } from "@/lib/voice";
@@ -346,9 +347,13 @@ function Bubble({ message: m }: { message: ChatMessage }) {
           paddingVertical: space.sm + 2,
         }}
       >
-        <Text style={[typeScale.body, { color: mine ? t.inkText : t.text }]} selectable>
-          {m.text}
-        </Text>
+        {mine ? (
+          <Text style={[typeScale.body, { color: t.inkText }]} selectable>
+            {m.text}
+          </Text>
+        ) : (
+          <CoachText text={m.text} />
+        )}
       </View>
       {m.actions.map((a, i) => (
         <ActionCard key={`${m.id}-${i}`} action={a} />
@@ -435,6 +440,37 @@ function ActionCard({ action }: { action: AssistantAction }) {
         </Row>
       )}
       <ErrorText message={error} />
+    </View>
+  );
+}
+
+/** A coach reply: block titles, list items with a hanging indent, bold key numbers. */
+function CoachText({ text }: { text: string }) {
+  const t = useTheme();
+  const draw = (parts: Span[]) =>
+    parts.map((s, i) => (
+      <Text key={i} style={s.bold ? { fontWeight: "700", color: t.text } : undefined}>
+        {s.text}
+      </Text>
+    ));
+  return (
+    <View>
+      {parseCoachText(text).map((line, i) =>
+        line.kind === "gap" ? (
+          <View key={i} style={{ height: space.sm }} />
+        ) : line.kind === "bullet" ? (
+          <View key={i} style={{ flexDirection: "row", gap: space.sm, marginTop: 3 }}>
+            <Text style={[typeScale.body, { color: t.accent }]}>•</Text>
+            <Text style={[typeScale.body, { color: t.text, flex: 1 }]} selectable>
+              {draw(line.spans)}
+            </Text>
+          </View>
+        ) : (
+          <Text key={i} style={[line.kind === "title" ? typeScale.bodyStrong : typeScale.body, { color: t.text }]} selectable>
+            {draw(line.spans)}
+          </Text>
+        ),
+      )}
     </View>
   );
 }
