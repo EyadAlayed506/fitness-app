@@ -1,0 +1,6 @@
+bench_press
+bicycle
+leg_press
+pec_deck
+rowing
+treadmill

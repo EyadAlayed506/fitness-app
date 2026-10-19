@@ -118,9 +118,8 @@ def main():
     RESULTS.mkdir(exist_ok=True)
     draw_confusion(test["confusion"], names, RESULTS / "confusion_test.png", f"Test split ({test['n']} photos): rows = true class")
     real_names = [n for n in names if real["per_class"].get(n)]
-    idx = [names.index(n) for n in real_names]
-    cm_real = np.array(real["confusion"])[idx]
-    draw_confusion(np.pad(cm_real, ((0, len(names) - len(idx)), (0, 0))), names, RESULTS / "confusion_realworld.png",
+    # all 6 rows, so each row keeps its own label; classes without real-world photos stay empty
+    draw_confusion(real["confusion"], names, RESULTS / "confusion_realworld.png",
                    f"Real-world photos ({real['n']}): rows = true class (only {', '.join(real_names)})")
 
     OUT.mkdir(exist_ok=True)
