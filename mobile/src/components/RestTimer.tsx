@@ -1,5 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { Platform, Text, Vibration, View } from "react-native";
+import { Platform, Pressable, Text, Vibration, View } from "react-native";
 
 import { api } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
@@ -15,7 +16,7 @@ import {
 import { radius, space, useTheme } from "@/lib/theme";
 import type { RestSetting } from "@/lib/types";
 
-import { Button, Meter, Row, Txt } from "./ui";
+import { Meter, Row, Txt, type IconName } from "./ui";
 
 export interface RestTimer {
   state: RestTimerState;
@@ -123,7 +124,10 @@ function beep() {
   }
 }
 
-/** The rest-time section: remaining time, the exercise's rest length, and the controls. */
+/**
+ * The rest timer as one line: time left, then small controls. `compact` (the workout card) hides it
+ * while no rest is running. The countdown starts by itself when a set is logged.
+ */
 export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; compact?: boolean }) {
   const t = useTheme();
   const { state, dispatch, adjust } = timer;
@@ -133,47 +137,70 @@ export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; c
   const done = state.status === "done";
   // the running countdown's own length (moving on to another exercise changes only the next one)
   const total = (running || paused ? state.countdownSec : state.durationSec) * 1000;
-  const label = running || paused ? `Rest after ${state.countdownFor || "your set"}` : done ? "Rest over" : `Rest for ${state.exerciseName}`;
 
   if (compact && state.status === "idle") return null;
 
+  const play = running
+    ? { icon: "pause" as const, label: "Pause the rest", onPress: () => dispatch({ type: "pause", now: Date.now() }) }
+    : paused
+      ? { icon: "play" as const, label: "Resume the rest", onPress: () => dispatch({ type: "resume", now: Date.now() }) }
+      : { icon: "play" as const, label: done ? "Start the rest again" : "Start the rest", onPress: () => dispatch({ type: "start", now: Date.now() }) };
+
   return (
     <View
-      style={{ borderRadius: radius.md, padding: space.md + 2, marginTop: space.md, backgroundColor: done ? t.accentSoft : t.surface2 }}
+      style={{ marginTop: space.md, paddingVertical: space.sm, paddingLeft: space.md, paddingRight: space.sm, borderRadius: radius.md, backgroundColor: done ? t.accentSoft : t.surface2 }}
       accessibilityLabel={`Rest timer, ${formatRest(left)} left`}
     >
-      <Row style={{ justifyContent: "space-between" }}>
-        <Txt variant="small" style={{ flex: 1 }} numberOfLines={1}>
-          {label}
-        </Txt>
-        {!compact ? (
-          <Row gap={6}>
-            <Button title="−15 s" kind="ghost" small onPress={() => adjust(-15)} accessibilityLabel="Shorter rest, 15 seconds less" />
-            <Button title="+15 s" kind="ghost" small onPress={() => adjust(15)} accessibilityLabel="Longer rest, 15 seconds more" />
-          </Row>
-        ) : null}
-      </Row>
-      <Row style={{ alignItems: "baseline", marginTop: 4 }} gap={8}>
+      <Row gap={space.sm} style={{ alignItems: "center" }}>
+        <Ionicons name="timer-outline" size={18} color={done ? t.accentText : t.text2} />
         <Text
-          style={{ fontSize: compact ? 28 : 44, fontWeight: "700", letterSpacing: -0.8, color: done ? t.accent : t.text, fontVariant: ["tabular-nums"] }}
+          style={{ fontSize: 20, fontWeight: "700", color: done ? t.accentText : t.text, fontVariant: ["tabular-nums"] }}
           accessibilityLiveRegion="polite"
         >
           {done ? "0:00" : formatRest(left)}
         </Text>
-        <Txt variant="tiny">
-          {done ? "Time for your next set" : paused ? "Paused" : `of ${formatRest(total)}`}
+        <Txt variant="tiny" style={{ flex: 1 }} numberOfLines={1}>
+          {done ? "Rest over" : paused ? "Paused" : running ? `of ${formatRest(total)}` : "rest"}
         </Txt>
+        <TimerButton text="−15" label="Shorter rest, 15 seconds less" onPress={() => adjust(-15)} />
+        <TimerButton text="+15" label="Longer rest, 15 seconds more" onPress={() => adjust(15)} />
+        <TimerButton icon={play.icon} label={play.label} onPress={play.onPress} />
+        {running || paused || done ? <TimerButton icon="close" label={done ? "Dismiss" : "Skip the rest"} onPress={() => dispatch({ type: "skip" })} /> : null}
       </Row>
-      {running || paused ? <View style={{ marginTop: 6 }}><Meter value={total - left} max={total} height={4} /></View> : null}
-      <Row style={{ marginTop: 10, flexWrap: "wrap" }} gap={6}>
-        {running ? <Button title="Pause" icon="pause" small onPress={() => dispatch({ type: "pause", now: Date.now() })} /> : null}
-        {paused ? <Button title="Resume" icon="play" small onPress={() => dispatch({ type: "resume", now: Date.now() })} /> : null}
-        {state.status === "idle" || done ? (
-          <Button title={done ? "Start again" : "Start rest"} icon="timer-outline" small onPress={() => dispatch({ type: "start", now: Date.now() })} />
-        ) : null}
-        {running || paused ? <Button title="Restart" icon="refresh" small kind="ghost" onPress={() => dispatch({ type: "restart", now: Date.now() })} /> : null}
-        {running || paused || done ? <Button title={done ? "Dismiss" : "Skip"} small kind="ghost" onPress={() => dispatch({ type: "skip" })} /> : null}
-      </Row>
+      {running || paused ? (
+        <View style={{ marginTop: 6, marginRight: space.xs }}>
+          <Meter value={total - left} max={total} height={3} />
+        </View>
+      ) : null}
     </View>
+  );
+}
+
+/** A small control in the rest line (its touch area is larger than it looks). */
+function TimerButton({ text, icon, label, onPress }: { text?: string; icon?: IconName; label: string; onPress: () => void }) {
+  const t = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={6}
+      style={({ pressed }) => ({
+        minWidth: 34,
+        height: 32,
+        paddingHorizontal: 6,
+        borderRadius: radius.sm,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: t.surface,
+        opacity: pressed ? 0.6 : 1,
+      })}
+    >
+      {icon ? (
+        <Ionicons name={icon} size={16} color={t.text} />
+      ) : (
+        <Text style={{ fontSize: 13, fontWeight: "600", color: t.text, fontVariant: ["tabular-nums"] }}>{text}</Text>
+      )}
+    </Pressable>
   );
 }

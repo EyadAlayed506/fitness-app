@@ -122,11 +122,14 @@ def exercise_alternatives(exercise_id: int, user: CurrentUser, session: SessionD
 def _rest_setting(session, user_id: int, exercise: Exercise) -> RestSetting:
     pref = session.get(RestPreference, (user_id, exercise.id))
     default = ExercisePublic.model_validate(exercise).default_rest_seconds
+    profile = session.get(Profile, user_id)
+    # This exercise's own time, else the time the user set for all exercises, else the exercise's suggestion
+    usual = profile.rest_seconds if profile and profile.rest_seconds else default
     return RestSetting(
         exercise_id=exercise.id,
-        default_seconds=default,
+        default_seconds=usual,
         preferred_seconds=pref.seconds if pref else None,
-        seconds=pref.seconds if pref else default,
+        seconds=pref.seconds if pref else usual,
     )
 
 

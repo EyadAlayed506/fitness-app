@@ -105,6 +105,9 @@ class ProfileBase(SQLModel):
     minutes_per_session: int = Field(default=45, ge=15, le=180)
     equipment: Equipment = Equipment.gym
     unit_system: UnitSystem = UnitSystem.metric
+    # Rest between sets for every exercise (s); None = each exercise's suggested time.
+    # A time the user set for one exercise in the rest timer still wins. Limits as in models/exercise.py.
+    rest_seconds: int | None = Field(default=None, ge=15, le=600)
 
 
 class Profile(ProfileBase, table=True):

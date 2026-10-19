@@ -91,8 +91,8 @@ MAX_REST_SECONDS = 600
 
 class RestSetting(SQLModel):
     exercise_id: int
-    default_seconds: int
-    preferred_seconds: int | None
+    default_seconds: int  # the user's rest time for all exercises (Profile.rest_seconds), else this exercise's suggestion
+    preferred_seconds: int | None  # set for this exercise only
     seconds: int  # what the timer uses: the user's preference, else the default
 
 

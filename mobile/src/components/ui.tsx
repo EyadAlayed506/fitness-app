@@ -359,6 +359,7 @@ export function Stepper({
   max = 9999,
   decimals = 1,
   suffix,
+  compact = false,
   style,
 }: {
   label: string;
@@ -369,6 +370,8 @@ export function Stepper({
   max?: number;
   decimals?: number;
   suffix?: string;
+  /** smaller, for screens with a lot on them (logging a set) */
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
@@ -407,17 +410,17 @@ export function Stepper({
       accessibilityRole="button"
       accessibilityLabel={`${direction > 0 ? "More" : "Less"} ${label.toLowerCase()}, ${direction > 0 ? "+" : "−"}${step}`}
       hitSlop={4}
-      style={({ pressed }) => [styles.stepButton, { backgroundColor: t.surface }, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.stepButton, compact && styles.stepButtonCompact, { backgroundColor: t.surface }, pressed && styles.pressed]}
     >
-      <Ionicons name={direction > 0 ? "add" : "remove"} size={22} color={t.text} />
+      <Ionicons name={direction > 0 ? "add" : "remove"} size={compact ? 18 : 22} color={t.text} />
     </Pressable>
   );
   return (
-    <View style={[{ marginTop: space.md, minWidth: 0 }, style]}>
-      <Txt variant="label" style={{ marginBottom: 6 }} numberOfLines={1}>
+    <View style={[{ marginTop: compact ? space.sm : space.md, minWidth: 0 }, style]}>
+      <Txt variant={compact ? "tiny" : "label"} style={{ marginBottom: compact ? 2 : 6 }} numberOfLines={1}>
         {label}
       </Txt>
-      <View style={[styles.stepper, { backgroundColor: t.surface2 }]}>
+      <View style={[styles.stepper, compact && styles.stepperCompact, { backgroundColor: t.surface2 }]}>
         {button(-1)}
         <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "baseline", justifyContent: "center" }}>
           <TextInput
@@ -427,7 +430,7 @@ export function Stepper({
             selectTextOnFocus
             accessibilityLabel={label}
             style={{
-              fontSize: 24,
+              fontSize: compact ? 20 : 24,
               fontWeight: "700",
               color: t.text,
               textAlign: "center",
@@ -1093,6 +1096,8 @@ const styles = StyleSheet.create({
   toastAction: { marginLeft: space.xs, paddingLeft: space.md, borderLeftWidth: StyleSheet.hairlineWidth },
   stepper: { flexDirection: "row", alignItems: "center", borderRadius: radius.md, padding: 4, minHeight: 56, gap: 4 },
   stepButton: { width: 48, height: 48, borderRadius: radius.md - 2, alignItems: "center", justifyContent: "center" },
+  stepperCompact: { minHeight: 44, padding: 3 },
+  stepButtonCompact: { width: 38, height: 38 },
   dialogBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xl },
   dialog: { width: "100%", maxWidth: 360, borderRadius: radius.xl, padding: space.xl },
   toast: {

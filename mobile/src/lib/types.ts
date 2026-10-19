@@ -21,6 +21,8 @@ export interface Profile {
   minutes_per_session: number;
   equipment: string;
   unit_system: UnitSystem;
+  /** rest between sets for every exercise (s); null = each exercise's suggested time */
+  rest_seconds: number | null;
   height_cm: number;
   weight_kg: number;
   age: number;
@@ -98,7 +100,7 @@ export interface RoutineDay {
   custom_name: boolean;
   exercises: RoutineExercise[];
   cardio_minutes: number;
-  /** the user's own exercises (e.g. imported from a screenshot) instead of the generated ones */
+  /** the user's own exercises instead of the generated ones */
   custom_exercises?: boolean;
 }
 
@@ -627,22 +629,6 @@ export interface Alternative {
 }
 
 // ---------- snap and say ----------
-
-export interface ScreenshotItem {
-  /** as written in the screenshot */
-  text: string;
-  /** the catalogue match; null when the user must pick one */
-  exercise: Exercise | null;
-  sets: number;
-  reps: string;
-  confidence: number;
-}
-
-export interface ScreenshotRoutine {
-  title: string;
-  items: ScreenshotItem[];
-  model: string;
-}
 
 export interface WeightReading {
   kind: "pin_stack" | "barbell" | "dumbbell" | "other";

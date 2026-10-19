@@ -4,12 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { ExerciseInfo } from "@/components/ExerciseInfo";
-import { GymPicker, GymScanFlow, MachineTaken } from "@/components/GymParts";
+import { GymPicker, MachineTaken } from "@/components/GymParts";
 import { ExercisePhoto } from "@/components/ExercisePhoto";
 import { HandsFreePanel, useHandsFree } from "@/components/HandsFree";
 import { RestTimerPanel } from "@/components/RestTimer";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
-import { ScreenshotImport } from "@/components/SnapParts";
 import {
   Badge,
   Button,
@@ -46,7 +45,6 @@ import {
   setWorkoutGym,
   startWorkout,
   useCurrentGym,
-  useGyms,
   useRoutine,
   useWorkouts,
 } from "@/lib/data";
@@ -54,7 +52,7 @@ import { WEEKDAYS_SHORT, duration, longDateTime, plural, timeOf, tzOffset, units
 import { haptics } from "@/lib/haptics";
 import { errorMessage, invalidate, qk, queryClient, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
-import type { Gym, Points, Routine, RoutineDay, WorkoutSet } from "@/lib/types";
+import type { Points, Routine, RoutineDay, WorkoutSet } from "@/lib/types";
 
 type Via = "name" | "qr" | "photo";
 type SheetState =
@@ -68,8 +66,6 @@ type SheetState =
   | { kind: "edit-set"; workoutId: number; set: WorkoutSet; back: SheetState }
   | { kind: "taken"; exercise: PickedExercise }
   | { kind: "gym-pick" }
-  | { kind: "gym-scan" }
-  | { kind: "screenshot" }
   | null;
 
 export default function Workouts() {
@@ -80,7 +76,7 @@ export default function Workouts() {
   const workouts = useWorkouts();
   const routineQuery = useRoutine();
   useRefreshOnFocus([qk.workouts, qk.routine]);
-  const { timer, planDay, plan, setPlanDay, setPlan, swap, clearPlanDay } = useWorkoutSession();
+  const { timer, planDay, plan, setPlanDay, swap, clearPlanDay } = useWorkoutSession();
   const gym = useCurrentGym();
   const handsFree = useHandsFree();
   const params = useLocalSearchParams<{ start?: string }>();
@@ -132,34 +128,15 @@ export default function Workouts() {
     return x ? { id: x.exercise_id, name: x.name } : null;
   };
 
-  const startGymSession = async (day: RoutineDay, at: Gym) => {
-    try {
-      const created = await startWorkout();
-      if (created.gym_id !== at.id) await setWorkoutGym(created.id, at.id);
-      setPlan(created.id, { weekday: null, day });
-      setSheet(null);
-      haptics.impact();
-    } catch (e) {
-      toast(errorMessage(e) ?? "Couldn't start the workout");
-    }
-  };
-
-  /** a workout imported from a screenshot, started straight away */
-  const startImported = async (day: RoutineDay) => {
-    try {
-      const created = await startWorkout();
-      setPlan(created.id, { weekday: null, day });
-      setSheet(null);
-      haptics.impact();
-    } catch (e) {
-      toast(errorMessage(e) ?? "Couldn't start the workout");
-    }
-  };
-
+  // After starting a plan day, the first exercise opens straight away: nothing to add by hand
+  const openFirst = useRef(false);
   const startSession = async (weekday: number | null) => {
     try {
       const created = await startWorkout();
-      if (weekday != null) setPlanDay(created.id, weekday);
+      if (weekday != null) {
+        setPlanDay(created.id, weekday);
+        openFirst.current = true;
+      }
       haptics.impact();
     } catch (e) {
       toast(errorMessage(e) ?? "Couldn't start the workout");
@@ -188,6 +165,11 @@ export default function Workouts() {
     handsFree?.setCurrent(exercise); // short voice commands are for the exercise on screen
     setSheet({ kind: "set", exercise, via });
   };
+  useEffect(() => {
+    if (!openFirst.current || !active || !upNext) return;
+    openFirst.current = false;
+    logExercise({ id: upNext.exercise_id, name: upNext.name }, "name");
+  });
 
   const removeSet = async (workoutId: number, s: WorkoutSet) => {
     try {
@@ -275,24 +257,31 @@ export default function Workouts() {
                   <Txt variant="tiny">Shows its exercises as a checklist, with targets for each.</Txt>
                   <Chips<number>
                     value={-1}
-                    onChange={(d) => setPlanDay(active.id, d)}
+                    onChange={(d) => {
+                      setPlanDay(active.id, d);
+                      openFirst.current = true;
+                    }}
                     options={routine.days.map((d) => ({ value: d.weekday_index, label: `${WEEKDAYS_SHORT[d.weekday_index]} · ${d.title}` }))}
                     style={{ marginTop: space.xs }}
                   />
                 </View>
               ) : null}
 
-              <Button
-                title="Add exercise"
-                icon="add"
-                kind={followed ? "soft" : "primary"}
-                onPress={() => setSheet({ kind: "search" })}
-                style={{ marginTop: space.lg }}
-              />
-              <Row style={{ marginTop: space.sm }}>
-                <Button title="Scan QR" icon="qr-code" kind="soft" small onPress={() => setSheet({ kind: "scan" })} style={{ flex: 1 }} />
-                <Button title="From photo" icon="image" kind="soft" small onPress={() => setSheet({ kind: "photo" })} style={{ flex: 1 }} />
-              </Row>
+              {followed ? (
+                // The plan's exercises are already listed; adding one is the exception, so it stays quiet
+                <Row style={{ marginTop: space.md, justifyContent: "center", flexWrap: "wrap" }} gap={space.lg}>
+                  <LinkButton title="Add another exercise" onPress={() => setSheet({ kind: "search" })} />
+                  <LinkButton title="Scan QR" onPress={() => setSheet({ kind: "scan" })} />
+                </Row>
+              ) : (
+                <>
+                  <Button title="Add exercise" icon="add" onPress={() => setSheet({ kind: "search" })} style={{ marginTop: space.lg }} />
+                  <Row style={{ marginTop: space.sm }}>
+                    <Button title="Scan QR" icon="qr-code" kind="soft" small onPress={() => setSheet({ kind: "scan" })} style={{ flex: 1 }} />
+                    <Button title="From photo" icon="image" kind="soft" small onPress={() => setSheet({ kind: "photo" })} style={{ flex: 1 }} />
+                  </Row>
+                </>
+              )}
               {sheet?.kind !== "set" ? <RestTimerPanel timer={timer} compact /> : null}
               {active.sets.length ? (
                 <View style={{ marginTop: space.lg }}>
@@ -366,37 +355,10 @@ export default function Workouts() {
                   : "You can still log a workout. Add exercises by name, by scanning a machine’s QR code, or from a photo."}
               </Txt>
               {todayPlan ? (
-                <>
-                  <Button title="Start today's session" icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(today)} />
-                  <Button title="Start an empty workout" kind="ghost" small style={{ marginTop: space.sm, borderColor: "transparent" }} onPress={() => startSession(null)} />
-                </>
+                <Button title="Start today's session" icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(today)} />
               ) : (
                 <Button title="Start workout" icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(null)} />
               )}
-              <Pressable
-                onPress={() => setSheet({ kind: "gym-scan" })}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.gymLink, { borderTopColor: t.border, opacity: pressed ? 0.6 : 1 }]}
-              >
-                <Ionicons name="camera-outline" size={18} color={t.text2} />
-                <View style={{ flex: 1 }}>
-                  <Txt style={{ fontWeight: "600" }}>At another gym?</Txt>
-                  <Txt variant="small">Photograph it and get a session with only what&apos;s there.</Txt>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={t.muted} />
-              </Pressable>
-              <Pressable
-                onPress={() => setSheet({ kind: "screenshot" })}
-                accessibilityRole="button"
-                style={({ pressed }) => [styles.gymLink, { borderTopColor: t.border, marginTop: 0, opacity: pressed ? 0.6 : 1 }]}
-              >
-                <Ionicons name="phone-portrait-outline" size={18} color={t.text2} />
-                <View style={{ flex: 1 }}>
-                  <Txt style={{ fontWeight: "600" }}>Workout from a screenshot</Txt>
-                  <Txt variant="small">Saw one on Instagram or TikTok? Turn it into a session.</Txt>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={t.muted} />
-              </Pressable>
             </Card>
           )}
 
@@ -538,21 +500,6 @@ export default function Workouts() {
           </View>
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "gym-scan"} title="Photograph a gym" onClose={() => setSheet(null)}>
-        {sheet?.kind === "gym-scan" ? <GymScanStart onStart={startGymSession} /> : null}
-      </Sheet>
-      <Sheet visible={sheet?.kind === "screenshot"} title="Workout from a screenshot" onClose={() => setSheet(null)}>
-        {sheet?.kind === "screenshot" && routine ? (
-          <ScreenshotImport
-            routine={routine}
-            onStart={startImported}
-            onSaved={(weekday) => {
-              setSheet(null);
-              setOpenDay(weekday);
-            }}
-          />
-        ) : null}
-      </Sheet>
       <Sheet visible={sheet?.kind === "edit-set"} title="Edit set" onClose={() => setSheet(sheet?.kind === "edit-set" ? sheet.back : null)}>
         {sheet?.kind === "edit-set" ? (
           <SetEditForm
@@ -570,38 +517,6 @@ export default function Workouts() {
         ) : null}
       </Sheet>
     </Screen>
-  );
-}
-
-/** Pick (or add) the gym, then photograph it. */
-function GymScanStart({ onStart }: { onStart: (day: RoutineDay, gym: Gym) => void }) {
-  const gyms = useGyms();
-  const [gymId, setGymId] = useState<number | null>(null);
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const chosen = gyms.data?.find((g) => g.id === gymId) ?? null;
-  if (chosen) return <GymScanFlow key={chosen.id} gym={chosen} onStart={onStart} />;
-  const add = async () => {
-    setError(null);
-    try {
-      const created = await api<Gym>("/gyms", { method: "POST", body: { name: name.trim() || "Hotel gym" } });
-      invalidate(qk.gyms);
-      queryClient.setQueryData<Gym[]>(qk.gyms, (old) => [...(old ?? []), created]);
-      setGymId(created.id);
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  };
-  return (
-    <View>
-      <Txt variant="small">Which gym is it? Machines and settings are kept per gym.</Txt>
-      {gyms.data?.length ? <GymPicker value={gymId} onChange={(g) => setGymId(g.id)} /> : null}
-      <Row style={{ alignItems: "flex-end", marginTop: space.sm }}>
-        <Field label="Or a new gym" value={name} onChangeText={setName} placeholder="e.g. Hotel gym" style={{ flex: 1 }} maxLength={80} />
-        <Button title="Add" icon="add" kind="soft" onPress={add} />
-      </Row>
-      <ErrorText message={error} />
-    </View>
   );
 }
 
@@ -805,7 +720,7 @@ function WeekPlan({
   );
 }
 
-/** A day with the user's own exercises (e.g. from a screenshot): switch back to the suggested ones. */
+/** A day with the user's own exercises: switch back to the suggested ones. */
 function CustomDayNote({ day }: { day: RoutineDay }) {
   const toast = useToast();
   const restore = async () => {
@@ -825,7 +740,7 @@ function CustomDayNote({ day }: { day: RoutineDay }) {
   };
   return (
     <View style={{ marginTop: space.sm, gap: space.xs }}>
-      <Txt variant="tiny">You chose these exercises (e.g. from a screenshot).</Txt>
+      <Txt variant="tiny">You chose these exercises yourself.</Txt>
       <LinkButton title="Use the suggested exercises instead" onPress={restore} />
     </View>
   );
@@ -880,15 +795,6 @@ function WeekStrip({ routine }: { routine: Routine }) {
 }
 
 const styles = StyleSheet.create({
-  gymLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    marginTop: space.lg,
-    paddingTop: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    minHeight: 52,
-  },
   checkRow: {
     flexDirection: "row",
     alignItems: "center",

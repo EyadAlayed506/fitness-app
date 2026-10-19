@@ -95,11 +95,7 @@ export function HandsFreeMic({
       </Pressable>
       <View accessibilityLiveRegion="polite" aria-live="polite">
         <Txt variant="tiny" style={{ marginTop: space.xs, color: note?.error ? t.critical : t.muted }}>
-          {listening
-            ? "Say “8 reps at 60” or “same again”, then let go (or tap again)."
-            : note
-              ? note.text
-              : "Hands-free: “10 reps at 22.5 kilos”, “same again”. Works with headphones."}
+          {listening ? "Say “8 reps at 60” or “same again”, then let go (or tap again)." : note ? note.text : ""}
         </Txt>
       </View>
     </View>
@@ -213,7 +209,7 @@ const noSelect = (Platform.OS === "web" ? { userSelect: "none" } : {}) as ViewSt
 
 const styles = StyleSheet.create({
   mic: {
-    minHeight: 50,
+    minHeight: 44,
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: "row",

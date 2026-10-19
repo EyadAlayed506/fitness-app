@@ -13,7 +13,7 @@ import { haptics } from "@/lib/haptics";
 import { betterBest, bestOf, isNewBest, parseRepRange, suggestNext, type Best } from "@/lib/progression";
 import { errorMessage, qk } from "@/lib/query";
 import { spokenWeight } from "@/lib/speech";
-import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
+import { radius, space, useTheme } from "@/lib/theme";
 import type { Exercise, ExerciseHistory, Gym, Workout, WorkoutSet } from "@/lib/types";
 import type { SpokenSet } from "@/lib/voiceSet";
 
@@ -292,7 +292,8 @@ function SetFormBody({
   });
   const [rpe, setRpe] = useState<number | null>(lastHere?.rpe ?? null);
   const [notes, setNotes] = useState("");
-  const [showNotes, setShowNotes] = useState(false);
+  // effort and a note are optional, so they stay folded away (open if an effort is already filled in)
+  const [showMore, setShowMore] = useState(rpe != null);
   const [error, setError] = useState<string | null>(null);
   const [record, setRecord] = useState<{ text: string; n: number } | null>(null);
   const [snapWeight, setSnapWeight] = useState(false);
@@ -395,26 +396,20 @@ function SetFormBody({
 
       {lastTime ? (
         <View style={[styles.lastTime, { backgroundColor: t.surface2 }]}>
-          <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-            LAST TIME · {shortDate(lastTime.started_at.slice(0, 10)).toUpperCase()}
-          </Txt>
-          <Txt style={{ marginTop: 2, fontVariant: ["tabular-nums"] }} numberOfLines={2}>
-            {lastSessionText(lastTime.sets, unit)}
+          <Txt variant="small" style={{ fontVariant: ["tabular-nums"] }} numberOfLines={2}>
+            Last time ({shortDate(lastTime.started_at.slice(0, 10))}):{" "}
+            <Txt variant="small" style={{ color: t.text }}>
+              {lastSessionText(lastTime.sets, unit)}
+            </Txt>
           </Txt>
           {suggestion ? (
-            <Row gap={space.sm} style={{ marginTop: space.sm }}>
-              <Ionicons name={suggestion.kind === "weight" ? "trending-up" : "add-circle-outline"} size={18} color={t.goodInk} />
-              <View style={{ flex: 1 }}>
-                <Txt style={{ fontWeight: "600", color: t.text }}>
-                  Try {suggestion.weight > 0 ? `${suggestion.weight} ${unit}` : "bodyweight"} × {suggestion.reps}
-                </Txt>
-                <Txt variant="tiny">{suggestion.reason}</Txt>
-              </View>
-              <Button
+            <Row gap={space.sm} style={{ marginTop: 4 }}>
+              <Ionicons name={suggestion.kind === "weight" ? "trending-up" : "add-circle-outline"} size={16} color={t.goodInk} />
+              <Txt variant="small" style={{ flex: 1, fontWeight: "600", color: t.text }} numberOfLines={1}>
+                Try {suggestion.weight > 0 ? `${suggestion.weight} ${unit}` : "bodyweight"} × {suggestion.reps}
+              </Txt>
+              <LinkButton
                 title="Use"
-                kind="ghost"
-                small
-                accessibilityLabel={`Use the suggestion: ${suggestion.weight} ${unit} for ${suggestion.reps} reps`}
                 onPress={() => {
                   setReps(String(suggestion.reps));
                   setWeight(String(suggestion.weight));
@@ -431,10 +426,8 @@ function SetFormBody({
         </Txt>
       )}
 
-      <RestTimerPanel timer={timer} />
-
       <Row gap={space.md} style={{ alignItems: "flex-start" }}>
-        <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={0} max={200} decimals={0} style={{ flex: 1 }} />
+        <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={0} max={200} decimals={0} compact style={{ flex: 1 }} />
         <Stepper
           label="Weight"
           value={weight}
@@ -443,28 +436,23 @@ function SetFormBody({
           min={0}
           max={1000}
           suffix={unit}
+          compact
           style={{ flex: 1.15 }}
         />
       </Row>
-      <Row style={{ justifyContent: "space-between", flexWrap: "wrap" }} gap={space.sm}>
-        <Chips
-          value={unit}
-          onChange={(u) => {
+      <Row style={{ marginTop: space.sm, flexWrap: "wrap" }} gap={space.lg}>
+        <LinkButton
+          title={unit === "kg" ? "Use lb" : "Use kg"}
+          onPress={() => {
             // keep the same weight, shown in the other unit
+            const u = unit === "kg" ? "lb" : "kg";
             const n = Number(weight.replace(",", ".")) || 0;
             setWeight(String(Math.round((u === "lb" ? n / KG_PER_LB : n * KG_PER_LB) * 10) / 10));
             setUnit(u);
           }}
-          options={[
-            { value: "kg", label: "kg" },
-            { value: "lb", label: "lb" },
-          ]}
-          style={{ marginTop: space.sm }}
         />
-        <Row gap={space.lg} style={{ marginTop: space.sm }}>
-          {!snapWeight ? <LinkButton title="Weight from a photo" onPress={() => setSnapWeight(true)} /> : null}
-          {!showNotes ? <LinkButton title="Add a note" onPress={() => setShowNotes(true)} /> : null}
-        </Row>
+        {!snapWeight ? <LinkButton title="Weight from a photo" onPress={() => setSnapWeight(true)} /> : null}
+        {!showMore ? <LinkButton title="Effort or note" onPress={() => setShowMore(true)} /> : null}
       </Row>
       {snapWeight ? (
         <WeightFromPhoto
@@ -476,19 +464,21 @@ function SetFormBody({
           }}
         />
       ) : null}
-      <Chips<number>
-        label="Effort (RPE, optional)"
-        value={rpe ?? 0}
-        onChange={(v) => setRpe(v === 0 ? null : v)}
-        options={[
-          { value: 0, label: "–" },
-          ...[...new Set([...RPE_CHOICES, ...(rpe && !RPE_CHOICES.includes(rpe) ? [rpe] : [])])]
-            .sort((a, b) => a - b)
-            .map((v) => ({ value: v, label: String(v) })),
-        ]}
-      />
-      {showNotes ? (
-        <Field label="Note" value={notes} onChangeText={setNotes} placeholder="e.g. seat at 4, felt easy" autoFocus />
+      {showMore ? (
+        <>
+          <Chips<number>
+            label="Effort (RPE, optional)"
+            value={rpe ?? 0}
+            onChange={(v) => setRpe(v === 0 ? null : v)}
+            options={[
+              { value: 0, label: "–" },
+              ...[...new Set([...RPE_CHOICES, ...(rpe && !RPE_CHOICES.includes(rpe) ? [rpe] : [])])]
+                .sort((a, b) => a - b)
+                .map((v) => ({ value: v, label: String(v) })),
+            ]}
+          />
+          <Field label="Note (optional)" value={notes} onChangeText={setNotes} placeholder="e.g. seat at 4, felt easy" />
+        </>
       ) : null}
       <ErrorText message={error} />
 
@@ -499,29 +489,36 @@ function SetFormBody({
         onPress={async () => {
           await save(fromForm());
         }}
-        style={{ marginTop: space.lg }}
+        style={{ marginTop: space.md }}
       />
+      <RestTimerPanel timer={timer} />
+      {lastHere || (next && onNext) ? (
+        <Row style={{ marginTop: space.sm, flexWrap: "wrap" }} gap={space.sm}>
+          {lastHere ? (
+            <Button
+              title={`Same again · ${lastHere.reps} × ${weightText(lastHere.weight_kg, unit)}`}
+              icon="copy-outline"
+              kind="soft"
+              small
+              onPress={async () => {
+                await sameAsLast();
+              }}
+              style={{ flexGrow: 1 }}
+            />
+          ) : null}
+          {next && onNext ? (
+            <Button
+              title={`Next: ${next.name}`}
+              icon="arrow-forward"
+              kind={targetDone ? "primary" : "ghost"}
+              small
+              onPress={onNext}
+              style={{ flexGrow: 1 }}
+            />
+          ) : null}
+        </Row>
+      ) : null}
       <HandsFreeMic onSet={saveSpoken} />
-      {lastHere ? (
-        <Button
-          title={`Same as last set · ${lastHere.reps} × ${weightText(lastHere.weight_kg, unit)}`}
-          icon="copy-outline"
-          kind="soft"
-          onPress={async () => {
-            await sameAsLast();
-          }}
-          style={{ marginTop: space.sm }}
-        />
-      ) : null}
-      {next && onNext ? (
-        <Button
-          title={`Next: ${next.name}`}
-          icon="arrow-forward"
-          kind={targetDone ? "primary" : "ghost"}
-          onPress={onNext}
-          style={{ marginTop: space.sm }}
-        />
-      ) : null}
 
       {mine.length ? (
         <View style={{ marginTop: space.xl }}>
@@ -727,7 +724,7 @@ const styles = StyleSheet.create({
   setNumber: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   setRow: { minHeight: 44, borderTopWidth: StyleSheet.hairlineWidth },
   setEdit: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 44 },
-  lastTime: { borderRadius: radius.md, padding: space.md, marginBottom: space.xs },
+  lastTime: { borderRadius: radius.md, paddingVertical: space.sm, paddingHorizontal: space.md, marginBottom: space.xs },
   record: {
     flexDirection: "row",
     alignItems: "center",

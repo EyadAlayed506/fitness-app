@@ -434,17 +434,6 @@ export function afterCoachActions(kinds: string[]) {
 
 // ---------- plan days with the user's own exercises ----------
 
-/** Use these exercises on a training day instead of the generated ones (e.g. imported from a screenshot). */
-export async function saveCustomDay(
-  weekday: number,
-  body: { title: string; exercises: { exercise_id: number; sets: number; reps: string }[] },
-): Promise<Routine> {
-  const routine = await api<Routine>(`/me/schedule/days/${weekday}`, { method: "PUT", body });
-  queryClient.setQueryData(qk.routine, routine);
-  invalidate(...derivedKeys);
-  return routine;
-}
-
 /** Back to the generated exercises for a training day. */
 export async function removeCustomDay(weekday: number): Promise<Routine> {
   const routine = await api<Routine>(`/me/schedule/days/${weekday}`, { method: "DELETE" });

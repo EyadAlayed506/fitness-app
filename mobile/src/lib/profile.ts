@@ -16,6 +16,7 @@ export function profilePayload(p: Profile, changes: Partial<Record<string, unkno
     minutes_per_session: p.minutes_per_session,
     equipment: p.equipment,
     unit_system: p.unit_system,
+    rest_seconds: p.rest_seconds,
     ...changes,
   };
 }

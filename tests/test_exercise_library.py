@@ -77,6 +77,27 @@ def test_rest_preference(client, auth):
     assert client.put(f"/api/exercises/{lat['id']}/rest", json={"seconds": None}, headers=auth).json()["seconds"] == 120
 
 
+def test_rest_time_for_all_exercises(client, auth):
+    lat = by_code(client, auth, "lat-pulldown")
+    leg = by_code(client, auth, "leg-press")
+    profile = client.get("/api/me/profile", headers=auth).json()
+    body = {
+        "birth_date": profile["birth_date"], "sex": profile["sex"], "height": profile["height_cm"],
+        "weight": profile["weight_kg"], "training_days": profile["training_days"], "rest_seconds": 75,
+    }
+    r = client.put("/api/me/profile", json=body, headers=auth)
+    assert r.status_code == 200 and r.json()["rest_seconds"] == 75
+    rest = lambda ex: client.get(f"/api/exercises/{ex['id']}/rest", headers=auth).json()  # noqa: E731
+    assert rest(lat)["seconds"] == 75 and rest(leg)["seconds"] == 75
+    # a time set for one exercise in the rest timer still wins
+    client.put(f"/api/exercises/{lat['id']}/rest", json={"seconds": 150}, headers=auth)
+    assert rest(lat)["seconds"] == 150 and rest(leg)["seconds"] == 75
+    assert client.put("/api/me/profile", json={**body, "rest_seconds": 5}, headers=auth).status_code == 422
+    # back to each exercise's suggested time
+    client.put("/api/me/profile", json={**body, "rest_seconds": None}, headers=auth)
+    assert rest(leg)["seconds"] == leg["default_rest_seconds"]
+
+
 def test_routine_uses_exercise_rest_times(client, auth):
     routine = client.get("/api/me/routine", headers=auth).json()
     for day in routine["days"]:

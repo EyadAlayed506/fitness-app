@@ -30,6 +30,14 @@ const DIETS: Choice<string>[] = [
   { value: "normal", label: "Normal", hint: "Steady progress" },
   { value: "extreme", label: "Extreme", hint: "Fastest, hardest to keep" },
 ];
+// 0 = no single time: each exercise uses its own suggestion
+const REST: Choice<number>[] = [
+  { value: 0, label: "Suggested", hint: "Per exercise" },
+  { value: 60, label: "1 min" },
+  { value: 90, label: "1½ min" },
+  { value: 120, label: "2 min" },
+  { value: 180, label: "3 min" },
+];
 const EQUIPMENT: Choice<string>[] = [
   { value: "gym", label: "Gym", hint: "Machines and free weights" },
   { value: "home", label: "Home", hint: "Dumbbells" },
@@ -56,6 +64,7 @@ export function useProfileDraft(profile: Profile | null) {
   const [days, setDays] = useState<number[]>(profile?.training_days_chosen ? profile.training_days : []);
   const [minutes, setMinutes] = useState(profile?.minutes_per_session ?? 45);
   const [equipment, setEquipment] = useState(profile?.equipment ?? "gym");
+  const [rest, setRest] = useState(profile?.rest_seconds ?? 0);
 
   const switchUnits = (next: UnitSystem) => {
     if (next === unitSystem) return;
@@ -98,6 +107,7 @@ export function useProfileDraft(profile: Profile | null) {
     minutes_per_session: minutes,
     equipment,
     unit_system: unitSystem,
+    rest_seconds: rest || null,
   });
 
   return {
@@ -129,6 +139,8 @@ export function useProfileDraft(profile: Profile | null) {
     setMinutes,
     equipment,
     setEquipment,
+    rest,
+    setRest,
     problems,
     payload,
   };
@@ -224,6 +236,10 @@ export function TrainingFields({ draft }: { draft: ProfileDraft }) {
         options={[20, 30, 45, 60, 75, 90].map((m) => ({ value: m, label: `${m}` }))}
       />
       <Chips label="Equipment" value={draft.equipment} onChange={draft.setEquipment} options={EQUIPMENT} />
+      <Chips label="Rest between sets" value={draft.rest} onChange={draft.setRest} options={REST} />
+      <Txt variant="tiny" style={{ marginTop: 4 }}>
+        The rest timer starts with this after every set. You can still change it for one exercise in the timer.
+      </Txt>
     </>
   );
 }
