@@ -1,0 +1,121 @@
+{
+  "sources": {
+    "gec": "data/processed (prepare_data.py), MIT",
+    "thestalkers": "https://universe.roboflow.com/thestalkers-project/gym-equipment-ersfc v1, CC BY 4.0",
+    "fitfuel": "https://universe.roboflow.com/fitfuel/all-gym-equipment v2, CC BY 4.0"
+  },
+  "classes": [
+    "arm_curl",
+    "bench_press",
+    "bicycle",
+    "cable_crossover",
+    "chest_press",
+    "hack_squat",
+    "lat_pulldown",
+    "lateral_raise",
+    "leg_curl",
+    "leg_extension",
+    "leg_press",
+    "pec_deck",
+    "power_tower",
+    "rowing",
+    "seated_dip",
+    "seated_row",
+    "shoulder_press",
+    "smith_machine",
+    "treadmill"
+  ],
+  "orientation_check_fitfuel": 0.9335106382978723,
+  "fitfuel_edited_photos_turned": {
+    "0 deg": 798,
+    "90 deg": 224,
+    "180 deg": 272,
+    "270 deg": 277
+  },
+  "dropped_too_few_photos": {
+    "ab_crunch": 14,
+    "back_extension": 35,
+    "ghd": 30,
+    "ab_bench": 15,
+    "stepmill": 24,
+    "elliptical": 17
+  },
+  "duplicate_photos_removed": 682,
+  "photos_kept": 7527,
+  "images": {
+    "train": 5467,
+    "val": 1171,
+    "test": 1178
+  },
+  "edited_copies_in": {
+    "test": 797,
+    "train": 3585,
+    "val": 796
+  },
+  "split": {
+    "train": {
+      "arm_curl": 290,
+      "bench_press": 185,
+      "bicycle": 207,
+      "cable_crossover": 34,
+      "chest_press": 339,
+      "hack_squat": 68,
+      "lat_pulldown": 332,
+      "lateral_raise": 327,
+      "leg_curl": 344,
+      "leg_extension": 333,
+      "leg_press": 465,
+      "pec_deck": 453,
+      "power_tower": 393,
+      "rowing": 155,
+      "seated_dip": 322,
+      "seated_row": 326,
+      "shoulder_press": 319,
+      "smith_machine": 311,
+      "treadmill": 264
+    },
+    "val": {
+      "arm_curl": 67,
+      "bench_press": 40,
+      "bicycle": 44,
+      "cable_crossover": 8,
+      "chest_press": 73,
+      "hack_squat": 14,
+      "lat_pulldown": 75,
+      "lateral_raise": 70,
+      "leg_curl": 70,
+      "leg_extension": 73,
+      "leg_press": 98,
+      "pec_deck": 98,
+      "power_tower": 79,
+      "rowing": 33,
+      "seated_dip": 69,
+      "seated_row": 69,
+      "shoulder_press": 68,
+      "smith_machine": 66,
+      "treadmill": 57
+    },
+    "test": {
+      "arm_curl": 63,
+      "bench_press": 40,
+      "bicycle": 45,
+      "cable_crossover": 8,
+      "chest_press": 76,
+      "hack_squat": 14,
+      "lat_pulldown": 75,
+      "lateral_raise": 70,
+      "leg_curl": 70,
+      "leg_extension": 71,
+      "leg_press": 101,
+      "pec_deck": 98,
+      "power_tower": 88,
+      "rowing": 33,
+      "seated_dip": 69,
+      "seated_row": 66,
+      "shoulder_press": 68,
+      "smith_machine": 66,
+      "treadmill": 57
+    }
+  },
+  "seed": 42
+}

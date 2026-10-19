@@ -1,9 +1,18 @@
-# CPU is enough (the whole search ran on 4 CPU cores). On a PC with an NVIDIA GPU use "tensorflow[and-cuda]" under WSL2.
-tensorflow-cpu==2.21.0
-keras==3.15.1
-numpy==2.5.4
+# Training (PyTorch). With an NVIDIA GPU, install torch/torchvision from the CUDA index first:
+#   pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
+# Without one, the plain PyPI packages below run on the CPU.
+torch==2.11.0
+torchvision==0.26.0
+numpy==2.2.6
 pillow==13.0.0
-# export only
-tf2onnx==1.17.0
-onnx==1.23.2
-onnxruntime==1.31.0
+# export only: ONNX, and TFLite through onnx2tf + TensorFlow's converter
+onnx==1.20.1
+onnxruntime==1.26.0
+onnx2tf==2.6.9
+onnxsim==0.6.5
+onnx_graphsurgeon==0.6.1
+sng4onnx==2.0.1
+tensorflow==2.21.0
+tf_keras==2.21.0
+ai-edge-litert==2.1.2
+psutil==5.9.5

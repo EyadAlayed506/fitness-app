@@ -1,32 +1,44 @@
-"""Shared pieces: the dataset as tf.data, image preprocessing and augmentation, and the MobileNet models.
+"""Shared pieces (PyTorch): the dataset, image preprocessing and augmentation, and the MobileNet models.
 
-ImageNet weights come from Keras (storage.googleapis.com), so no other download is needed.
+Which prepared dataset to use comes from the DATASET environment variable: "processed" (the 6-class
+Gym-Equipment-Classifier set, the default) or "merged" (see prepare_roboflow.py). Runs go to runs/<DATASET>/.
+ImageNet weights come from torchvision (download.pytorch.org), so no other download is needed.
 """
 
-import os
-
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-
 import json
+import math
+import os
 import random
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
+import torch
+import torch.nn.functional as F
+from PIL import Image, ImageOps
+from torch import nn
+from torchvision import models
+from torchvision.transforms import v2
 
 HERE = Path(__file__).parent
-DATA = HERE / "data" / "processed"
-RUNS = HERE / "runs"
+DATASET = os.environ.get("DATASET", "processed")
+DATA = HERE / "data" / DATASET
+RUNS = HERE / "runs" / DATASET
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# loader processes; 0 = in the main process (the stored photos are small, and worker processes hung on Windows)
+WORKERS = int(os.environ.get("WORKERS", "0"))
 
-BACKBONES = ("mobilenet_v2", "mobilenet_v3_small", "mobilenet_v3_large")
+BACKBONES = ("mobilenet_v3_small", "mobilenet_v3_large")
+MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+
+torch.backends.cudnn.benchmark = True
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 
 
 def seed_everything(seed: int):
     random.seed(seed)
     np.random.seed(seed)
-    tf.random.set_seed(seed)
-    keras.utils.set_random_seed(seed)
+    torch.manual_seed(seed)
 
 
 def classes() -> list[str]:
@@ -45,17 +57,17 @@ def files(split: str, root: Path = DATA) -> tuple[list[str], list[int]]:
 
 # ---------- images ----------
 
-def _decode(path):
-    return tf.image.decode_jpeg(tf.io.read_file(path), channels=3)
+def open_rgb(path) -> Image.Image:
+    return ImageOps.exif_transpose(Image.open(path)).convert("RGB")
 
 
-def eval_image(img, size: int):
-    """Resize the short side to size/0.875, then crop the centre (the standard ImageNet evaluation)."""
-    shape = tf.cast(tf.shape(img)[:2], tf.float32)
-    scale = (size / 0.875) / tf.reduce_min(shape)
-    img = tf.image.resize(img, tf.cast(tf.round(shape * scale), tf.int32), antialias=True)
-    img = tf.image.resize_with_crop_or_pad(img, size, size)
-    return tf.clip_by_value(img, 0.0, 255.0)
+def eval_image(im: Image.Image, size: int) -> np.ndarray:
+    """Resize the short side to size/0.875, then crop the centre (the standard ImageNet evaluation). HWC uint8."""
+    short = round(size / 0.875)
+    s = short / min(im.size)
+    im = im.resize((round(im.width * s), round(im.height * s)), Image.Resampling.BILINEAR, reducing_gap=None)
+    left, top = (im.width - size) // 2, (im.height - size) // 2
+    return np.asarray(im.crop((left, top, left + size, top + size)))
 
 
 AUG = {
@@ -66,81 +78,129 @@ AUG = {
 }
 
 
-def train_image(img, size: int, aug: str):
-    """Random crop (part of the photo, any aspect 3:4-4:3), flip, small rotation, colour changes."""
-    min_area, jitter, max_rot = AUG[aug]
-    img = tf.cast(img, tf.float32)
-    begin, crop_size, _ = tf.image.sample_distorted_bounding_box(
-        tf.shape(img), bounding_boxes=tf.constant([[[0.0, 0.0, 1.0, 1.0]]]), min_object_covered=0.0,
-        aspect_ratio_range=(0.75, 1.33), area_range=(min_area, 1.0), max_attempts=20, use_image_if_no_bounding_boxes=True,
-    )
-    img = tf.slice(img, begin, crop_size)
-    img = tf.image.resize(img, (size, size), antialias=True)
-    img = tf.image.random_flip_left_right(img)
-    if max_rot:
-        angle = tf.random.uniform([], -max_rot, max_rot)
-        img = rotate(img, angle)
-    if jitter:
-        img = tf.image.random_brightness(img, 255 * jitter)
-        img = tf.image.random_contrast(img, 1 - jitter, 1 + jitter)
-        img = tf.image.random_saturation(img, 1 - jitter, 1 + jitter)
-    return tf.clip_by_value(img, 0.0, 255.0)
+class Photos(torch.utils.data.Dataset):
+    """Photos as uint8 CHW tensors. With aug: random crop (any aspect 3:4-4:3) and flip here, in the loader workers;
+    rotation and colour changes run on the GPU in augment_batch."""
+
+    def __init__(self, paths, labels, size, aug=None):
+        self.paths, self.labels, self.size = paths, labels, size
+        self.crop = v2.Compose([
+            v2.RandomResizedCrop(size, scale=(AUG[aug][0], 1.0), ratio=(0.75, 1.33), antialias=True),
+            v2.RandomHorizontalFlip(),
+        ]) if aug else None
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, k):
+        im = open_rgb(self.paths[k])
+        if self.crop:
+            x = self.crop(v2.functional.pil_to_tensor(im))
+        else:
+            x = torch.from_numpy(eval_image(im, self.size).copy()).permute(2, 0, 1)
+        return x, self.labels[k]
 
 
-def rotate(img, angle):
-    """Rotate about the centre, filling with the nearest edge pixels."""
-    size = tf.cast(tf.shape(img)[0], tf.float32)
-    c, s = tf.cos(angle), tf.sin(angle)
-    cx = size / 2
-    # projective transform [a0, a1, a2, b0, b1, b2, c0, c1] mapping output to input points
-    t = [c, -s, cx - c * cx + s * cx, s, c, cx - s * cx - c * cx, 0.0, 0.0]
-    out = tf.raw_ops.ImageProjectiveTransformV3(
-        images=img[None], transforms=tf.cast([t], tf.float32), output_shape=tf.shape(img)[:2],
-        fill_value=0.0, interpolation="BILINEAR", fill_mode="NEAREST",
-    )
-    return out[0]
+def _seed_worker(_):
+    s = torch.initial_seed() % 2**32
+    np.random.seed(s)
+    random.seed(s)
 
 
-def dataset(split: str, size: int, batch: int, aug: str | None = None, shuffle: bool = False, root: Path = DATA, repeat_views: int = 1):
+def loader(split: str, size: int, batch: int, aug: str | None = None, shuffle: bool = False, root: Path = DATA, seed: int = 0):
     paths, labels = files(split, root)
-    ds = tf.data.Dataset.from_tensor_slices((paths, labels))
-    if shuffle:
-        ds = ds.shuffle(len(paths), reshuffle_each_iteration=True)
-    if repeat_views > 1:
-        ds = ds.repeat(repeat_views)
-    fn = (lambda p, y: (train_image(_decode(p), size, aug), y)) if aug else (lambda p, y: (eval_image(_decode(p), size), y))
-    return ds.map(fn, num_parallel_calls=tf.data.AUTOTUNE).batch(batch).prefetch(tf.data.AUTOTUNE)
+    g = torch.Generator()
+    g.manual_seed(seed)
+    return torch.utils.data.DataLoader(
+        Photos(paths, labels, size, aug), batch_size=batch, shuffle=shuffle, num_workers=WORKERS, pin_memory=True,
+        persistent_workers=WORKERS > 0, worker_init_fn=_seed_worker, generator=g, drop_last=False,
+    )
+
+
+def augment_batch(x: torch.Tensor, aug: str) -> torch.Tensor:
+    """x: uint8 NCHW on the GPU -> float 0-255. Small rotation (edges repeated), then brightness, contrast, saturation."""
+    _, jitter, max_rot = AUG[aug]
+    x = x.float()
+    n = x.shape[0]
+    if max_rot:
+        a = (torch.rand(n, device=x.device) * 2 - 1) * max_rot
+        c, s, z = torch.cos(a), torch.sin(a), torch.zeros_like(a)
+        theta = torch.stack([torch.stack([c, -s, z], 1), torch.stack([s, c, z], 1)], 1)
+        grid = F.affine_grid(theta, list(x.shape), align_corners=False)
+        x = F.grid_sample(x, grid, mode="bilinear", padding_mode="border", align_corners=False)
+    if jitter:
+        r = lambda: torch.rand(n, 1, 1, 1, device=x.device) * 2 - 1  # noqa: E731
+        x = x + r() * 255 * jitter
+        mean = x.mean((2, 3), keepdim=True)
+        x = (x - mean) * (1 + r() * jitter) + mean
+        gray = (0.299 * x[:, 0:1] + 0.587 * x[:, 1:2] + 0.114 * x[:, 2:3])
+        x = (x - gray) * (1 + r() * jitter) + gray
+    return x.clamp(0, 255)
 
 
 # ---------- models ----------
 
-def backbone(name: str, size: int) -> keras.Model:
-    """ImageNet-pretrained MobileNet without its classifier. Input: RGB pixels 0-255 (scaling is inside)."""
-    inp = keras.Input((size, size, 3))
-    if name == "mobilenet_v2":
-        x = keras.layers.Rescaling(1 / 127.5, offset=-1)(inp)
-        base = keras.applications.MobileNetV2(input_shape=(size, size, 3), include_top=False, weights="imagenet", pooling="avg")
-    elif name == "mobilenet_v3_small":
-        x = inp
-        base = keras.applications.MobileNetV3Small(input_shape=(size, size, 3), include_top=False, weights="imagenet", pooling="avg", include_preprocessing=True)
-    elif name == "mobilenet_v3_large":
-        x = inp
-        base = keras.applications.MobileNetV3Large(input_shape=(size, size, 3), include_top=False, weights="imagenet", pooling="avg", include_preprocessing=True)
-    else:
-        raise ValueError(name)
-    # training=False keeps batch-norm statistics frozen, also while the layers are fine-tuned (small dataset)
-    return keras.Model(inp, base(x, training=False), name=f"{name}_{size}")
+class Head(nn.Sequential):
+    def __init__(self, features: int, n_classes: int, hidden: int, dropout: float):
+        layers = [nn.Dropout(dropout)] if dropout else []
+        if hidden:
+            layers += [nn.Linear(features, hidden), nn.ReLU()] + ([nn.Dropout(dropout)] if dropout else [])
+            features = hidden
+        super().__init__(*layers, nn.Linear(features, n_classes))
 
 
-def head(features: int, n_classes: int, hidden: int, dropout: float, l2: float) -> keras.Model:
-    reg = keras.regularizers.l2(l2) if l2 else None
-    inp = keras.Input((features,))
-    x = keras.layers.Dropout(dropout)(inp) if dropout else inp
-    if hidden:
-        x = keras.layers.Dense(hidden, activation="relu", kernel_regularizer=reg)(x)
-        x = keras.layers.Dropout(dropout)(x) if dropout else x
-    out = keras.layers.Dense(n_classes, activation="softmax", kernel_regularizer=reg)(x)
-    return keras.Model(inp, out, name="head")
+class Net(nn.Module):
+    """ImageNet-pretrained MobileNetV3 plus a new classifier head. Input: RGB pixels 0-255, NCHW (scaling is inside).
+    Output: logits. Batch-norm layers always use their ImageNet statistics (small dataset)."""
+
+    def __init__(self, name: str, n_classes: int, hidden: int = 0, dropout: float = 0.2, pretrained: bool = True):
+        super().__init__()
+        if name == "mobilenet_v3_small":
+            net = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None)
+        elif name == "mobilenet_v3_large":
+            net = models.mobilenet_v3_large(weights=models.MobileNet_V3_Large_Weights.IMAGENET1K_V2 if pretrained else None)
+        else:
+            raise ValueError(name)
+        self.features = net.features
+        self.n_features = net.features[-1].out_channels
+        self.head = Head(self.n_features, n_classes, hidden, dropout)
+        self.register_buffer("mean", torch.tensor(MEAN).view(1, 3, 1, 1) * 255)
+        self.register_buffer("std", torch.tensor(STD).view(1, 3, 1, 1) * 255)
+
+    def embed(self, x):
+        x = (x - self.mean) / self.std
+        return self.features(x).mean((2, 3))
+
+    def forward(self, x):
+        return self.head(self.embed(x))
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        for m in self.features.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eval()
+        return self
+
+    def set_trainable(self, unfreeze: float):
+        """Head always; plus the top `unfreeze` share of the backbone's layers (batch norm stays frozen)."""
+        leaves = [m for m in self.features.modules() if not list(m.children())]
+        first = math.floor(len(leaves) * (1 - unfreeze)) if unfreeze > 0 else len(leaves)
+        for k, m in enumerate(leaves):
+            for p in m.parameters(recurse=False):
+                p.requires_grad = k >= first and not isinstance(m, nn.BatchNorm2d)
+        for p in self.head.parameters():
+            p.requires_grad = True
+
+
+class Exported(nn.Module):
+    """What the app gets: NHWC float 0-255 in, softmax probabilities out."""
+
+    def __init__(self, net: Net):
+        super().__init__()
+        self.net = net
+
+    def forward(self, x):
+        return torch.softmax(self.net(x.permute(0, 3, 1, 2)), dim=-1)
 
 
 def save_json(path: Path, data):
@@ -149,6 +209,7 @@ def save_json(path: Path, data):
 
 
 def macro_f1(y_true, y_pred, n: int) -> float:
+    y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
     f1s = []
     for c in range(n):
         tp = np.sum((y_pred == c) & (y_true == c))

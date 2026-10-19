@@ -1,0 +1,140 @@
+[
+  {
+    "name": "mobilenet_v3_large_224_g4",
+    "config": {
+      "backbone": "mobilenet_v3_large",
+      "size": 224,
+      "aug": "strong",
+      "hidden": 0,
+      "dropout": 0.2,
+      "label_smoothing": 0.1,
+      "weight_decay": 0.0001,
+      "batch": 32,
+      "head_epochs": 5,
+      "head_lr": 0.001,
+      "unfreeze": 0.6,
+      "ft_epochs": 15,
+      "ft_lr": 0.0003,
+      "patience": 4,
+      "seed": 42
+    },
+    "runs": [
+      {
+        "seed": 42,
+        "val_acc": 0.8872758326216909,
+        "val_macro_f1": 0.8849519214258073
+      },
+      {
+        "seed": 1,
+        "val_acc": 0.8838599487617421,
+        "val_macro_f1": 0.8781826209008771
+      },
+      {
+        "seed": 2,
+        "val_acc": 0.8872758326216909,
+        "val_macro_f1": 0.883804778733753
+      },
+      {
+        "seed": 3,
+        "val_acc": 0.8787361229718189,
+        "val_macro_f1": 0.8766564127892494
+      }
+    ],
+    "mean_val_macro_f1": 0.8808989334624217,
+    "sd_val_macro_f1": 0.004092594277739798,
+    "mean_val_acc": 0.8842869342442357,
+    "sd_val_acc": 0.004035709330702499
+  },
+  {
+    "name": "mobilenet_v3_large_224_g7",
+    "config": {
+      "backbone": "mobilenet_v3_large",
+      "size": 224,
+      "aug": "strong",
+      "hidden": 0,
+      "dropout": 0.2,
+      "label_smoothing": 0.1,
+      "weight_decay": 0.0001,
+      "batch": 32,
+      "head_epochs": 5,
+      "head_lr": 0.001,
+      "unfreeze": 1.0,
+      "ft_epochs": 15,
+      "ft_lr": 0.0003,
+      "patience": 4,
+      "seed": 42
+    },
+    "runs": [
+      {
+        "seed": 42,
+        "val_acc": 0.8787361229718189,
+        "val_macro_f1": 0.8796301270812372
+      },
+      {
+        "seed": 1,
+        "val_acc": 0.8684884713919727,
+        "val_macro_f1": 0.85842586700575
+      },
+      {
+        "seed": 2,
+        "val_acc": 0.8770281810418445,
+        "val_macro_f1": 0.8782654759680544
+      },
+      {
+        "seed": 3,
+        "val_acc": 0.874466268146883,
+        "val_macro_f1": 0.8748149204690593
+      }
+    ],
+    "mean_val_macro_f1": 0.8727840976310253,
+    "sd_val_macro_f1": 0.009784284266020613,
+    "mean_val_acc": 0.8746797608881298,
+    "sd_val_acc": 0.004485041632960032
+  },
+  {
+    "name": "mobilenet_v3_large_224_g1",
+    "config": {
+      "backbone": "mobilenet_v3_large",
+      "size": 224,
+      "aug": "strong",
+      "hidden": 0,
+      "dropout": 0.2,
+      "label_smoothing": 0.1,
+      "weight_decay": 0.0001,
+      "batch": 32,
+      "head_epochs": 5,
+      "head_lr": 0.001,
+      "unfreeze": 0.3,
+      "ft_epochs": 15,
+      "ft_lr": 0.0003,
+      "patience": 4,
+      "seed": 42
+    },
+    "runs": [
+      {
+        "seed": 42,
+        "val_acc": 0.8778821520068317,
+        "val_macro_f1": 0.8753968965845818
+      },
+      {
+        "seed": 1,
+        "val_acc": 0.8659265584970111,
+        "val_macro_f1": 0.8611220390753287
+      },
+      {
+        "seed": 2,
+        "val_acc": 0.8710503842869343,
+        "val_macro_f1": 0.8673267415197664
+      },
+      {
+        "seed": 3,
+        "val_acc": 0.8676345004269855,
+        "val_macro_f1": 0.8713259314677578
+      }
+    ],
+    "mean_val_macro_f1": 0.8687929021618587,
+    "sd_val_macro_f1": 0.006083330976819913,
+    "mean_val_acc": 0.8706233988044406,
+    "sd_val_acc": 0.005287268892970869
+  }
+]

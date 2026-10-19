@@ -1,33 +1,35 @@
 """Final step: score the chosen model once on the test split and the real-world photos, then export it.
 
-Exports TFLite (float32, float16 and dynamic-range int8, for phones) and ONNX (for the backend's onnxruntime), checks
-every export gives the same predictions as the Keras model on the test photos, and measures size and CPU speed.
+Exports ONNX (for the backend's onnxruntime) and TFLite (float32, float16 and dynamic-range int8, for phones; made
+from the ONNX file with onnx2tf), checks every export gives the same predictions as the PyTorch model on the test
+photos, and measures size and CPU speed.
 
-    python evaluate_export.py runs/finetune/<name>/model.keras
+    python evaluate_export.py runs/<dataset>/finetune/<name>/model.pt
 """
 
 import json
+import os
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 import numpy as np
-import tensorflow as tf
+import torch
 from PIL import Image, ImageDraw
-from tensorflow import keras
+from torch import nn
 
-from common import HERE, classes, dataset, macro_f1, save_json
+from common import DATASET, HERE, Exported, files, eval_image, open_rgb, save_json
+from finetune import load
 
-OUT = HERE / "model"
-RESULTS = HERE / "results"
+OUT = HERE / "model" if DATASET == "processed" else HERE / "model" / DATASET
+RESULTS = HERE / "results" if DATASET == "processed" else HERE / "results" / DATASET
 
 
 def images(split, size, root=None):
-    xs, ys = [], []
-    for x, y in dataset(split, size, 64, **({"root": root} if root else {})):
-        xs.append(x.numpy())
-        ys.append(y.numpy())
-    return np.concatenate(xs), np.concatenate(ys)
+    paths, labels = files(split, *([root] if root else []))
+    return np.stack([eval_image(open_rgb(p), size) for p in paths]).astype(np.float32), np.array(labels)
 
 
 def report(y, pred, names):
@@ -49,7 +51,7 @@ def report(y, pred, names):
 
 def draw_confusion(cm, names, path, title):
     cm = np.array(cm)
-    cell, left, top = 64, 120, 70
+    cell, left, top = 64, 150, 70
     n = len(names)
     im = Image.new("RGB", (left + cell * n + 10, top + cell * n + 10), "white")
     d = ImageDraw.Draw(im)
@@ -70,86 +72,114 @@ def draw_confusion(cm, names, path, title):
     im.save(path)
 
 
-def tflite(model, mode, rep=None):
-    conv = tf.lite.TFLiteConverter.from_keras_model(model)
-    if mode == "float16":
-        conv.optimizations = [tf.lite.Optimize.DEFAULT]
-        conv.target_spec.supported_types = [tf.float16]
-    elif mode == "int8":
-        conv.optimizations = [tf.lite.Optimize.DEFAULT]  # dynamic-range: int8 weights, float activations
-    return conv.convert()
+def timed(fn, x, k=40):
+    times = []
+    for i in range(k):
+        t = time.perf_counter()
+        fn(x[i : i + 1])
+        times.append(time.perf_counter() - t)
+    return round(float(np.median(times)) * 1000, 1)
+
+
+def to_tflite(onnx_nchw: Path, work: Path) -> dict[str, bytes]:
+    """ONNX (NCHW) -> TensorFlow SavedModel with NHWC input (onnx2tf) -> TFLite float32, float16 (float16 weights,
+    float32 maths) and int8 (dynamic range: int8 weights, float activations) with TensorFlow's own converter."""
+    import onnx2tf
+    import tensorflow as tf
+
+    onnx2tf.convert(input_onnx_file_path=str(onnx_nchw), output_folder_path=str(work), non_verbose=True, tflite_backend="tf_converter")
+    out = {}
+    for mode in ("float32", "float16", "int8"):
+        conv = tf.lite.TFLiteConverter.from_saved_model(str(work))
+        if mode == "float16":
+            conv.optimizations = [tf.lite.Optimize.DEFAULT]
+            conv.target_spec.supported_types = [tf.float16]
+        elif mode == "int8":
+            conv.optimizations = [tf.lite.Optimize.DEFAULT]
+        out[mode] = conv.convert()
+    return out
 
 
 def run_tflite(blob, x):
-    it = tf.lite.Interpreter(model_content=blob, num_threads=4)
+    try:
+        from ai_edge_litert.interpreter import Interpreter
+    except ImportError:
+        from tensorflow.lite import Interpreter
+    it = Interpreter(model_content=blob, num_threads=4)
     inp, out = it.get_input_details()[0], it.get_output_details()[0]
-    it.resize_tensor_input(inp["index"], [1, *x.shape[1:]])
     it.allocate_tensors()
     preds, times = [], []
     for k in range(len(x)):
         t = time.perf_counter()
-        it.set_tensor(inp["index"], x[k : k + 1].astype(np.float32))
+        it.set_tensor(inp["index"], x[k : k + 1])
         it.invoke()
         times.append(time.perf_counter() - t)
         preds.append(it.get_tensor(out["index"])[0])
-    return np.array(preds), float(np.median(times) * 1000)
+    return np.array(preds), round(float(np.median(times) * 1000), 1)
+
+
+class SoftmaxNCHW(nn.Module):
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+
+    def forward(self, x):
+        return torch.softmax(self.net(x), dim=-1)
 
 
 def main():
     path = Path(sys.argv[1])
     result = json.loads((path.parent / "result.json").read_text())
-    cfg, names = result["config"], classes()
+    model, cfg, names = load(path, "cpu")
     size = cfg["size"]
-    model = keras.models.load_model(path, compile=False, safe_mode=False)
+    torch.set_num_threads(4)
 
     x_test, y_test = images("test", size)
     x_real, y_real = images("realworld", size, root=HERE / "data")
-    p_test = model.predict(x_test, batch_size=64, verbose=0)
-    p_real = model.predict(x_real, batch_size=64, verbose=0)
-    # CPU speed of the Keras model, one photo at a time
-    times = []
-    for k in range(40):
-        t = time.perf_counter()
-        model(x_test[k : k + 1], training=False)
-        times.append(time.perf_counter() - t)
+    exported = Exported(model).eval()
+    with torch.no_grad():
+        p_test = torch.cat([exported(torch.from_numpy(b)) for b in np.array_split(x_test, max(1, len(x_test) // 64))]).numpy()
+        p_real = torch.cat([exported(torch.from_numpy(b)) for b in np.array_split(x_real, max(1, len(x_real) // 64))]).numpy()
+        torch_ms = timed(lambda x: exported(torch.from_numpy(x)), x_test)
 
     test = report(y_test, p_test.argmax(1), names)
     real = report(y_real, p_real.argmax(1), names)
-    RESULTS.mkdir(exist_ok=True)
+    RESULTS.mkdir(parents=True, exist_ok=True)
     draw_confusion(test["confusion"], names, RESULTS / "confusion_test.png", f"Test split ({test['n']} photos): rows = true class")
     real_names = [n for n in names if real["per_class"].get(n)]
-    # all 6 rows, so each row keeps its own label; classes without real-world photos stay empty
+    # all rows, so each row keeps its own label; classes without real-world photos stay empty
     draw_confusion(real["confusion"], names, RESULTS / "confusion_realworld.png",
                    f"Real-world photos ({real['n']}): rows = true class (only {', '.join(real_names)})")
 
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(parents=True, exist_ok=True)
     exports = {}
-    for mode in ("float32", "float16", "int8"):
-        blob = tflite(model, mode)
-        fname = f"gym_machines_{mode}.tflite"
-        (OUT / fname).write_bytes(blob)
-        p, ms = run_tflite(blob, x_test)
-        exports[fname] = {"mb": round(len(blob) / 1e6, 2), "test_acc": float((p.argmax(1) == y_test).mean()),
-                          "same_predictions_as_keras": float((p.argmax(1) == p_test.argmax(1)).mean()), "cpu_ms_per_photo": round(ms, 1)}
-
     import onnxruntime as ort
-    import tf2onnx
 
-    spec = (tf.TensorSpec((None, size, size, 3), tf.float32, name="image"),)
-    onnx_model, _ = tf2onnx.convert.from_keras(model, input_signature=spec, opset=17)
     onnx_path = OUT / "gym_machines.onnx"
-    onnx_path.write_bytes(onnx_model.SerializeToString())
+    torch.onnx.export(exported, (torch.zeros(1, size, size, 3),), str(onnx_path), input_names=["image"], output_names=["probabilities"],
+                      dynamic_axes={"image": {0: "batch"}, "probabilities": {0: "batch"}}, opset_version=17, dynamo=False)
     sess = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
-    name_in = sess.get_inputs()[0].name
-    p = sess.run(None, {name_in: x_test.astype(np.float32)})[0]
-    t = []
-    for k in range(40):
-        s = time.perf_counter()
-        sess.run(None, {name_in: x_test[k : k + 1].astype(np.float32)})
-        t.append(time.perf_counter() - s)
+    p = sess.run(None, {"image": x_test})[0]
     exports["gym_machines.onnx"] = {"mb": round(onnx_path.stat().st_size / 1e6, 2), "test_acc": float((p.argmax(1) == y_test).mean()),
-                                    "same_predictions_as_keras": float((p.argmax(1) == p_test.argmax(1)).mean()),
-                                    "cpu_ms_per_photo": round(float(np.median(t)) * 1000, 1)}
+                                    "same_predictions_as_pytorch": float((p.argmax(1) == p_test.argmax(1)).mean()),
+                                    "max_prob_difference": float(np.abs(p - p_test).max()),
+                                    "cpu_ms_per_photo": timed(lambda x: sess.run(None, {"image": x}), x_test)}
+
+    work = Path(tempfile.mkdtemp())
+    try:
+        nchw = work / "nchw.onnx"
+        torch.onnx.export(SoftmaxNCHW(model).eval(), (torch.zeros(1, 3, size, size),), str(nchw), input_names=["image"],
+                          output_names=["probabilities"], opset_version=17, dynamo=False)
+        for mode, blob in to_tflite(nchw, work / "tf").items():
+            fname = f"gym_machines_{mode}.tflite"
+            (OUT / fname).write_bytes(blob)
+            p, ms = run_tflite(blob, x_test)
+            exports[fname] = {"mb": round(len(blob) / 1e6, 2), "test_acc": float((p.argmax(1) == y_test).mean()),
+                              "same_predictions_as_pytorch": float((p.argmax(1) == p_test.argmax(1)).mean()),
+                              "max_prob_difference": float(np.abs(p - p_test).max()), "cpu_ms_per_photo": ms}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
     (OUT / "labels.txt").write_text("\n".join(names) + "\n")
     save_json(OUT / "model_card.json", {
         "input": f"RGB photo, {size}x{size}, pixel values 0-255 (float32), NHWC; scaling to the network's range is inside the model",
@@ -157,15 +187,17 @@ def main():
         "output": "softmax probabilities, one per class in labels.txt order",
         "classes": names,
         "backbone": cfg["backbone"],
+        "framework": f"PyTorch {torch.__version__}",
         "config": cfg,
     })
 
-    final = {"model": str(path), "config": cfg, "test": test, "realworld": real, "keras_cpu_ms_per_photo": round(float(np.median(times)) * 1000, 1),
+    final = {"model": str(path), "dataset": DATASET, "config": cfg, "test": test, "realworld": real, "pytorch_cpu_ms_per_photo": torch_ms,
              "exports": exports, "val": {"acc": result["val"]["acc"], "macro_f1": result["val"]["macro_f1"]}}
     save_json(RESULTS / "final_metrics.json", final)
-    print(json.dumps({k: final[k] for k in ("val", "keras_cpu_ms_per_photo", "exports")}, indent=1))
+    print(json.dumps({k: final[k] for k in ("val", "pytorch_cpu_ms_per_photo", "exports")}, indent=1))
     print("test:", round(test["acc"], 4), round(test["macro_f1"], 4), "| real-world:", round(real["acc"], 4), round(real["macro_f1"], 4))
 
 
 if __name__ == "__main__":
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
     main()
