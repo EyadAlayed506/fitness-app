@@ -231,7 +231,7 @@ export function PhotoMatchStatusCard({ compact = false }: { compact?: boolean })
       <Txt variant="small">
         {s.downloading
           ? `Downloading the photo model: ${Math.round(s.downloaded_mb)} of ${Math.round(s.size_mb)} MB (one time).`
-          : `A small model (${Math.round(s.size_mb)} MB, one time) lets the app match a new photo with your earlier ones in a fraction of a second, without the vision model.`}
+          : `A small model (${Math.round(s.size_mb)} MB, one time) lets the app match a new photo with your earlier ones, so a machine it learned is recognised even if the classifier gets it wrong.`}
       </Txt>
       {s.downloading ? (
         <View style={{ marginTop: space.sm }}>

@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Annotated
 
 import httpx
@@ -6,7 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from rapidfuzz import fuzz
 from sqlmodel import select
 
-from app.config import get_settings
+from app.config import PROJECT_DIR, get_settings
 from app.database import SessionDep
 from app.deps import CurrentUser
 from app.models.exercise import (
@@ -24,6 +25,7 @@ from app.models.user import Profile
 from app.models.workout import BestSet, ExerciseHistoryOut, LastSession, PastSet, WorkoutSession, WorkoutSet
 from app.services.alternatives import find_alternatives
 from app.services.calculations import estimated_1rm
+from app.services.machine_classifier import MachineClassifier
 from app.services.qr import parse_qr_payload, qr_png
 from app.services.recognition import RecognitionError, Recognizer, image_type
 
@@ -199,15 +201,21 @@ MAX_PHOTO_BYTES = 15 * 1024 * 1024
 
 
 def get_recognizer() -> Iterator[Recognizer]:
-    """The vision model on this PC (Ollama). Tests replace this with a fake."""
+    """The vision model on this PC (Ollama), for gym photos, screenshots, weights and menus. Tests replace this."""
     s = get_settings()
     with httpx.Client() as http:
         yield Recognizer(http, s.ollama_url, s.ollama_vision_model)
 
 
+def get_machine_recognizer() -> MachineClassifier:
+    """The MobileNet machine classifier (ml/machine_classifier) for photos of one machine. Tests replace this."""
+    path = Path(get_settings().machine_model_dir)
+    return MachineClassifier(path if path.is_absolute() else PROJECT_DIR / path)
+
+
 @router.post("/recognize", response_model=RecognitionOut)
 def recognize_exercise(
-    _: CurrentUser, session: SessionDep, recognizer: Annotated[Recognizer, Depends(get_recognizer)],
+    _: CurrentUser, session: SessionDep, recognizer: Annotated[MachineClassifier, Depends(get_machine_recognizer)],
     image: UploadFile = File(...),
 ):
     """Up to three exercises from the catalogue that match a photo of a machine, best first.

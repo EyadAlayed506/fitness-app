@@ -1,0 +1,40 @@
+{
+  "input": "RGB photo, 224x224, pixel values 0-255 (float32), NHWC; scaling to the network's range is inside the model",
+  "preprocessing": "resize the short side to 256 px, then crop the centre 224x224",
+  "output": "softmax probabilities, one per class in labels.txt order",
+  "classes": [
+    "ab_crunch",
+    "arm_curl",
+    "calf_raise",
+    "chest_press",
+    "hack_squat",
+    "hip_abductor",
+    "lat_pulldown",
+    "lateral_raise",
+    "leg_curl",
+    "leg_extension",
+    "leg_press",
+    "pec_deck",
+    "seated_row"
+  ],
+  "backbone": "mobilenet_v3_large",
+  "framework": "PyTorch 2.11.0+cu128",
+  "config": {
+    "backbone": "mobilenet_v3_large",
+    "size": 224,
+    "aug": "strong",
+    "hidden": 0,
+    "dropout": 0.2,
+    "label_smoothing": 0.1,
+    "weight_decay": 0.0001,
+    "batch": 32,
+    "head_epochs": 5,
+    "head_lr": 0.001,
+    "unfreeze": 0.6,
+    "ft_epochs": 15,
+    "ft_lr": 0.0003,
+    "patience": 4,
+    "seed": 42
+  },
+  "trained_on": "data/machines13_team (Roboflow sets + the team's web photos), runs/machines13_team/finetune/team_s42"
+}

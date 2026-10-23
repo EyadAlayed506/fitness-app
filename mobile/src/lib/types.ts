@@ -584,7 +584,7 @@ export interface PhotoMatchStatus {
 }
 
 export interface SmartRecognition {
-  /** "memory": matched an earlier photo; "model": the vision model's guess; "none": nothing (pick by hand) */
+  /** "memory": matched an earlier photo; "model": the machine classifier's guess; "none": nothing (pick by hand) */
   source: "memory" | "model" | "none";
   photo_token: string;
   match: { exercise: Exercise; similarity: number; photo_id: number; taken_at: string } | null;

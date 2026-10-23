@@ -1,8 +1,8 @@
-"""Recognise a gym machine or exercise from a photo with a vision model running on this PC (Ollama).
+"""Look at photos with a vision model running on this PC (Ollama): a whole gym (scan_gym), and the
+screenshots, weights and menus in snap.py, which use ask().
 
-The vision model gets the photo and the app's exercise list and picks up to three exercises from that
-list. It can only answer with exercises that exist in the catalogue, and the user always confirms the
-guess. (Learning from the user's own confirmed photos is in photo_match.py.)
+A photo of one machine (Workouts > Photo) is recognised by the MobileNet in machine_classifier.py
+instead; learning from the user's own confirmed photos is in photo_match.py.
 """
 
 import base64
@@ -14,34 +14,7 @@ import httpx
 from app.models.exercise import Exercise
 from app.services.assistant import ollama_problem
 
-MAX_GUESSES = 3
 MIN_CONFIDENCE = 0.05
-
-PROMPT = """You identify gym machines and exercise equipment in photos for a workout app.
-
-Pick the exercises from the list below that match what the photo shows. If a name or label is visible on the machine, use it. A free weight (barbell, dumbbell, kettlebell) or a bench can match several exercises: list the most likely ones.
-
-Answer only with exercises from this list, using their id. Give up to 3 guesses, best first, with your confidence from 0 to 1. If the photo doesn't show gym equipment or nothing on the list matches, return an empty list. In "seen", describe in a few words what is in the photo.
-
-Exercises (id: name - main muscles, equipment):
-{catalogue}"""
-
-ANSWER_FORMAT = {
-    "type": "object",
-    "properties": {
-        "seen": {"type": "string"},
-        "guesses": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {"exercise_id": {"type": "integer"}, "confidence": {"type": "number"}},
-                "required": ["exercise_id", "confidence"],
-            },
-        },
-    },
-    "required": ["seen", "guesses"],
-}
-
 
 GYM_PROMPT = """You look at a photo of a gym (for example a hotel gym) for a workout app and list the training equipment you can see.
 
@@ -110,25 +83,6 @@ class Recognizer:
 
     def problem(self) -> str | None:
         return ollama_problem(self.http, self.url, self.model)
-
-    def recognize(self, image: bytes, catalogue: list[Exercise]) -> tuple[list[Guess], str]:
-        listing = "\n".join(
-            f"{e.id}: {e.name} - {e.primary_muscles or e.muscle_group}, {e.category}" for e in catalogue
-        )
-        answer = self.ask(image, PROMPT.format(catalogue=listing), ANSWER_FORMAT)
-
-        by_id = {e.id: e for e in catalogue}
-        guesses: list[Guess] = []
-        for g in answer.get("guesses") or []:
-            try:
-                ex = by_id.get(int(g.get("exercise_id")))
-                confidence = max(0.0, min(1.0, float(g.get("confidence", 0))))
-            except (TypeError, ValueError, AttributeError):
-                continue
-            if ex and confidence >= MIN_CONFIDENCE and all(x.exercise.id != ex.id for x in guesses):
-                guesses.append(Guess(ex, round(confidence, 2)))  # ids not in the catalogue are dropped
-        guesses.sort(key=lambda g: -g.confidence)
-        return guesses[:MAX_GUESSES], str(answer.get("seen") or "")[:200]
 
     def scan_gym(
         self, image: bytes, machines: list[Exercise], equipment_keys: list[str]

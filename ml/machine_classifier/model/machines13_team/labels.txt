@@ -1,0 +1,13 @@
+ab_crunch
+arm_curl
+calf_raise
+chest_press
+hack_squat
+hip_abductor
+lat_pulldown
+lateral_raise
+leg_curl
+leg_extension
+leg_press
+pec_deck
+seated_row

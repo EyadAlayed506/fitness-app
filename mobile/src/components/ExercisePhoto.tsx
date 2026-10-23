@@ -19,7 +19,7 @@ const likelihood = (c: number) =>
 
 /**
  * Choose or take a photo of a machine. Earlier photos the user confirmed are checked first ("Matched from
- * your earlier photo"); otherwise the vision model on the PC suggests exercises ("Best guess"). Whatever the
+ * your earlier photo"); otherwise the machine classifier on the PC suggests exercises ("Best guess"). Whatever the
  * user picks is remembered with the photo, so the app gets better at their gym's machines.
  */
 export function ExercisePhoto({

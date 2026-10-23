@@ -30,10 +30,11 @@ from app.models.gym import (
 )
 from app.models.user import User
 from app.models.workout import WorkoutSession, WorkoutSet
-from app.routers.exercises import MAX_PHOTO_BYTES, get_recognizer
+from app.routers.exercises import MAX_PHOTO_BYTES, get_machine_recognizer, get_recognizer
 from app.services import photo_match
 from app.services.activity import TzOffset, local_today, user_routine
 from app.services.gym_equipment import EQUIPMENT_LABELS, possible
+from app.services.machine_classifier import MachineClassifier
 from app.services.photo_match import Candidate, Embedder
 from app.services.plan import build_plan
 from app.services.recognition import RecognitionError, Recognizer, image_type
@@ -43,6 +44,7 @@ from app.services.schedule import DayChoice
 router = APIRouter(tags=["gyms"])
 
 RecognizerDep = Annotated[Recognizer, Depends(get_recognizer)]
+MachineRecognizerDep = Annotated[MachineClassifier, Depends(get_machine_recognizer)]
 
 
 def get_embedder() -> Embedder:
@@ -466,15 +468,15 @@ def _backfill(session: Session, embedder: Embedder, photos: list[MachinePhoto]) 
 def smart_recognize(
     user: CurrentUser,
     session: SessionDep,
-    recognizer: RecognizerDep,
+    recognizer: MachineRecognizerDep,
     embedder: EmbedderDep,
     image: UploadFile = File(...),
     gym_id: int | None = Query(default=None, description="the gym the photo was taken at (default: the default gym)"),
 ):
-    """Which machine a photo shows: first from the user's own earlier photos, else the vision model.
+    """Which machine a photo shows: first from the user's own earlier photos, else the machine classifier.
 
     The photo is kept for a day so the user can confirm it (POST /photo-memory/photos), which teaches
-    the app this machine. It's never sent anywhere but this server and the vision model on this PC.
+    the app this machine. It never leaves this server.
     """
     data, kind = _read_photo(image)
     gym = owned_gym(session, gym_id, user) if gym_id is not None else default_gym(session, user.id)
@@ -521,7 +523,7 @@ def smart_recognize(
             memory_seconds=memory_seconds,
         )
 
-    # nothing close enough: ask the vision model (if it's there)
+    # nothing close enough: ask the machine classifier (if its model file is there)
     problem = recognizer.problem()
     if problem:
         return SmartRecognitionOut(

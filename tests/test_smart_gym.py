@@ -1,7 +1,7 @@
 """Gyms, machine settings, photograph-a-gym and the photos that teach the app your machines.
 
-A fake image model (vectors from a photo's average colour) and a fake vision model stand in for the
-real ones: no download, no GPU, no network.
+A fake image model (vectors from a photo's average colour), a fake machine classifier and a fake vision
+model stand in for the real ones: no download, no GPU, no network.
 """
 
 import io
@@ -14,12 +14,13 @@ from sqlmodel import select
 from app.config import get_settings
 from app.main import app
 from app.models.exercise import Exercise
-from app.routers.exercises import get_recognizer
+from app.routers.exercises import get_machine_recognizer, get_recognizer
 from app.routers.gyms import get_embedder
 from app.services import photo_match
+from app.services.machine_classifier import MachineClassifier
 from app.services.recognition import Recognizer
 from tests.conftest import signup_and_login
-from tests.test_recognition import FakeVision
+from tests.test_recognition import FakeVision, machine  # noqa: F401 (machine is a fixture)
 
 
 def photo(rgb: tuple[int, int, int]) -> bytes:
@@ -149,16 +150,16 @@ def test_machine_settings_per_gym(client, auth, session):
 
 # ---------- the app learns your machines ----------
 
-def test_photo_memory_learns_a_corrected_machine(client, auth, session, embedder, vision, folders):
-    leg_press, incline = exercise_id(session, "Leg Press"), exercise_id(session, "Incline Chest Press")
-    vision.answer = {"seen": "a machine", "guesses": [{"exercise_id": incline, "confidence": 0.7}]}
+def test_photo_memory_learns_a_corrected_machine(client, auth, session, embedder, machine, folders):
+    leg_press, hack_squat = exercise_id(session, "Leg Press"), exercise_id(session, "Hack Squat")
+    machine.probs = {"hack_squat": 0.7, "leg_press": 0.3}
     red = photo((200, 30, 30))
 
-    # nothing saved yet: the vision model's best guess (wrong here)
+    # nothing saved yet: the classifier's best guess (wrong here)
     first = recognize(client, auth, red).json()
     assert first["source"] == "model" and first["match"] is None
-    assert first["guesses"][0]["exercise"]["id"] == incline
-    assert len(vision.requests) == 1
+    assert first["guesses"][0]["exercise"]["id"] == hack_squat
+    assert len(machine.inputs) == 1
 
     # the user corrects it: the photo is remembered as the leg press
     saved = client.post("/api/photo-memory/photos", json={
@@ -171,16 +172,16 @@ def test_photo_memory_learns_a_corrected_machine(client, auth, session, embedder
     assert client.post("/api/photo-memory/photos", json={"photo_token": first["photo_token"], "exercise_id": leg_press},
                        headers=auth).status_code == 404
 
-    # the same machine again (slightly different light): matched from memory, the vision model isn't asked
+    # the same machine again (slightly different light): matched from memory, the classifier isn't asked
     again = recognize(client, auth, photo((205, 36, 28))).json()
     assert again["source"] == "memory"
     assert again["match"]["exercise"]["id"] == leg_press and again["match"]["similarity"] > 0.99
     assert again["guesses"][0]["exercise"]["id"] == leg_press
-    assert len(vision.requests) == 1
+    assert len(machine.inputs) == 1
 
-    # a different machine: not close enough, so the vision model is asked
+    # a different machine: not close enough, so the classifier is asked
     other = recognize(client, auth, photo((30, 30, 200))).json()
-    assert other["source"] == "model" and len(vision.requests) == 2
+    assert other["source"] == "model" and len(machine.inputs) == 2
 
     photos = client.get("/api/photo-memory/photos", headers=auth).json()
     assert [p["exercise_name"] for p in photos] == ["Leg Press"]
@@ -197,9 +198,9 @@ def test_photo_memory_learns_a_corrected_machine(client, auth, session, embedder
                        headers=stranger).status_code == 404
 
 
-def test_photos_saved_before_the_model_was_there_are_matched_later(client, auth, session, embedder, vision):
+def test_photos_saved_before_the_model_was_there_are_matched_later(client, auth, session, embedder, machine):
     leg_press = exercise_id(session, "Leg Press")
-    vision.answer = {"seen": "", "guesses": [{"exercise_id": leg_press, "confidence": 0.9}]}
+    machine.probs = {"leg_press": 0.9}
     embedder.is_ready = False
     status = client.get("/api/photo-memory/status", headers=auth).json()
     assert status["ready"] is False and "351 MB" in status["problem"]
@@ -216,12 +217,12 @@ def test_photos_saved_before_the_model_was_there_are_matched_later(client, auth,
     assert client.get("/api/photo-memory/photos", headers=auth).json()[0]["matchable"] is True
 
 
-def test_without_ollama_the_user_picks_by_hand(client, auth, session, embedder, vision):
-    vision.down = True
+def test_without_the_model_file_the_user_picks_by_hand(client, auth, session, embedder, folders):
+    app.dependency_overrides[get_machine_recognizer] = lambda: MachineClassifier(folders / "no-model")
     r = recognize(client, auth, photo((90, 90, 90)))
     assert r.status_code == 200
     body = r.json()
-    assert body["source"] == "none" and body["guesses"] == [] and "Ollama" in body["problem"]
+    assert body["source"] == "none" and body["guesses"] == [] and "isn't on this PC" in body["problem"]
     # the hand-picked machine is still remembered
     saved = client.post("/api/photo-memory/photos", json={
         "photo_token": body["photo_token"], "exercise_id": exercise_id(session, "Leg Press")}, headers=auth)
@@ -306,8 +307,7 @@ def test_inventory_from_logged_workouts_photos_and_settings(client, auth, sessio
     assert set(inv["exercise_ids"]) == {curl, leg_press}
 
 
-def test_deleting_the_account_removes_photo_files(client, auth, session, embedder, vision, folders):
-    vision.answer = {"seen": "", "guesses": []}
+def test_deleting_the_account_removes_photo_files(client, auth, session, embedder, machine, folders):
     token = recognize(client, auth, photo((10, 200, 10))).json()["photo_token"]
     client.post("/api/photo-memory/photos", json={"photo_token": token, "exercise_id": exercise_id(session, "Leg Press")},
                 headers=auth)
