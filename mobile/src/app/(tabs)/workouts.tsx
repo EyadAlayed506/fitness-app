@@ -272,6 +272,7 @@ export default function Workouts() {
                 <Row style={{ marginTop: space.md, justifyContent: "center", flexWrap: "wrap" }} gap={space.lg}>
                   <LinkButton title="Add another exercise" onPress={() => setSheet({ kind: "search" })} />
                   <LinkButton title="Scan QR" onPress={() => setSheet({ kind: "scan" })} />
+                  <LinkButton title="From photo" onPress={() => setSheet({ kind: "photo" })} />
                 </Row>
               ) : (
                 <>
