@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     ollama_vision_model: str = "qwen3-vl:8b"  # reads gym photos, screenshots, weights and menus
     # Workouts > Photo: the MobileNet trained in ml/machine_classifier (a folder with gym_machines.onnx and
     # labels.txt; relative paths are from the project folder)
-    machine_model_dir: str = "ml/machine_classifier/model/machines13_team"
+    machine_model_dir: str = "ml/machine_classifier/model/machines13_yt"
     # Voice messages: speech to text on this PC with Whisper (downloads once, about 500 MB for "small")
     whisper_model: str = "small"  # tiny, base, small, medium, large-v3 (bigger = better and slower)
     whisper_device: str = "cpu"  # "cuda" for an NVIDIA GPU (needs the CUDA libraries)
