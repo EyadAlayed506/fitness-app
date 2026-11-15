@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-secret-change-me-in-the-env-file"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 30
+    # Pilot accounts. Sign-up stays open for local development; set ALLOW_SIGNUP=false on the shared
+    # server and create the testers' accounts with `uv run python -m app.pilot_accounts`.
+    allow_signup: bool = True
+    # "email:password,email:password" — the pilot's tester accounts. Only ever in the server's .env,
+    # never in git. Passwords must not contain a comma. See docs/team/ACCOUNTS.md.
+    pilot_accounts: str = ""
     usda_api_key: str = "DEMO_KEY"
     off_user_agent: str = "FitnessApp/0.1 (contact@example.com)"
     external_timeout_seconds: float = 8.0

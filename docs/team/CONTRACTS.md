@@ -22,10 +22,17 @@ the shared backend/build pieces.
 | Expiry | `JWT_EXPIRE_MINUTES`, default **30** | `app/config.py` |
 | Identity | `CurrentUser` dependency decodes the bearer token and loads the user; invalid/expired → 401 | `app/deps.py` |
 | Log-out | Client-side only (token deleted on the phone). The token stays valid until `exp` | `mobile/src/lib/auth.tsx` |
-| Revocation | **None.** No server-side way to cut off a token before it expires | — |
+| Revocation | **None** at `dfd5df0`. Added in BE-02 (branch `alzoman`): see below | — |
 | Delete account | `DELETE /api/me` removes the user and their rows and photo files | `app/services/accounts.py` |
 | Demo account | `demo@fitness.app` / `demo1234`, fixed in the repository | `app/demo.py` |
 | Mobile 401 handling | Shows "Your session expired. Please log in again." | `mobile/src/lib/api.ts` |
+
+### BE-02 status (branch `alzoman`)
+
+Items 1, 2, 3 and 5 below are **implemented** (runbook: [ACCOUNTS.md](ACCOUNTS.md)); item 4 (session length)
+is still a proposal. The admin command became a roster sync, `uv run python -m app.pilot_accounts`, driven by
+`PILOT_ACCOUNTS` in the server `.env`. Removing an account *disables* it (records kept); nothing is deleted.
+A disabled account logging in gets `403 {"detail": "This account no longer has access to the pilot"}`.
 
 ### Proposed (BE-02) — needs Nawaf + Samer sign-off
 

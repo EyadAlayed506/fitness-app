@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import select
 
+from app.config import get_settings
 from app.database import SessionDep
 from app.models.user import Token, User, UserCreate, UserPublic
 from app.security import create_access_token, hash_password, verify_password
@@ -14,6 +15,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/signup", response_model=UserPublic, status_code=201)
 def signup(data: UserCreate, session: SessionDep):
+    if not get_settings().allow_signup:
+        raise HTTPException(status_code=403, detail="Sign-up is closed for this pilot")
     email = data.email.lower()
     if session.exec(select(User).where(User.email == email)).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -39,4 +42,6 @@ def login(form: Annotated[OAuth2PasswordRequestForm, Depends()], session: Sessio
             detail="Wrong email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return Token(access_token=create_access_token(user.id))
+    if user.disabled_at is not None:
+        raise HTTPException(status_code=403, detail="This account no longer has access to the pilot")
+    return Token(access_token=create_access_token(user.id, user.token_version))

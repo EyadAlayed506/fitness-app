@@ -68,6 +68,11 @@ class User(SQLModel, table=True):
     marketing_consented_at: datetime | None = None
     unsubscribe_token: str = Field(default_factory=lambda: secrets.token_urlsafe(24), unique=True)
     created_at: datetime = Field(default_factory=utcnow)
+    # Access control (nullable so an existing database gains these columns on start-up).
+    # disabled_at: set when the account is removed from the pilot; it can no longer log in or use old tokens.
+    disabled_at: datetime | None = None
+    # Bumped to log the user out everywhere (password change, removal). None counts as 0.
+    token_version: int | None = None
 
 
 class UserCreate(SQLModel):
