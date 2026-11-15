@@ -10,3 +10,6 @@ __pycache__/
 /ml/machine_classifier/data/
 /ml/machine_classifier/runs/
 /ml/machine_classifier/.venv
+# backups and data set aside by `python -m app.backup` (they contain testers' records)
+/backups/
+*.before-restore-*

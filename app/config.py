@@ -9,13 +9,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # current folder, if there is a different one, wins).
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ENV = PROJECT_DIR / ".env"
+DEFAULT_JWT_SECRET = "dev-only-secret-change-me-in-the-env-file"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(PROJECT_ENV, ".env"), extra="ignore")
 
     database_url: str = "sqlite:///./fitness.db"
-    jwt_secret: str = "dev-only-secret-change-me-in-the-env-file"
+    jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 30
     # Pilot accounts. Sign-up stays open for local development; set ALLOW_SIGNUP=false on the shared
