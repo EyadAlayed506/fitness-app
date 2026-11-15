@@ -30,10 +30,12 @@ from app.routers import (
 )
 from app.routers.assistant import chosen_provider
 from app.seed import seed_catalogue
+from app import log_redaction
 from app.startup_checks import current_commit, pilot_server_problems, pilot_server_warnings
 
 STATIC_DIR = Path(__file__).parent / "static"
 log = logging.getLogger("uvicorn.error")  # shows up in the server's console
+log_redaction.install()  # WHOOP codes and unsubscribe links never reach the request log
 APP_VERSION = "0.1.0"
 COMMIT = current_commit()  # read once at start-up; shown by /api/health
 

@@ -58,12 +58,12 @@ Expo Go or the browser. They need a development build (see [DELIVERY-OPTIONS.md]
 
 ## 5. Checks (what CI runs)
 
-| Where | Command | Baseline result at `dfd5df0` |
+| Where | Command | Result |
 |---|---|---|
-| repo root | `uv run pytest` | Not run in BE-01 session (see report). Historical: 236 passed at `5ca0a81` |
+| repo root | `uv run pytest` | Passed in CI on `alzoman` (2026-11-15). Historical: 236 passed at `5ca0a81` |
 | `mobile/` | `npm test` | **72 passed, 0 failed** (Node 22.23.4, Linux) |
-| `mobile/` | `npm run lint` | Not run in BE-01 session |
-| `mobile/` | `npm run typecheck` | Not run in BE-01 session |
+| `mobile/` | `npm run lint` | Passed in CI on `alzoman` (2026-11-15) |
+| `mobile/` | `npm run typecheck` | Passed in CI on `alzoman` (2026-11-15) |
 
 CI: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs all four on every PR into
 `merged_branch` and on every push to `merged_branch` or to `alzoman`. Free on public repositories; no secrets used.
