@@ -39,6 +39,14 @@ def test_signup_closed_on_the_pilot_server(client, session, closed_signup):
     assert session.exec(select(User)).all() == []
 
 
+def test_closed_signup_answers_403_before_checking_the_request(client, session, closed_signup):
+    """Not 422: a closed server refuses every attempt the same way, even ones it couldn't parse."""
+    for body in ({"email": "ali@pilot.local", "password": "x"}, {}, {"email": "not-an-email"}):
+        r = client.post("/api/auth/signup", json=body)
+        assert r.status_code == 403 and r.json() == {"detail": "Sign-up is closed for this pilot"}
+    assert session.exec(select(User)).all() == []
+
+
 def test_pilot_accounts_can_log_in_when_signup_is_closed(client, session, closed_signup):
     sync_pilot_accounts(session, ROSTER)
     me = client.get("/api/me", headers=headers_for(client, "ali@pilot.local", "ali-pass-1"))

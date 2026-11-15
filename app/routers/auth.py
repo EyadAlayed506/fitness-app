@@ -13,10 +13,15 @@ from app.security import create_access_token, hash_password, verify_password
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/signup", response_model=UserPublic, status_code=201)
-def signup(data: UserCreate, session: SessionDep):
+def require_signup_open() -> None:
+    # A route dependency runs before the request body is validated, so a closed server answers 403 to
+    # every sign-up attempt (not 422 for, say, an address the email validator rejects).
     if not get_settings().allow_signup:
         raise HTTPException(status_code=403, detail="Sign-up is closed for this pilot")
+
+
+@router.post("/signup", response_model=UserPublic, status_code=201, dependencies=[Depends(require_signup_open)])
+def signup(data: UserCreate, session: SessionDep):
     email = data.email.lower()
     if session.exec(select(User).where(User.email == email)).first():
         raise HTTPException(status_code=409, detail="An account with this email already exists")

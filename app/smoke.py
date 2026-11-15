@@ -7,7 +7,7 @@ Accounts: the first two entries of SMOKE_ACCOUNTS if set (same "email:password,e
 otherwise of PILOT_ACCOUNTS. Put them in the environment or .env, never on the command line.
 
 It leaves no trace in the testers' records: the one body measurement it creates is deleted again, and the sign-up
-check uses an email that already exists, so even an open server creates nothing.
+check sends an invalid sign-up (existing email, too-short password), so even an open server creates nothing.
 Exit code 0 = every check passed.
 """
 
@@ -56,9 +56,10 @@ def run_smoke(client: httpx.Client, accounts: list[tuple[str, str]]) -> list[Che
         headers.append(h)
     a, b = headers
 
-    r = client.post("/api/auth/signup", json={"email": accounts[0][0], "password": "smoke-test-only-1"})
+    # deliberately invalid (existing email, too-short password): even an open server can't create an account
+    r = client.post("/api/auth/signup", json={"email": accounts[0][0], "password": "x"})
     check("sign-up is closed", r.status_code == 403,
-          "open: set ALLOW_SIGNUP=false" if r.status_code == 409 else f"HTTP {r.status_code}")
+          "open: set ALLOW_SIGNUP=false" if r.status_code in (409, 422) else f"HTTP {r.status_code}")
 
     r = client.get("/api/me", headers={"Authorization": "Bearer not-a-real-token"})
     check("a fake login token is refused", r.status_code == 401, f"HTTP {r.status_code}")
