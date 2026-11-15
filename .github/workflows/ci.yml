@@ -1,0 +1,65 @@
+# Checks for every pull request into merged_branch and every push to it.
+# Free: standard GitHub-hosted runners are free and unlimited for public repositories.
+# No secrets are used or needed: tests replace WHOOP, USDA, Open Food Facts and the AI with fakes.
+name: CI
+
+on:
+  pull_request:
+    branches: [merged_branch]
+  push:
+    # merged_branch, plus Alzoman's work branch so checks run without opening a pull request
+    branches: [merged_branch, alzoman, "alzoman/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        run: python -m pip install --upgrade uv
+      - name: Install locked dependencies
+        # --locked fails if uv.lock is out of date with pyproject.toml, instead of silently re-resolving
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run pytest -q
+
+  mobile:
+    name: Mobile (test, lint, typecheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          lfs: false
+      - uses: actions/setup-node@v6
+        with:
+          # npm test uses --experimental-strip-types, which needs Node 22.6 or newer
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
