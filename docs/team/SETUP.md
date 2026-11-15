@@ -53,6 +53,9 @@ npm ci                           # exact versions from package-lock.json (use in
 npx expo start                   # w = browser, or scan the QR code with Expo Go
 ```
 
+Web app as testers get it: `npx expo export -p web`, then start the backend and open http://localhost:8000
+(the backend serves `mobile/dist`; the older simple preview is at `/preview`).
+
 Health Connect, and any future Apple Health code, are native modules: they do **not** run in
 Expo Go or the browser. They need a development build (see [DELIVERY-OPTIONS.md](DELIVERY-OPTIONS.md)).
 

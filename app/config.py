@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     photo_match_model_file: str = "clip-vit-b32-visual.onnx"
     photo_match_threshold: float = 0.90  # cosine similarity a saved photo must reach to count as the same machine
     models_dir: str = "models"  # downloaded models (next to the database)
+    # The real app's web build (`cd mobile && npx expo export -p web`), served at "/". Relative to the project folder.
+    web_app_dir: str = "mobile/dist"
     photos_dir: str = "data/photos"  # confirmed machine photos; they never leave this server
 
     @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri", "anthropic_api_key")

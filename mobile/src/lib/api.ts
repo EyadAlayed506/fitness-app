@@ -8,14 +8,17 @@ const API_PORT = 8000;
 
 /**
  * Where the backend runs.
- * - Web: the same computer the page was opened from.
+ * - Web app built with `expo export` and served by the backend: the same address as the page
+ *   (works behind https on port 443, e.g. a Tailscale Funnel address).
+ * - Web during development (`expo start --web`): the same computer, port 8000.
  * - Expo Go on a phone: the computer running `npx expo start` (Expo tells us its address).
- * EXPO_PUBLIC_API_URL overrides both, and the login screen lets the user change it.
+ * EXPO_PUBLIC_API_URL overrides all of these, and the login screen lets the user change it.
  */
 function defaultServerUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
   if (Platform.OS === "web" && typeof window !== "undefined") {
+    if (process.env.NODE_ENV === "production") return window.location.origin;
     return `${window.location.protocol}//${window.location.hostname}:${API_PORT}`;
   }
   const host = Constants.expoConfig?.hostUri?.split(":")[0];

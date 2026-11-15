@@ -16,7 +16,9 @@ domain. Trade-off: the service is up only while that PC is on. See [DELIVERY-OPT
 2. `git clone https://github.com/EyadAlayed506/fitness-app.git C:\fitness-server`, then `cd C:\fitness-server`
    and `git switch <branch from step 0>`.
 3. `uv sync --locked`
-4. Windows power settings: never sleep while plugged in. Pause Windows Update for the pilot weeks.
+4. Build the web app (Node.js 22): `cd mobile`, `npm ci`, `npx expo export -p web`, `cd ..`.
+   The server then shows the app at `/` (the older simple preview moves to `/preview`).
+5. Windows power settings: never sleep while plugged in. Pause Windows Update for the pilot weeks.
 
 ## 2. Settings (`C:\fitness-server\.env`, never committed, keep a private copy elsewhere)
 
@@ -47,7 +49,8 @@ uv run fastapi run app/main.py --host 127.0.0.1 --port 8000
 `127.0.0.1` means only this PC can reach it directly; testers come in through Funnel (next step).
 The console/access log shows full request URLs, including WHOOP's one-time OAuth code. Keep raw logs on
 this PC; remove such values before pasting logs into chat or an issue.
-Check: open `http://127.0.0.1:8000/api/health` → `"status": "ok"` and the commit you expect.
+Check: open `http://127.0.0.1:8000/api/health` → `"status": "ok"` and the commit you expect, and
+`http://127.0.0.1:8000/` → the app's login screen.
 
 Start automatically: Task Scheduler → Create Task → trigger "At startup", action
 `powershell -NoProfile -Command "cd C:\fitness-server; uv run fastapi run app/main.py --host 127.0.0.1 --port 8000"`,
@@ -85,18 +88,19 @@ To restore on the live server: stop the task, `restore <folder> --force` (curren
 ## 6. Updating the server
 
 1. `uv run python -m app.backup create`
-2. Stop the task → `git pull` → `uv sync --locked` → start the task.
+2. Stop the task → `git pull` → `uv sync --locked` → in `mobile`: `npm ci` and `npx expo export -p web` → start the task.
 3. `/api/health` shows the new commit; log in as one tester.
 4. Rollback: stop → `git switch --detach <previous commit>` → `uv sync --locked` → start. Restore the
    backup from step 1 only if the update damaged data (new columns added by an update are harmless to keep).
 
-## 7. Mobile build pointing at the server
+## 7. The app for testers
 
-The app reads `EXPO_PUBLIC_API_URL` at build time. Add it to the `preview` profile in `mobile/eas.json`
-(coordinate with Samer — shared file), e.g. `"env": { "EXPO_PUBLIC_API_URL": "https://<machine>.<tailnet>.ts.net" }`,
-then `eas build -p android --profile preview`. The URL is public; never put keys in `EXPO_PUBLIC_*`.
+Testers open `https://<machine>.<tailnet>.ts.net` in their phone browser (see INSTALL-TESTERS.md). The web
+app talks to the server at the same address, so no build setting is needed. Give testers the `https` Funnel
+address (logins then travel encrypted). No phone builds are made for the pilot (web-only decision,
+2026-11-16).
 
 ## 8. Release record (each build you hand out)
 
-App version + EAS build link, server commit (from `/api/health`), `MACHINE_MODEL_DIR`, coach provider/model,
+Server commit (the web app is built from the same commit) (from `/api/health`), `MACHINE_MODEL_DIR`, coach provider/model,
 evidence retrieval: disabled, API URL, last backup + restore rehearsal date, known issues.

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlmodel import Session
 
 from app.config import PROJECT_ENV, get_settings
@@ -30,7 +31,7 @@ from app.routers import (
 )
 from app.routers.assistant import chosen_provider
 from app.seed import seed_catalogue
-from app import log_redaction
+from app import log_redaction, web_app
 from app.startup_checks import current_commit, pilot_server_problems, pilot_server_warnings
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -104,4 +105,14 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/", include_in_schema=False)
 def index():
+    """The real app's web build if it has been exported (see app/web_app.py), otherwise the simple preview."""
+    page = web_app.resolve("")
+    return web_app.file_response(page) if page else FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/preview", include_in_schema=False)
+def simple_preview():
     return FileResponse(STATIC_DIR / "index.html")
+
+
+app.add_exception_handler(StarletteHTTPException, web_app.not_found_handler)
