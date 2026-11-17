@@ -84,7 +84,7 @@ def read_conversation(user: CurrentUser, session: SessionDep, backend: Assistant
         model=backend.model,
         messages_left_today=_left_today(session, user.id, backend),
         messages=[_public(m) for m in messages],
-        disclaimer=assistant.DISCLAIMER,
+        disclaimer=assistant.disclaimer(),
     )
 
 

@@ -92,6 +92,24 @@ def tr_count(table: Table, key: str, n: float, **params: object) -> str:
     return _fill(form, lang, {"n": number, **params})
 
 
+_AR_WEEKDAYS = ("الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
+_AR_MONTHS = ("يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر")
+
+
+def short_date(d) -> str:
+    """"Tue 18 Nov" / "الثلاثاء 18 نوفمبر" (Western digits and the Gregorian calendar, as in the app)."""
+    if current_language() == "ar":
+        return f"{_AR_WEEKDAYS[d.weekday()]} {d.day} {_AR_MONTHS[d.month - 1]}"
+    return d.strftime("%a %d %b")
+
+
+def weekday_name(index: int) -> str:
+    """0 = Monday ... 6 = Sunday, as the backend counts."""
+    if current_language() == "ar":
+        return _AR_WEEKDAYS[index]
+    return ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[index]
+
+
 class LanguageMiddleware:
     """Reads `Accept-Language` once per request. Plain ASGI, so the language reaches every endpoint and thread."""
 

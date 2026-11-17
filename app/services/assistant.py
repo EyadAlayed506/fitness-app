@@ -33,15 +33,93 @@ from app.services.activity import (
 )
 from app.services.plan import build_plan
 
+from app.i18n import Table, current_language, short_date, tr, tr_count
+
 MAX_TOOL_ROUNDS = 8  # model calls per question, so a confused loop can't run up the bill
 MAX_TOOL_RESULT_CHARS = 20_000
 MAX_TOKENS = 16_000
 HISTORY_MESSAGES = 20  # earlier messages sent with each question (10 questions and answers)
 
-DISCLAIMER = (
-    "The coach is an AI. It reads your data and can log things for you, but it can make mistakes (check what it "
-    "added, and use Undo), and it isn't a doctor: for pain, injury or health worries, talk to a professional."
-)
+# What the user sees from the coach besides its replies, in the language of the request (app.i18n)
+TEXTS: Table = {
+    "en": {
+        "disclaimer": "The coach is an AI. It reads your data and can log things for you, but it can make mistakes (check what it "
+        "added, and use Undo), and it isn't a doctor: for pain, injury or health worries, talk to a professional.",
+        "cut_off": "\n\n(My answer got cut off. Ask me to continue or to keep it shorter.)",
+        "too_many_steps": "Sorry, that took too many steps. Could you ask in a simpler way?",
+        "no_answer": "Sorry, I don't have an answer for that.",
+        "refusal": "Sorry, I can't help with that one. For health worries, please talk to a professional.",
+        "no_key": "The assistant isn't set up on this server yet. For Claude: get an API key at console.anthropic.com, "
+        "put it in the backend's .env file as ANTHROPIC_API_KEY and restart the backend.",
+        "key_refused": "The Anthropic API key was refused. Check ANTHROPIC_API_KEY in .env.",
+        "busy": "The assistant is busy right now. Try again in a minute.",
+        "couldnt_answer": "The assistant couldn't answer ({status}): {message}",
+        "unreachable": "Couldn't reach the assistant service. Check the internet connection.",
+        "ollama_off": "Ollama isn't running on this PC (nothing answered at {url}). Start the Ollama app, "
+        "or install it from ollama.com, then try again.",
+        "ollama_no_model": "The model {model} isn't downloaded yet. Open a terminal and run: ollama pull {model}",
+        "action_food": "{food}, {amount} ({kcal} kcal{estimate}) for {meal}{when}",
+        "ai_estimate": ", AI estimate",
+        "on_day": " on {day}",
+        "action_removed": "Removed a {meal} entry ({kcal} kcal) on {day}",
+        "action_sets": "{exercise}: {sets} of {reps}{load}{started}",
+        "set_count": "{n} set|{n} sets",
+        "started": " (started a workout)",
+        "action_weight": "Weigh-in: {weight} on {day}",
+        "action_sleep": "Sleep {bed}-{wake} ({h} h {m} min), night to {day}",
+        "serving": "{n} serving|{n} servings",
+        "meal.breakfast": "breakfast",
+        "meal.lunch": "lunch",
+        "meal.dinner": "dinner",
+        "meal.snack": "snack",
+        "reply_in": "The app is set to English: reply in English unless the user writes in another language.",
+    },
+    "ar": {
+        "disclaimer": "المدرب ذكاء اصطناعي. يقرأ بياناتك ويستطيع تسجيل الأشياء لك، لكنه قد يخطئ (تحقّق مما أضافه "
+        "واستخدم «تراجع»)، وهو ليس طبيباً: في حالة الألم أو الإصابة أو القلق على صحتك، استشر مختصاً.",
+        "cut_off": "\n\n(انقطعت إجابتي. اطلب مني المتابعة أو اختصار الإجابة.)",
+        "too_many_steps": "عذراً، احتاج ذلك خطوات كثيرة. هل يمكنك السؤال بطريقة أبسط؟",
+        "no_answer": "عذراً، ليست لدي إجابة عن ذلك.",
+        "refusal": "عذراً، لا أستطيع المساعدة في هذا. إن كان الأمر يتعلق بصحتك، فتحدّث مع مختص.",
+        "no_key": "المساعد غير مُعدّ على هذا الخادم بعد. لاستخدام Claude: احصل على مفتاح API من console.anthropic.com، "
+        "وضعه في ملف ‎.env في الخادم باسم ANTHROPIC_API_KEY ثم أعد تشغيل الخادم.",
+        "key_refused": "رُفض مفتاح Anthropic API. تحقّق من ANTHROPIC_API_KEY في ملف ‎.env.",
+        "busy": "المساعد مشغول الآن. حاول مرة أخرى بعد دقيقة.",
+        "couldnt_answer": "تعذّر على المساعد الإجابة ({status}): {message}",
+        "unreachable": "تعذّر الوصول إلى خدمة المساعد. تحقّق من الاتصال بالإنترنت.",
+        "ollama_off": "Ollama لا يعمل على هذا الجهاز (لا استجابة على {url}). شغّل تطبيق Ollama، "
+        "أو ثبّته من ollama.com، ثم حاول مجدداً.",
+        "ollama_no_model": "النموذج {model} لم يُنزَّل بعد. افتح الطرفية ونفّذ: ollama pull {model}",
+        "action_food": "{food}، {amount} ({kcal} سعرة{estimate}) في {meal}{when}",
+        "ai_estimate": "، تقدير الذكاء الاصطناعي",
+        "on_day": " يوم {day}",
+        "action_removed": "أُزيل عنصر من {meal} ({kcal} سعرة) يوم {day}",
+        "action_sets": "{exercise}: {sets} من {reps} تكرار{load}{started}",
+        "set_count": "لا مجموعات|مجموعة واحدة|مجموعتان|{n} مجموعات|{n} مجموعة|{n} مجموعة",
+        "started": " (بدأ تمريناً)",
+        "action_weight": "الوزن: {weight} يوم {day}",
+        "action_sleep": "النوم {bed}-{wake} ({h} س {m} د)، ليلة {day}",
+        "serving": "لا حصص|حصة واحدة|حصتان|{n} حصص|{n} حصة|{n} حصة",
+        "meal.breakfast": "الفطور",
+        "meal.lunch": "الغداء",
+        "meal.dinner": "العشاء",
+        "meal.snack": "الوجبة الخفيفة",
+        "reply_in": "The app is set to Arabic: reply in Arabic (simple Modern Standard Arabic) unless the user writes in "
+        "another language. Keep numbers in Western digits (0-9) and units as the app shows them.",
+    },
+}
+
+# Kept for code and tests that read them directly: the English texts
+DISCLAIMER = TEXTS["en"]["disclaimer"]
+
+
+def disclaimer() -> str:
+    return tr(TEXTS, "disclaimer")
+
+
+def _meal(meal: str) -> str:
+    key = f"meal.{meal}"
+    return tr(TEXTS, key) if key in TEXTS["en"] else meal
 
 # Stable text only (no dates or user data), so it can be cached between requests.
 SYSTEM_PROMPT = """You are the coach inside a fitness app. You help one person with their training, sleep and food, using the data they have logged in the app.
@@ -58,6 +136,7 @@ How to work:
 - You are not a doctor. Don't diagnose, and don't advise on medication, injuries, eating disorders or medical conditions; for pain, injury, chest pain, dizziness, or anything that worries them, tell them to see a professional. In an emergency, tell them to contact emergency services.
 - Don't say that sleep caused a change in performance (or the other way round) just because the numbers moved together.
 - Use the user's units (metric or imperial, from their profile). Be brief, warm and encouraging, in plain language.
+- Reply in the language the app note names (English or Arabic), unless the user writes in another language. Food and exercise names from the tools can stay as they are.
 
 How your replies look (the app shows them on a phone screen):
 - Start with the answer in one short sentence. Then add only the details that help.
@@ -399,12 +478,11 @@ def _log_food(ctx: ToolContext, args: dict) -> Any:
                   quantity=quantity, unit=unit, added_via=FoodAddedVia.search),
         ctx.user, ctx.session,
     )
-    amount = f"{quantity:g} {unit}{'s' if unit == SERVING and quantity != 1 else ''}"
-    when = "" if entry.date == ctx.today else f" on {entry.date.strftime('%a %d %b')}"
-    ctx.actions.append(Action(
-        "food", f"{food.name}, {amount} ({round(entry.calories)} kcal{', AI estimate' if estimated else ''}) for {entry.meal}{when}",
-        "/food", [f"/food-logs/{entry.id}"],
-    ))
+    amount = tr_count(TEXTS, "serving", quantity) if unit == SERVING else f"{quantity:g} {unit}"
+    when = "" if entry.date == ctx.today else tr(TEXTS, "on_day", day=short_date(entry.date))
+    summary = tr(TEXTS, "action_food", food=food.name, amount=amount, kcal=round(entry.calories),
+                 estimate=tr(TEXTS, "ai_estimate") if estimated else "", meal=_meal(entry.meal), when=when)
+    ctx.actions.append(Action("food", _plain(summary), "/food", [f"/food-logs/{entry.id}"]))
     result = {"logged": entry, "food": food.name, "serving_size": food.serving_size, "serving_unit": food.serving_unit}
     if estimated:
         result["note"] = ("This food isn't in any database: its numbers are an AI estimate, saved as the user's own "
@@ -422,7 +500,7 @@ def _remove_food(ctx: ToolContext, args: dict) -> Any:
         raise ToolError("No food entry with that id. Look it up with get_food_day first.")
     calories, meal, day = entry.calories, entry.meal, entry.date
     delete_food_log(entry_id, ctx.user, ctx.session)
-    ctx.actions.append(Action("removed", f"Removed a {meal} entry ({round(calories)} kcal) on {day.strftime('%a %d %b')}", "/food"))
+    ctx.actions.append(Action("removed", _plain(tr(TEXTS, "action_removed", meal=_meal(meal), kcal=round(calories), day=short_date(day))), "/food"))
     return {"removed": entry_id}
 
 
@@ -456,11 +534,9 @@ def _log_sets(ctx: ToolContext, args: dict) -> Any:
         for _ in range(sets)
     ]
     load = f" x {weight:g} {unit}" if weight else ""
-    ctx.actions.append(Action(
-        "sets", f"{exercise.name}: {sets} set{'s' if sets > 1 else ''} of {reps}{load}"
-        + (" (started a workout)" if started else ""), "/workouts",
-        [f"/workouts/{workout_id}/sets/{s.id}" for s in added],
-    ))
+    summary = tr(TEXTS, "action_sets", exercise=exercise.name, sets=tr_count(TEXTS, "set_count", sets), reps=reps,
+                 load=load, started=tr(TEXTS, "started") if started else "")
+    ctx.actions.append(Action("sets", _plain(summary), "/workouts", [f"/workouts/{workout_id}/sets/{s.id}" for s in added]))
     return {"workout_id": workout_id, "started_new_workout": started, "sets": added}
 
 
@@ -476,8 +552,8 @@ def _log_weight(ctx: ToolContext, args: dict) -> Any:
     if args.get("unit") is None and ctx.profile.unit_system == "imperial":
         unit = WeightUnit("lb")
     entry = log_weight(WeightEntryIn(date=_date(args.get("date"), ctx), weight=value, unit=unit), ctx.profile, ctx.session)
-    ctx.actions.append(Action("weight", f"Weigh-in: {value:g} {unit.value} on {entry.date.strftime('%a %d %b')}", "/home",
-                              [f"/me/weight/{entry.id}"]))
+    summary = tr(TEXTS, "action_weight", weight=f"{value:g} {unit.value}", day=short_date(entry.date))
+    ctx.actions.append(Action("weight", _plain(summary), "/home", [f"/me/weight/{entry.id}"]))
     return entry
 
 
@@ -491,10 +567,9 @@ def _log_sleep(ctx: ToolContext, args: dict) -> Any:
         raise ToolError(f"Bad sleep times: {e}. Use YYYY-MM-DDTHH:MM for bedtime and wake_time.")
     entry = log_sleep(data, ctx.user, ctx.session)
     h, m = divmod(entry.duration_minutes, 60)
-    ctx.actions.append(Action(
-        "sleep", f"Sleep {data.bedtime:%H:%M}-{data.wake_time:%H:%M} ({h} h {m:02d} min), night to {entry.date:%a %d %b}",
-        "/sleep", [f"/sleep/{entry.id}"],
-    ))
+    summary = tr(TEXTS, "action_sleep", bed=f"{data.bedtime:%H:%M}", wake=f"{data.wake_time:%H:%M}", h=h, m=f"{m:02d}",
+                 day=short_date(entry.date))
+    ctx.actions.append(Action("sleep", _plain(summary), "/sleep", [f"/sleep/{entry.id}"]))
     return entry
 
 
@@ -627,12 +702,20 @@ class AssistantError(Exception):
 
 def _context_note(ctx: ToolContext) -> str:
     units = "imperial (lb, in)" if ctx.profile.unit_system == "imperial" else "metric (kg, cm)"
-    return f"(App note: today is {ctx.today.strftime('%A')} {ctx.today.isoformat()} for the user; their units are {units}.)"
+    language = "Arabic" if current_language() == "ar" else "English"
+    return (f"(App note: today is {ctx.today.strftime('%A')} {ctx.today.isoformat()} for the user; their units are {units}; "
+            f"app language: {language}. {tr(TEXTS, 'reply_in')})")
 
 
-CUT_OFF = "\n\n(My answer got cut off. Ask me to continue or to keep it shorter.)"
-TOO_MANY_STEPS = "Sorry, that took too many steps. Could you ask in a simpler way?"
-NO_ANSWER = "Sorry, I don't have an answer for that."
+def _plain(text: str) -> str:
+    """Action summaries are shown as they are, without the direction marks placeholders get in Arabic."""
+    return text.replace("\u2068", "").replace("\u2069", "")
+
+
+# English texts kept for code and tests that read them directly; replies use the request's language
+CUT_OFF = TEXTS["en"]["cut_off"]
+TOO_MANY_STEPS = TEXTS["en"]["too_many_steps"]
+NO_ANSWER = TEXTS["en"]["no_answer"]
 
 
 class ClaudeBackend:
@@ -647,10 +730,7 @@ class ClaudeBackend:
 
     def problem(self) -> str | None:
         if self.client is None:
-            return (
-                "The assistant isn't set up on this server yet. For Claude: get an API key at console.anthropic.com, "
-                "put it in the backend's .env file as ANTHROPIC_API_KEY and restart the backend."
-            )
+            return tr(TEXTS, "no_key")
         return None
 
     def ask(self, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
@@ -659,13 +739,13 @@ class ClaudeBackend:
         try:
             return self._ask(ctx, history, question)
         except anthropic.AuthenticationError:
-            raise AssistantError(502, "The Anthropic API key was refused. Check ANTHROPIC_API_KEY in .env.")
+            raise AssistantError(502, tr(TEXTS, "key_refused"))
         except anthropic.RateLimitError:
-            raise AssistantError(429, "The assistant is busy right now. Try again in a minute.")
+            raise AssistantError(429, tr(TEXTS, "busy"))
         except anthropic.APIStatusError as e:
-            raise AssistantError(502, f"The assistant couldn't answer ({e.status_code}): {e.message}")
+            raise AssistantError(502, _plain(tr(TEXTS, "couldnt_answer", status=e.status_code, message=e.message)))
         except anthropic.APIConnectionError:
-            raise AssistantError(502, "Couldn't reach the assistant service. Check the internet connection.")
+            raise AssistantError(502, tr(TEXTS, "unreachable"))
 
     def _ask(self, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
         """Calls Claude with tools until it gives a final answer (at most MAX_TOOL_ROUNDS model calls)."""
@@ -689,7 +769,7 @@ class ClaudeBackend:
                 fallbacks="default",
             )
             if response.stop_reason == "refusal":
-                return Answer("Sorry, I can't help with that one. For health worries, please talk to a professional.", used)
+                return Answer(tr(TEXTS, "refusal"), used)
             if response.stop_reason in ("tool_use", "pause_turn"):
                 # keep the whole reply (including any thinking blocks) unchanged, then add the tool results
                 messages.append({"role": "assistant", "content": response.content})
@@ -704,9 +784,9 @@ class ClaudeBackend:
                 continue
             text = "\n\n".join(b.text for b in response.content if b.type == "text").strip()
             if response.stop_reason == "max_tokens":
-                text += CUT_OFF
-            return Answer(text or NO_ANSWER, used)
-        return Answer(TOO_MANY_STEPS, used)
+                text += tr(TEXTS, "cut_off")
+            return Answer(text or tr(TEXTS, "no_answer"), used)
+        return Answer(tr(TEXTS, "too_many_steps"), used)
 
 
 # Small local models have less room: shorter history and tool results
@@ -725,12 +805,9 @@ def ollama_problem(http: httpx.Client, url: str, model: str) -> str | None:
         r.raise_for_status()
         names = {m.get("name") for m in r.json().get("models", [])}
     except (httpx.HTTPError, ValueError):
-        return (
-            f"Ollama isn't running on this PC (nothing answered at {url}). Start the Ollama app, "
-            "or install it from ollama.com, then try again."
-        )
+        return _plain(tr(TEXTS, "ollama_off", url=url))
     if model not in names and f"{model}:latest" not in names:
-        return f"The model {model} isn't downloaded yet. Open a terminal and run: ollama pull {model}"
+        return _plain(tr(TEXTS, "ollama_no_model", model=model))
     return None
 
 
@@ -774,9 +851,9 @@ class OllamaBackend:
                 continue
             text = _THINK.sub("", message.get("content") or "").strip()
             if reply.get("done_reason") == "length":
-                text += CUT_OFF
-            return Answer(text or NO_ANSWER, used)
-        return Answer(TOO_MANY_STEPS, used)
+                text += tr(TEXTS, "cut_off")
+            return Answer(text or tr(TEXTS, "no_answer"), used)
+        return Answer(tr(TEXTS, "too_many_steps"), used)
 
     def _chat(self, messages: list[dict], tools: bool = True, answer_format: dict | None = None, timeout: float = 300) -> dict:
         body: dict[str, Any] = {

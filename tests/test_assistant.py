@@ -539,3 +539,32 @@ def test_coach_asks_which_meal_then_logs(client, auth, session, claude):
     second = ask(client, auth, "breakfast").json()
     assert second["answer"]["actions"][0]["summary"].endswith("for breakfast")
     assert [e["meal"] for e in client.get(f"/api/food-logs?date={TODAY}", headers=auth).json()["entries"]] == ["breakfast"]
+
+
+def test_in_arabic_the_coach_is_told_to_reply_in_arabic_and_its_action_cards_are_arabic(client, auth, session):
+    from app.i18n import reset_language, set_language
+
+    token = set_language("ar")
+    try:
+        ctx = tool_ctx(session)
+        note = assistant._context_note(ctx)
+        assert "app language: Arabic" in note and "reply in Arabic" in note
+        content, err = assistant.run_tool(ctx, "log_workout_sets", {"exercise": "bench press", "sets": 3, "reps": 8, "weight": 60})
+        assert not err, content
+        assert ctx.actions[0].summary == "Barbell Bench Press: 3 مجموعات من 8 تكرار x 60 kg (بدأ تمريناً)"
+        assert "⁨" not in ctx.actions[0].summary, "no invisible direction marks in a summary"
+        content, err = assistant.run_tool(ctx, "log_weight", {"weight": 93.5})
+        assert not err, content
+        assert ctx.actions[1].summary.startswith("الوزن: 93.5 kg يوم ")
+        assert assistant.disclaimer().startswith("المدرب ذكاء اصطناعي")
+    finally:
+        reset_language(token)
+    # English again outside the Arabic request
+    assert assistant.disclaimer() == assistant.DISCLAIMER
+
+
+def test_the_coach_status_follows_the_request_language(client, auth):
+    english = client.get("/api/assistant", headers=auth).json()
+    arabic = client.get("/api/assistant", headers={**auth, "Accept-Language": "ar"}).json()
+    assert english["disclaimer"] == assistant.DISCLAIMER
+    assert arabic["disclaimer"].startswith("المدرب ذكاء اصطناعي")
