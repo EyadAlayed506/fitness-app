@@ -10,6 +10,8 @@ const TOKEN_KEY = "token";
 interface AuthState {
   ready: boolean;
   token: string | null;
+  /** the server rejected the saved login (it expired): the login screen says so */
+  expired: boolean;
   user: User | null;
   profile: Profile | null;
   plan: Plan | null;
@@ -29,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [expired, setExpired] = useState(false);
 
   const clear = useCallback(async () => {
     queryClient.clear(); // never show one account's cached data to the next
@@ -66,7 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // On start: restore the server address and a saved login
   useEffect(() => {
-    setUnauthorizedHandler(() => void clear());
+    setUnauthorizedHandler(() => {
+      setExpired(true);
+      void clear();
+    });
     (async () => {
       await server.load();
       const saved = await storage.get(TOKEN_KEY);
@@ -85,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       ready,
       token,
+      expired,
       user,
       profile,
       plan,
@@ -94,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           form: { username: email.trim(), password },
         });
         await applyToken(res.access_token);
+        setExpired(false);
       },
       async signup(email, password, marketing) {
         await api("/auth/signup", {
@@ -105,12 +113,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           form: { username: email.trim(), password },
         });
         await applyToken(res.access_token);
+        setExpired(false);
       },
-      logout: clear,
+      async logout() {
+        setExpired(false); // logging out on purpose is not an expired session
+        await clear();
+      },
       refresh,
       setUser,
     }),
-    [ready, token, user, profile, plan, applyToken, clear, refresh],
+    [ready, token, expired, user, profile, plan, applyToken, clear, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

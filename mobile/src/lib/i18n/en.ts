@@ -81,6 +81,7 @@ export const en = {
   "login.newHere": "New here?",
   "login.createAccount": "Create an account",
   "login.missingFields": "Enter your email and password.",
+  "login.sessionExpired": "You were logged out because your session ended. Log in again to carry on: everything you logged is saved.",
 
   "signup.title": "Create your account",
   "signup.subtitle": "Get your BMI, daily calories and a workout plan in a minute.",

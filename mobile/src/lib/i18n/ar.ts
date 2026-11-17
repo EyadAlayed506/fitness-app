@@ -84,6 +84,7 @@ export const ar: Dictionary = {
   "login.newHere": "جديد هنا؟",
   "login.createAccount": "إنشاء حساب",
   "login.missingFields": "أدخل بريدك الإلكتروني وكلمة المرور.",
+  "login.sessionExpired": "سُجّل خروجك لأن جلستك انتهت. سجّل الدخول مجدداً للمتابعة: كل ما سجّلته محفوظ.",
 
   "signup.title": "أنشئ حسابك",
   "signup.subtitle": "احصل على مؤشر كتلة جسمك وسعراتك اليومية وخطة تمارين خلال دقيقة.",
