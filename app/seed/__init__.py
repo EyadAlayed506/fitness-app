@@ -10,9 +10,11 @@ SEED_DIR = Path(__file__).parent
 
 
 def exercise_rows() -> list[dict]:
-    rows = json.loads((SEED_DIR / "exercises.json").read_text())
+    # UTF-8 always: Windows' default encoding would garble the Arabic text
+    rows = json.loads((SEED_DIR / "exercises.json").read_text(encoding="utf-8"))
     for row in rows:
         row["instructions"] = "\n".join(row.get("instructions") or [])
+        row["instructions_ar"] = "\n".join(row.get("instructions_ar") or []) or None
     return rows
 
 
@@ -31,6 +33,6 @@ def seed_catalogue(session: Session) -> None:
             exercise.sqlmodel_update(row)
             session.add(exercise)
     if session.exec(select(Food).where(Food.source == FoodSource.builtin).limit(1)).first() is None:
-        for row in json.loads((SEED_DIR / "foods.json").read_text()):
+        for row in json.loads((SEED_DIR / "foods.json").read_text(encoding="utf-8")):
             session.add(Food(source=FoodSource.builtin, **row))
     session.commit()

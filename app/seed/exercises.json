@@ -14,6 +14,15 @@
    "Keep your back and head against the pad.",
    "Push the handles forward until your arms are almost straight, without locking the elbows.",
    "Bring them back slowly until you feel a stretch in the chest."
+  ],
+  "name_ar": "جهاز ضغط الصدر",
+  "aliases_ar": "ضغط صدر, تشست برس, جهاز الصدر",
+  "primary_muscles_ar": "الصدر، الترايسبس، الكتف الأمامي",
+  "instructions_ar": [
+   "اضبط المقعد بحيث تكون المقابض بمحاذاة منتصف صدرك.",
+   "أبقِ ظهرك ورأسك ملاصقين للمسند.",
+   "ادفع المقابض للأمام حتى تكاد ذراعاك تستقيمان، دون قفل المرفقين.",
+   "أعدها ببطء حتى تشعر بتمدد في الصدر."
   ]
  },
  {
@@ -32,6 +41,16 @@
    "Lower the bar with control to the middle of your chest.",
    "Press it back up over your shoulders.",
    "Use a spotter or safety bars when lifting heavy."
+  ],
+  "name_ar": "بنش برس بالبار",
+  "aliases_ar": "بنش, بنش برس, ضغط بنش, ضغط صدر بالبار",
+  "primary_muscles_ar": "الصدر، الترايسبس، الكتف الأمامي",
+  "instructions_ar": [
+   "استلقِ على المقعد وعيناك تحت البار وقدماك مسطحتان على الأرض.",
+   "امسك البار أعرض قليلاً من عرض الكتفين.",
+   "أنزل البار بتحكّم إلى منتصف صدرك.",
+   "ادفعه للأعلى فوق كتفيك.",
+   "استعن بمساعد أو بقضبان أمان عند رفع أوزان ثقيلة."
   ]
  },
  {
@@ -49,6 +68,15 @@
    "Keep your back against the pad.",
    "Press up and forward until your arms are almost straight.",
    "Lower slowly to the starting position."
+  ],
+  "name_ar": "جهاز ضغط الصدر المائل",
+  "aliases_ar": "ضغط مائل, صدر علوي, انكلاين",
+  "primary_muscles_ar": "أعلى الصدر، الكتف الأمامي",
+  "instructions_ar": [
+   "اضبط المقعد بحيث تبدأ المقابض عند مستوى أعلى الصدر.",
+   "أبقِ ظهرك ملاصقاً للمسند.",
+   "ادفع للأعلى وللأمام حتى تكاد ذراعاك تستقيمان.",
+   "أنزل ببطء إلى وضع البداية."
   ]
  },
  {
@@ -66,6 +94,15 @@
    "Keep a slight bend in your elbows throughout.",
    "Bring the handles together in front of your chest.",
    "Open your arms slowly until you feel a stretch, not pain, in the chest."
+  ],
+  "name_ar": "جهاز فتح الصدر (بِك دِك)",
+  "aliases_ar": "بك دك, فراشة, تفتيح صدر",
+  "primary_muscles_ar": "الصدر",
+  "instructions_ar": [
+   "اضبط المقعد بحيث تكون المقابض عند مستوى الصدر.",
+   "أبقِ مرفقيك منثنيين قليلاً طوال الحركة.",
+   "اجمع المقابض أمام صدرك.",
+   "افتح ذراعيك ببطء حتى تشعر بتمدد في الصدر، لا بألم."
   ]
  },
  {
@@ -83,6 +120,15 @@
    "Step forward into a split stance with a slight lean.",
    "With elbows slightly bent, bring your hands together in front of your chest.",
    "Return slowly, keeping the same elbow angle."
+  ],
+  "name_ar": "تقاطع الكيبل للصدر",
+  "aliases_ar": "كروس اوفر, تفتيح كيبل, كيبل صدر",
+  "primary_muscles_ar": "الصدر",
+  "instructions_ar": [
+   "اضبط البكرتين عند مستوى الكتف أو أعلى، وامسك مقبضاً بكل يد.",
+   "تقدّم بخطوة في وقفة متباعدة مع ميل خفيف للأمام.",
+   "مع ثني المرفقين قليلاً، اجمع يديك أمام صدرك.",
+   "ارجع ببطء مع الحفاظ على زاوية المرفق نفسها."
   ]
  },
  {
@@ -100,6 +146,15 @@
    "Keep your feet flat and shoulder blades pulled back.",
    "Press the dumbbells up until your arms are almost straight.",
    "Lower them with control to the sides of your chest."
+  ],
+  "name_ar": "ضغط الصدر بالدمبل",
+  "aliases_ar": "بنش دمبل, ضغط دمبل, صدر دمبل",
+  "primary_muscles_ar": "الصدر، الترايسبس",
+  "instructions_ar": [
+   "استلقِ على مقعد مستوٍ وفي كل يد دمبل عند مستوى الصدر.",
+   "أبقِ قدميك مسطحتين ولوحَي كتفيك مشدودين للخلف.",
+   "ادفع الدمبلز للأعلى حتى تكاد ذراعاك تستقيمان.",
+   "أنزلها بتحكّم إلى جانبي صدرك."
   ]
  },
  {
@@ -117,6 +172,15 @@
    "Keep your body in a straight line from head to heels.",
    "Lower your chest towards the floor, elbows at about 45 degrees.",
    "Push back up. Do them with knees on the floor to make it easier."
+  ],
+  "name_ar": "تمرين الضغط",
+  "aliases_ar": "ضغط, بوش اب, تمرين ضغط ارضي",
+  "primary_muscles_ar": "الصدر، الترايسبس، الجذع",
+  "instructions_ar": [
+   "ابدأ في وضع اللوح المرتفع ويداك أعرض قليلاً من الكتفين.",
+   "أبقِ جسمك في خط مستقيم من الرأس إلى الكعبين.",
+   "أنزل صدرك نحو الأرض والمرفقان بزاوية 45 درجة تقريباً.",
+   "ادفع للأعلى. لتسهيله، أدِّه والركبتان على الأرض."
   ]
  },
  {
@@ -134,6 +198,15 @@
    "Grip the bar a little wider than shoulder width.",
    "Pull the bar down to your upper chest, leading with your elbows.",
    "Let it rise slowly until your arms are straight."
+  ],
+  "name_ar": "سحب أمامي (لات بول داون)",
+  "aliases_ar": "سحب امامي, لات, بول داون, سحب ظهر",
+  "primary_muscles_ar": "العضلة الظهرية العريضة، الباي",
+  "instructions_ar": [
+   "اضبط مسند الركبتين بحيث تثبت ساقاك.",
+   "امسك البار أعرض قليلاً من عرض الكتفين.",
+   "اسحب البار إلى أعلى صدرك مع قيادة الحركة بالمرفقين.",
+   "اتركه يرتفع ببطء حتى تستقيم ذراعاك."
   ]
  },
  {
@@ -151,6 +224,15 @@
    "Keep your back straight and chest up.",
    "Pull the handle to your lower ribs, squeezing your shoulder blades together.",
    "Return slowly until your arms are straight."
+  ],
+  "name_ar": "تجديف الكيبل جالساً",
+  "aliases_ar": "سحب ارضي, تجديف كيبل, رو جالس",
+  "primary_muscles_ar": "منتصف الظهر، العضلة الظهرية، الباي",
+  "instructions_ar": [
+   "اجلس وقدماك على المنصة والركبتان منثنيتان قليلاً.",
+   "أبقِ ظهرك مستقيماً وصدرك مرفوعاً.",
+   "اسحب المقبض نحو أسفل أضلاعك مع ضم لوحَي الكتفين.",
+   "ارجع ببطء حتى تستقيم ذراعاك."
   ]
  },
  {
@@ -168,6 +250,15 @@
    "Pull the handles back, squeezing your shoulder blades together.",
    "Keep your chest on the pad the whole time.",
    "Return slowly until your arms are straight."
+  ],
+  "name_ar": "جهاز التجديف بإسناد الصدر",
+  "aliases_ar": "جهاز تجديف, تي بار, رو جهاز",
+  "primary_muscles_ar": "منتصف الظهر، العضلة الظهرية",
+  "instructions_ar": [
+   "اضبط المقعد بحيث يستند صدرك على المسند وتصل إلى المقابض.",
+   "اسحب المقابض للخلف مع ضم لوحَي الكتفين.",
+   "أبقِ صدرك على المسند طوال الوقت.",
+   "ارجع ببطء حتى تستقيم ذراعاك."
   ]
  },
  {
@@ -185,6 +276,15 @@
    "Kneel or stand on the platform and grip the handles.",
    "Pull yourself up until your chin is above your hands.",
    "Lower slowly until your arms are straight."
+  ],
+  "name_ar": "جهاز العقلة المساعد",
+  "aliases_ar": "عقلة مساعدة, جرافيترون, عقلة جهاز",
+  "primary_muscles_ar": "العضلة الظهرية العريضة، الباي",
+  "instructions_ar": [
+   "اختر الوزن المقابل: كلما زاد الوزن زادت المساعدة.",
+   "اركع أو قف على المنصة وامسك المقابض.",
+   "اسحب نفسك للأعلى حتى يصبح ذقنك فوق يديك.",
+   "انزل ببطء حتى تستقيم ذراعاك."
   ]
  },
  {
@@ -202,6 +302,15 @@
    "Hold a dumbbell in the other hand with the arm straight.",
    "Pull the dumbbell towards your hip, keeping the elbow close to your body.",
    "Lower slowly and repeat, then switch sides."
+  ],
+  "name_ar": "تجديف بالدمبل",
+  "aliases_ar": "رو دمبل, تجديف يد واحدة, سحب دمبل",
+  "primary_muscles_ar": "العضلة الظهرية العريضة، منتصف الظهر",
+  "instructions_ar": [
+   "ضع يداً وركبة على المقعد مع إبقاء ظهرك مستوياً.",
+   "امسك دمبل باليد الأخرى والذراع مستقيمة.",
+   "اسحب الدمبل نحو وركك مع إبقاء المرفق قريباً من جسمك.",
+   "أنزله ببطء وكرّر، ثم بدّل الجانب."
   ]
  },
  {
@@ -219,6 +328,15 @@
    "Pull yourself up until your chin is above the bar.",
    "Lower slowly until your arms are straight.",
    "Use a resistance band or the assisted machine if you can't do a full rep yet."
+  ],
+  "name_ar": "العقلة",
+  "aliases_ar": "عقلة, بول اب, سحب على العقلة",
+  "primary_muscles_ar": "العضلة الظهرية العريضة، الباي",
+  "instructions_ar": [
+   "تعلّق بالبار ويداك أعرض قليلاً من الكتفين وراحتاك للأمام.",
+   "اسحب نفسك للأعلى حتى يصبح ذقنك فوق البار.",
+   "انزل ببطء حتى تستقيم ذراعاك.",
+   "استعن بشريط مطاطي أو بالجهاز المساعد إن لم تستطع أداء تكرار كامل بعد."
   ]
  },
  {
@@ -236,6 +354,15 @@
    "Keep your body straight from head to heels.",
    "Pull your chest up to the bar.",
    "Lower slowly. Bend your knees to make it easier."
+  ],
+  "name_ar": "التجديف المقلوب",
+  "aliases_ar": "تجديف بوزن الجسم, سحب استرالي",
+  "primary_muscles_ar": "منتصف الظهر، الباي",
+  "instructions_ar": [
+   "استلقِ تحت بار مثبّت عند مستوى الخصر تقريباً وامسكه بذراعين مستقيمتين.",
+   "أبقِ جسمك مستقيماً من الرأس إلى الكعبين.",
+   "اسحب صدرك نحو البار.",
+   "انزل ببطء. لتسهيله، اثنِ ركبتيك."
   ]
  },
  {
@@ -253,6 +380,15 @@
    "Keep your back against the pad.",
    "Press the handles up until your arms are almost straight.",
    "Lower slowly back to shoulder height."
+  ],
+  "name_ar": "جهاز ضغط الأكتاف",
+  "aliases_ar": "ضغط كتف, شولدر برس, جهاز الكتف",
+  "primary_muscles_ar": "الأكتاف، الترايسبس",
+  "instructions_ar": [
+   "اضبط المقعد بحيث تبدأ المقابض عند مستوى الكتفين.",
+   "أبقِ ظهرك ملاصقاً للمسند.",
+   "ادفع المقابض للأعلى حتى تكاد ذراعاك تستقيمان.",
+   "أنزلها ببطء إلى مستوى الكتفين."
   ]
  },
  {
@@ -270,6 +406,15 @@
    "Place your arms against the pads.",
    "Raise your arms out to the sides to shoulder height.",
    "Lower slowly."
+  ],
+  "name_ar": "جهاز الرفرفة الجانبية",
+  "aliases_ar": "رفرفة جانبي جهاز, جانبي كتف",
+  "primary_muscles_ar": "الكتف الجانبي",
+  "instructions_ar": [
+   "اضبط المقعد بحيث يكون كتفاك بمحاذاة محور الجهاز.",
+   "ضع ذراعيك على المساند.",
+   "ارفع ذراعيك جانباً حتى مستوى الكتفين.",
+   "أنزلهما ببطء."
   ]
  },
  {
@@ -287,6 +432,15 @@
    "Hold the handles with arms straight in front of you, elbows slightly bent.",
    "Move your arms out and back until they're in line with your body.",
    "Return slowly."
+  ],
+  "name_ar": "جهاز فتح الكتف الخلفي",
+  "aliases_ar": "رفرفة خلفي, كتف خلفي جهاز, ريفرس فلاي",
+  "primary_muscles_ar": "الكتف الخلفي، أعلى الظهر",
+  "instructions_ar": [
+   "اجلس مواجهاً للجهاز وصدرك على المسند.",
+   "امسك المقابض وذراعاك ممدودتان أمامك والمرفقان منثنيان قليلاً.",
+   "حرّك ذراعيك للخارج وللخلف حتى تصبحا بمحاذاة جسمك.",
+   "ارجع ببطء."
   ]
  },
  {
@@ -304,6 +458,15 @@
    "Press the dumbbells up until your arms are almost straight.",
    "Keep your lower back against the bench.",
    "Lower slowly back to shoulder height."
+  ],
+  "name_ar": "ضغط الأكتاف بالدمبل",
+  "aliases_ar": "ضغط كتف دمبل, شولدر دمبل",
+  "primary_muscles_ar": "الأكتاف، الترايسبس",
+  "instructions_ar": [
+   "اجلس على مقعد بمسند ظهر وفي كل يد دمبل عند مستوى الكتف.",
+   "ادفع الدمبلز للأعلى حتى تكاد ذراعاك تستقيمان.",
+   "أبقِ أسفل ظهرك ملاصقاً للمقعد.",
+   "أنزلها ببطء إلى مستوى الكتفين."
   ]
  },
  {
@@ -321,6 +484,15 @@
    "With a slight bend in the elbows, raise your arms out to the sides to shoulder height.",
    "Avoid swinging your body.",
    "Lower slowly."
+  ],
+  "name_ar": "رفرفة جانبية بالدمبل",
+  "aliases_ar": "رفرفة جانبي, جانبي دمبل",
+  "primary_muscles_ar": "الكتف الجانبي",
+  "instructions_ar": [
+   "قف وفي كل يد دمبل خفيف بجانبك.",
+   "مع ثني المرفقين قليلاً، ارفع ذراعيك جانباً حتى مستوى الكتفين.",
+   "تجنّب أرجحة جسمك.",
+   "أنزلهما ببطء."
   ]
  },
  {
@@ -338,6 +510,15 @@
    "Bend your elbows to lower the top of your head towards the floor.",
    "Push back up.",
    "Elevate your hands or reduce the range to make it easier."
+  ],
+  "name_ar": "ضغط الكتف المرتفع (بايك)",
+  "aliases_ar": "بايك, ضغط بايك",
+  "primary_muscles_ar": "الأكتاف، الترايسبس",
+  "instructions_ar": [
+   "ابدأ في وضع الضغط، ثم قرّب قدميك وارفع وركيك ليشكّل جسمك حرف V مقلوباً.",
+   "اثنِ مرفقيك لتُنزل أعلى رأسك نحو الأرض.",
+   "ادفع للأعلى.",
+   "لتسهيله، ارفع يديك على سطح أعلى أو قلّل مدى الحركة."
   ]
  },
  {
@@ -355,6 +536,15 @@
    "Release the safety handles.",
    "Lower the platform until your knees are at about 90 degrees, keeping your lower back on the pad.",
    "Push back up without locking your knees, then put the safety handles back on when done."
+  ],
+  "name_ar": "جهاز ضغط الأرجل",
+  "aliases_ar": "دفع ارجل, ليق برس, ضغط رجل",
+  "primary_muscles_ar": "الفخذ الأمامي، الأرداف",
+  "instructions_ar": [
+   "اجلس وظهرك مسطح على المسند وقدماك على المنصة بعرض الكتفين.",
+   "حرّر مقابض الأمان.",
+   "أنزل المنصة حتى تصبح ركبتاك بزاوية 90 درجة تقريباً، مع إبقاء أسفل ظهرك على المسند.",
+   "ادفع للأعلى دون قفل الركبتين، ثم أعد مقابض الأمان عند الانتهاء."
   ]
  },
  {
@@ -372,6 +562,15 @@
    "Put the ankle pad just above your feet.",
    "Straighten your legs to lift the pad.",
    "Lower slowly."
+  ],
+  "name_ar": "جهاز مدّ الرجلين",
+  "aliases_ar": "رفرفة امامي, ليق اكستنشن, تمديد ارجل",
+  "primary_muscles_ar": "الفخذ الأمامي",
+  "instructions_ar": [
+   "اضبط مسند الظهر بحيث تكون ركبتاك بمحاذاة محور الجهاز.",
+   "ضع مسند الكاحل فوق قدميك مباشرة.",
+   "مدّ ساقيك لرفع المسند.",
+   "أنزله ببطء."
   ]
  },
  {
@@ -389,6 +588,15 @@
    "Release the safety handles.",
    "Bend your knees to lower yourself until your thighs are about parallel to the platform.",
    "Push back up through your whole foot."
+  ],
+  "name_ar": "جهاز الهاك سكوات",
+  "aliases_ar": "هاك, هاك سكوات",
+  "primary_muscles_ar": "الفخذ الأمامي، الأرداف",
+  "instructions_ar": [
+   "قف على المنصة وظهرك وكتفاك ملاصقان للمساند، والقدمان بعرض الكتفين.",
+   "حرّر مقابض الأمان.",
+   "اثنِ ركبتيك لتنزل حتى يصبح فخذاك موازيين للمنصة تقريباً.",
+   "ادفع للأعلى بكامل قدمك."
   ]
  },
  {
@@ -407,6 +615,16 @@
    "Bend your hips and knees to sit down as low as you can with good form.",
    "Stand back up, pushing through your whole foot.",
    "Use a squat rack with safety bars."
+  ],
+  "name_ar": "السكوات بالبار",
+  "aliases_ar": "سكوات, قرفصاء بالبار, سكوات خلفي",
+  "primary_muscles_ar": "الفخذ الأمامي، الأرداف، الجذع",
+  "instructions_ar": [
+   "ضع البار على أعلى ظهرك لا على رقبتك، وقف والقدمان بعرض الكتفين تقريباً.",
+   "شدّ عضلات جذعك وأبقِ صدرك مرفوعاً.",
+   "اثنِ الوركين والركبتين لتنزل لأدنى ما تستطيع بأداء صحيح.",
+   "قف مجدداً بالدفع بكامل قدمك.",
+   "استخدم حامل سكوات بقضبان أمان."
   ]
  },
  {
@@ -424,6 +642,15 @@
    "Stand with feet a little wider than shoulder width.",
    "Squat down between your knees, keeping your chest up.",
    "Stand back up."
+  ],
+  "name_ar": "سكوات الكأس بالدمبل",
+  "aliases_ar": "جوبلت, سكوات دمبل",
+  "primary_muscles_ar": "الفخذ الأمامي، الأرداف",
+  "instructions_ar": [
+   "امسك دمبل واحداً عمودياً أمام صدرك بكلتا يديك.",
+   "قف والقدمان أعرض قليلاً من الكتفين.",
+   "انزل في وضع القرفصاء بين ركبتيك مع إبقاء صدرك مرفوعاً.",
+   "قف مجدداً."
   ]
  },
  {
@@ -441,6 +668,15 @@
    "Sit your hips back and down, keeping your chest up.",
    "Go as low as is comfortable.",
    "Stand back up."
+  ],
+  "name_ar": "السكوات بوزن الجسم",
+  "aliases_ar": "قرفصاء, سكوات, سكوات بدون وزن",
+  "primary_muscles_ar": "الفخذ الأمامي، الأرداف",
+  "instructions_ar": [
+   "قف والقدمان بعرض الكتفين تقريباً، والذراعان أمامك للتوازن.",
+   "ادفع وركيك للخلف وللأسفل مع إبقاء صدرك مرفوعاً.",
+   "انزل بقدر ما تشعر بالراحة.",
+   "قف مجدداً."
   ]
  },
  {
@@ -458,6 +694,15 @@
    "Put the lower pad just above your heels and lock the thigh pad.",
    "Bend your knees to pull the pad down and back.",
    "Return slowly."
+  ],
+  "name_ar": "جهاز ثني الرجلين جالساً",
+  "aliases_ar": "رفرفة خلفي جالس, ليق كيرل, خلفي جهاز",
+  "primary_muscles_ar": "الفخذ الخلفي",
+  "instructions_ar": [
+   "اضبط مسند الظهر بحيث تكون ركبتاك بمحاذاة محور الجهاز.",
+   "ضع المسند السفلي فوق كعبيك مباشرة وثبّت مسند الفخذين.",
+   "اثنِ ركبتيك لسحب المسند للأسفل وللخلف.",
+   "ارجع ببطء."
   ]
  },
  {
@@ -475,6 +720,15 @@
    "Put the pad just above your heels.",
    "Bend your knees to bring the pad towards your glutes.",
    "Lower slowly."
+  ],
+  "name_ar": "جهاز ثني الرجلين مستلقياً",
+  "aliases_ar": "رفرفة خلفي نايم, ليق كيرل منبطح",
+  "primary_muscles_ar": "الفخذ الخلفي",
+  "instructions_ar": [
+   "استلقِ على بطنك وركبتاك بعد طرف المقعد مباشرة.",
+   "ضع المسند فوق كعبيك مباشرة.",
+   "اثنِ ركبتيك لتقرّب المسند من أردافك.",
+   "أنزله ببطء."
   ]
  },
  {
@@ -492,6 +746,15 @@
    "With a slight bend in the knees, push your hips back and lower the dumbbells along your legs.",
    "Keep your back flat; stop when you feel a stretch in the back of your legs.",
    "Drive your hips forward to stand up."
+  ],
+  "name_ar": "الرفعة الرومانية بالدمبل",
+  "aliases_ar": "روماني, ديدلفت روماني, ار دي ال",
+  "primary_muscles_ar": "الفخذ الخلفي، الأرداف",
+  "instructions_ar": [
+   "قف وفي كل يد دمبل أمام فخذيك.",
+   "مع ثني الركبتين قليلاً، ادفع وركيك للخلف وأنزل الدمبلز بمحاذاة ساقيك.",
+   "أبقِ ظهرك مستوياً، وتوقّف عندما تشعر بتمدد في خلف ساقيك.",
+   "ادفع وركيك للأمام لتقف."
   ]
  },
  {
@@ -509,6 +772,15 @@
    "Hinge at the hips, letting the other leg rise behind you, back flat.",
    "Lower until your body is close to horizontal or you feel a stretch.",
    "Return to standing. Hold onto something for balance if needed."
+  ],
+  "name_ar": "الرفعة الرومانية على رجل واحدة",
+  "aliases_ar": "روماني رجل واحدة, ديدلفت رجل وحدة",
+  "primary_muscles_ar": "الفخذ الخلفي، الأرداف، التوازن",
+  "instructions_ar": [
+   "قف على رجل واحدة مع ثني الركبة قليلاً.",
+   "انحنِ من الوركين واترك الرجل الأخرى ترتفع خلفك، مع ظهر مستوٍ.",
+   "انزل حتى يقترب جسمك من الوضع الأفقي أو تشعر بتمدد.",
+   "عُد إلى الوقوف. أمسك بشيء للتوازن إن احتجت."
   ]
  },
  {
@@ -526,6 +798,15 @@
    "Feet flat, about shoulder-width apart.",
    "Push through your heels to lift your hips until your body is straight from shoulders to knees.",
    "Lower slowly."
+  ],
+  "name_ar": "جهاز دفع الورك",
+  "aliases_ar": "هيب ثرست, دفع ورك, جلوت درايف",
+  "primary_muscles_ar": "الأرداف",
+  "instructions_ar": [
+   "اجلس وأعلى ظهرك على المسند والحزام أو المسند على وركيك.",
+   "القدمان مسطحتان بعرض الكتفين تقريباً.",
+   "ادفع بكعبيك لرفع وركيك حتى يستقيم جسمك من الكتفين إلى الركبتين.",
+   "أنزل ببطء."
   ]
  },
  {
@@ -542,6 +823,14 @@
    "Sit with your back against the pad and the pads on the outside of your knees.",
    "Push your knees out against the pads.",
    "Return slowly."
+  ],
+  "name_ar": "جهاز إبعاد الفخذين",
+  "aliases_ar": "جهاز الفخذ الخارجي, ابدكتور, تفتيح ارجل",
+  "primary_muscles_ar": "الألوية الوسطى",
+  "instructions_ar": [
+   "اجلس وظهرك على المسند والمساند على الجهة الخارجية من ركبتيك.",
+   "ادفع ركبتيك للخارج ضد المساند.",
+   "ارجع ببطء."
   ]
  },
  {
@@ -559,6 +848,15 @@
    "Feet flat, knees bent.",
    "Push through your heels to lift your hips until your body is straight from shoulders to knees.",
    "Lower slowly."
+  ],
+  "name_ar": "دفع الورك بالدمبل",
+  "aliases_ar": "هيب ثرست دمبل, دفع ورك دمبل",
+  "primary_muscles_ar": "الأرداف، الفخذ الخلفي",
+  "instructions_ar": [
+   "اجلس على الأرض وأعلى ظهرك مستند إلى مقعد، ودمبل على وركيك تمسكه بكلتا يديك.",
+   "القدمان مسطحتان والركبتان منثنيتان.",
+   "ادفع بكعبيك لرفع وركيك حتى يستقيم جسمك من الكتفين إلى الركبتين.",
+   "أنزل ببطء."
   ]
  },
  {
@@ -576,6 +874,15 @@
    "Push through your heels to lift your hips until your body is straight from shoulders to knees.",
    "Squeeze your glutes at the top.",
    "Lower slowly."
+  ],
+  "name_ar": "جسر الأرداف",
+  "aliases_ar": "جسر, بريدج, جسر الورك",
+  "primary_muscles_ar": "الأرداف، الفخذ الخلفي",
+  "instructions_ar": [
+   "استلقِ على ظهرك والركبتان منثنيتان والقدمان مسطحتان على الأرض.",
+   "ادفع بكعبيك لرفع وركيك حتى يستقيم جسمك من الكتفين إلى الركبتين.",
+   "شدّ أردافك في الأعلى.",
+   "أنزل ببطء."
   ]
  },
  {
@@ -593,6 +900,15 @@
    "Lower your heels as far as is comfortable.",
    "Push up onto your toes as high as you can.",
    "Lower slowly."
+  ],
+  "name_ar": "جهاز رفع السمانة جالساً",
+  "aliases_ar": "سمانة جالس, بطات جهاز, كاف جالس",
+  "primary_muscles_ar": "السمانة",
+  "instructions_ar": [
+   "اجلس ومقدمة قدميك على المنصة والمسند على فخذيك.",
+   "أنزل كعبيك بقدر ما تشعر بالراحة.",
+   "ارتفع على أطراف أصابعك لأعلى ما تستطيع.",
+   "أنزل ببطء."
   ]
  },
  {
@@ -610,6 +926,15 @@
    "Lower your heels below the step.",
    "Rise up onto your toes as high as you can.",
    "Lower slowly."
+  ],
+  "name_ar": "رفع السمانة واقفاً",
+  "aliases_ar": "سمانة, بطات, كاف ريز",
+  "primary_muscles_ar": "السمانة",
+  "instructions_ar": [
+   "قف ومقدمة قدميك على درجة، ممسكاً بشيء للتوازن.",
+   "أنزل كعبيك تحت مستوى الدرجة.",
+   "ارتفع على أطراف أصابعك لأعلى ما تستطيع.",
+   "أنزل ببطء."
   ]
  },
  {
@@ -627,6 +952,15 @@
    "Grip the handles with your palms up.",
    "Curl the handles up by bending your elbows.",
    "Lower slowly until your arms are almost straight."
+  ],
+  "name_ar": "جهاز ثني الذراع (باي)",
+  "aliases_ar": "باي جهاز, بريتشر جهاز, تبيس جهاز",
+  "primary_muscles_ar": "الباي",
+  "instructions_ar": [
+   "اضبط المقعد بحيث يستند أعلى ذراعيك على المسند.",
+   "امسك المقابض وراحتاك للأعلى.",
+   "ارفع المقابض بثني مرفقيك.",
+   "أنزلها ببطء حتى تكاد ذراعاك تستقيمان."
   ]
  },
  {
@@ -644,6 +978,15 @@
    "Keep your elbows at your sides.",
    "Curl the handle up towards your shoulders.",
    "Lower slowly."
+  ],
+  "name_ar": "ثني الذراع بالكيبل",
+  "aliases_ar": "باي كيبل, تبيس كيبل",
+  "primary_muscles_ar": "الباي",
+  "instructions_ar": [
+   "قف مواجهاً لبكرة منخفضة ممسكاً ببار أو مقبض وراحتاك للأعلى.",
+   "أبقِ مرفقيك بجانب جسمك.",
+   "ارفع المقبض نحو كتفيك.",
+   "أنزله ببطء."
   ]
  },
  {
@@ -661,6 +1004,15 @@
    "Keep your elbows at your sides.",
    "Curl the dumbbells up towards your shoulders.",
    "Lower slowly without swinging."
+  ],
+  "name_ar": "ثني الذراع بالدمبل",
+  "aliases_ar": "باي دمبل, تبيس دمبل, كيرل",
+  "primary_muscles_ar": "الباي",
+  "instructions_ar": [
+   "قف وفي كل يد دمبل وراحتاك للأمام.",
+   "أبقِ مرفقيك بجانب جسمك.",
+   "ارفع الدمبلز نحو كتفيك.",
+   "أنزلها ببطء دون أرجحة."
   ]
  },
  {
@@ -678,6 +1030,15 @@
    "Pull yourself up until your chin is above the bar.",
    "Lower slowly until your arms are straight.",
    "Use a resistance band or the assisted machine if needed."
+  ],
+  "name_ar": "العقلة بقبضة معكوسة",
+  "aliases_ar": "عقلة عكسية, تشن اب",
+  "primary_muscles_ar": "الباي، العضلة الظهرية العريضة",
+  "instructions_ar": [
+   "تعلّق بالبار ويداك بعرض الكتفين وراحتاك نحوك.",
+   "اسحب نفسك للأعلى حتى يصبح ذقنك فوق البار.",
+   "انزل ببطء حتى تستقيم ذراعاك.",
+   "استعن بشريط مطاطي أو بالجهاز المساعد عند الحاجة."
   ]
  },
  {
@@ -695,6 +1056,15 @@
    "Keep your elbows at your sides.",
    "Push the handle down until your arms are straight.",
    "Let it rise slowly until your forearms are about parallel to the floor."
+  ],
+  "name_ar": "دفع الترايسبس بالكيبل",
+  "aliases_ar": "تراي كيبل, بوش داون, تراي حبل",
+  "primary_muscles_ar": "الترايسبس",
+  "instructions_ar": [
+   "قف مواجهاً لبكرة مرتفعة ممسكاً ببار أو حبل.",
+   "أبقِ مرفقيك بجانب جسمك.",
+   "ادفع المقبض للأسفل حتى تستقيم ذراعاك.",
+   "اتركه يرتفع ببطء حتى يصبح ساعداك موازيين للأرض تقريباً."
   ]
  },
  {
@@ -711,6 +1081,14 @@
    "Sit with your back against the pad and grip the handles at your sides.",
    "Push the handles down until your arms are almost straight.",
    "Return slowly."
+  ],
+  "name_ar": "جهاز المتوازي للترايسبس",
+  "aliases_ar": "متوازي جهاز, ديبس جهاز",
+  "primary_muscles_ar": "الترايسبس، الصدر",
+  "instructions_ar": [
+   "اجلس وظهرك على المسند وامسك المقابض بجانبيك.",
+   "ادفع المقابض للأسفل حتى تكاد ذراعاك تستقيمان.",
+   "ارجع ببطء."
   ]
  },
  {
@@ -728,6 +1106,15 @@
    "Keep your upper arms close to your head.",
    "Lower the dumbbell behind your head by bending your elbows.",
    "Straighten your arms to lift it back up."
+  ],
+  "name_ar": "مدّ الترايسبس فوق الرأس بالدمبل",
+  "aliases_ar": "تراي فوق الراس, فرنسي دمبل, تراي دمبل",
+  "primary_muscles_ar": "الترايسبس",
+  "instructions_ar": [
+   "اجلس أو قف ممسكاً بدمبل واحد بكلتا يديك فوق رأسك.",
+   "أبقِ أعلى ذراعيك قريباً من رأسك.",
+   "أنزل الدمبل خلف رأسك بثني مرفقيك.",
+   "مدّ ذراعيك لترفعه مجدداً."
   ]
  },
  {
@@ -745,6 +1132,15 @@
    "Bend your elbows to lower your body, keeping your back close to the bench.",
    "Push back up.",
    "Bend your knees more to make it easier. Skip it if it hurts your shoulders."
+  ],
+  "name_ar": "المتوازي على المقعد",
+  "aliases_ar": "ديبس كرسي, متوازي مقعد",
+  "primary_muscles_ar": "الترايسبس",
+  "instructions_ar": [
+   "اجلس على حافة مقعد ويداك بجانب وركيك، ثم انزلق للأمام ليكون وزنك على يديك.",
+   "اثنِ مرفقيك لإنزال جسمك مع إبقاء ظهرك قريباً من المقعد.",
+   "ادفع للأعلى.",
+   "اثنِ ركبتيك أكثر لتسهيله، وتجنّبه إن آلم كتفيك."
   ]
  },
  {
@@ -761,6 +1157,14 @@
    "Set the seat and hold the handles or pads.",
    "Curl your upper body forward by tightening your abs.",
    "Return slowly."
+  ],
+  "name_ar": "جهاز تمرين البطن",
+  "aliases_ar": "بطن جهاز, كرنش جهاز",
+  "primary_muscles_ar": "عضلات البطن",
+  "instructions_ar": [
+   "اضبط المقعد وامسك المقابض أو المساند.",
+   "اثنِ الجزء العلوي من جسمك للأمام بشدّ عضلات بطنك.",
+   "ارجع ببطء."
   ]
  },
  {
@@ -777,6 +1181,14 @@
    "Kneel facing a high pulley holding a rope beside your head.",
    "Curl your upper body down towards your knees using your abs, not your arms.",
    "Return slowly."
+  ],
+  "name_ar": "طحن البطن بالكيبل",
+  "aliases_ar": "بطن كيبل, كرنش كيبل",
+  "primary_muscles_ar": "عضلات البطن",
+  "instructions_ar": [
+   "اركع مواجهاً لبكرة مرتفعة ممسكاً بحبل بجانب رأسك.",
+   "اثنِ الجزء العلوي من جسمك نحو ركبتيك مستخدماً عضلات بطنك لا ذراعيك.",
+   "ارجع ببطء."
   ]
  },
  {
@@ -794,6 +1206,15 @@
    "Keep your body in a straight line from head to heels.",
    "Brace your core and breathe steadily.",
    "Hold for the time you choose. Put your knees down to make it easier."
+  ],
+  "name_ar": "البلانك",
+  "aliases_ar": "بلانك, ثبات, لوح",
+  "primary_muscles_ar": "عضلات البطن، الخواصر",
+  "instructions_ar": [
+   "استند على ساعديك وأطراف أصابع قدميك، والمرفقان تحت الكتفين.",
+   "أبقِ جسمك في خط مستقيم من الرأس إلى الكعبين.",
+   "شدّ عضلات جذعك وتنفّس بانتظام.",
+   "اثبت للمدة التي تختارها. لتسهيله، ضع ركبتيك على الأرض."
   ]
  },
  {
@@ -811,6 +1232,15 @@
    "Press your lower back gently into the floor.",
    "Slowly lower the opposite arm and leg towards the floor.",
    "Return and switch sides."
+  ],
+  "name_ar": "تمرين الحشرة الميتة (ديد بَغ)",
+  "aliases_ar": "ديد بق, الحشرة الميتة",
+  "primary_muscles_ar": "عضلات البطن",
+  "instructions_ar": [
+   "استلقِ على ظهرك وذراعاك للأعلى وركبتاك منثنيتان بزاوية 90 درجة فوق وركيك.",
+   "اضغط أسفل ظهرك برفق نحو الأرض.",
+   "أنزل ببطء الذراع والرجل المتقابلتين نحو الأرض.",
+   "ارجع وبدّل الجانب."
   ]
  }
 ]

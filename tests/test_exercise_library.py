@@ -14,7 +14,7 @@ def by_code(client, auth, code):
 
 
 def test_every_exercise_has_curated_details():
-    rows = json.loads((SEED_DIR / "exercises.json").read_text())
+    rows = json.loads((SEED_DIR / "exercises.json").read_text(encoding="utf-8"))
     for row in rows:
         assert row["pattern"], row["name"]
         assert 2 <= len(row["instructions"]) <= 6, row["name"]
@@ -117,3 +117,40 @@ def test_seed_updates_existing_exercises_without_new_ids(session):
     ex = session.exec(select(Exercise).where(Exercise.qr_code == "leg-press")).one()
     assert ex.id == old_id and ex.pattern == "squat" and ex.instructions
     assert len(session.exec(select(Exercise)).all()) == 48
+
+
+def test_every_exercise_has_arabic_text():
+    rows = json.loads((SEED_DIR / "exercises.json").read_text(encoding="utf-8"))
+    for row in rows:
+        assert row["name_ar"] and row["primary_muscles_ar"] and row["aliases_ar"], row["name"]
+        assert len(row["instructions_ar"]) == len(row["instructions"]), row["name"]
+    assert len({r["name_ar"] for r in rows}) == len(rows), "Arabic names are unique"
+
+
+def test_exercises_in_the_request_language(client, auth):
+    english = by_code(client, auth, "leg-press")
+    arabic = client.get("/api/exercises/qr/leg-press", headers={**auth, "Accept-Language": "ar"}).json()
+    assert english["name"] == "Leg Press" and arabic["name"] == "جهاز ضغط الأرجل"
+    assert arabic["id"] == english["id"] and arabic["qr_code"] == "leg-press", "identity is unchanged"
+    assert arabic["instructions"][0].startswith("اجلس") and arabic["primary_muscles"].startswith("الفخذ")
+    assert "safety" in " ".join(english["instructions"]), "English is unchanged"
+
+
+def test_search_finds_exercises_by_their_arabic_names(client, auth):
+    found = client.get("/api/exercises?search=بنش", headers=auth).json()
+    assert found and found[0]["name"] == "Barbell Bench Press"
+    # spelling variants (alef forms) and colloquial aliases also match
+    assert client.get("/api/exercises?search=السكوات بالبار", headers=auth).json()[0]["qr_code"] == "barbell-back-squat"
+    assert client.get("/api/exercises?search=بنش برس بالبار", headers=auth).json()[0]["qr_code"] == "barbell-bench-press"
+    lat = client.get("/api/exercises?search=سحب امامي", headers={**auth, "Accept-Language": "ar"}).json()
+    assert lat[0]["name"] == "سحب أمامي (لات بول داون)"
+
+
+def test_logged_sets_show_the_arabic_name_but_store_the_exercise_id(client, auth):
+    leg_press = by_code(client, auth, "leg-press")
+    workout = client.post("/api/workouts", json={}, headers=auth).json()
+    body = {"exercise_id": leg_press["id"], "reps": 10, "weight": 100, "unit": "kg"}
+    added = client.post(f"/api/workouts/{workout['id']}/sets", json=body, headers={**auth, "Accept-Language": "ar"}).json()
+    assert added["exercise_name"] == "جهاز ضغط الأرجل"
+    english = client.get(f"/api/workouts/{workout['id']}", headers=auth).json()
+    assert english["sets"][0]["exercise_name"] == "Leg Press"

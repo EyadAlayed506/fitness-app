@@ -338,9 +338,9 @@ export const ar: Dictionary = {
   "sets.delete": "حذف المجموعة",
 
   "search.label": "اسم الجهاز أو التمرين",
-  "search.placeholder": "مثلاً: lat pulldown",
+  "search.placeholder": "مثلاً: سحب أمامي",
   "search.noMatch": "لا نتائج",
-  "search.noMatchText": "جرّب اسماً آخر، مثلاً «chest press». أسماء التمارين بالإنجليزية حالياً.",
+  "search.noMatchText": "جرّب اسماً آخر، مثلاً «ضغط صدر».",
 
   "qr.cameraOff": "الوصول إلى الكاميرا متوقف لهذا التطبيق. فعّله من إعدادات هاتفك، أو اكتب الرمز في الأسفل.",
   "qr.allowHint": "اسمح باستخدام الكاميرا لمسح ملصق QR على الجهاز.",

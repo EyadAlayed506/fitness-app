@@ -19,6 +19,7 @@ from app.services.activity import (
     sleep_nights,
 )
 from app.i18n import Table, tr
+from app.models.exercise import exercise_label
 from app.services.calculations import estimated_1rm
 from app.services.plan import build_plan
 from app.services.schedule import effective_training_days
@@ -132,7 +133,7 @@ def _exercise_weeks(this_week: list[DoneWorkout], before: list[DoneWorkout]) -> 
     for w in this_week:
         for s, ex in w.sets:
             by_ex.setdefault(ex.id, []).append(s)
-            names[ex.id] = ex.name
+            names[ex.id] = exercise_label(ex)
             last_day[ex.id] = w.day
     for ex_id, sets in by_ex.items():
         earlier = [(s, w.day) for w in before for s, ex in w.sets if ex.id == ex_id]

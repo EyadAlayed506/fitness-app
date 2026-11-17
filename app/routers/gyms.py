@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
 from app.i18n import Table, tr
-from app.models.exercise import Exercise, ExercisePublic, RecognizedExercise
+from app.models.exercise import Exercise, exercise_label, ExercisePublic, RecognizedExercise
 from app.models.gym import (
     Gym,
     GymIn,
@@ -247,7 +247,7 @@ def _setting_public(gym_id: int, exercise: Exercise, setting: MachineSetting | N
         **values,
         gym_id=gym_id,
         exercise_id=exercise.id,
-        exercise_name=exercise.name,
+        exercise_name=exercise_label(exercise),
         saved=setting is not None,
         updated_at=setting.updated_at if setting else None,
     )
@@ -610,20 +610,20 @@ def save_photo(data: PhotoIn, user: CurrentUser, session: SessionDep, embedder: 
     session.add(photo)
     session.commit()
     session.refresh(photo)
-    return _photo_public(photo, exercise.name)
+    return _photo_public(photo, exercise_label(exercise))
 
 
 @router.get("/photo-memory/photos", response_model=list[MachinePhotoPublic])
 def list_photos(user: CurrentUser, session: SessionDep, gym_id: int | None = None):
     """The user's saved machine photos, newest first (one gym, or all)."""
     query = (
-        select(MachinePhoto, Exercise.name)
+        select(MachinePhoto, Exercise)
         .join(Exercise, Exercise.id == MachinePhoto.exercise_id)
         .where(MachinePhoto.user_id == user.id)
     )
     if gym_id is not None:
         query = query.where(MachinePhoto.gym_id == gym_id)
-    return [_photo_public(p, name) for p, name in session.exec(query.order_by(MachinePhoto.id.desc())).all()]
+    return [_photo_public(p, exercise_label(ex)) for p, ex in session.exec(query.order_by(MachinePhoto.id.desc())).all()]
 
 
 @router.delete("/photo-memory/photos/{photo_id}", status_code=204)

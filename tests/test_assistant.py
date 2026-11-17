@@ -551,7 +551,7 @@ def test_in_arabic_the_coach_is_told_to_reply_in_arabic_and_its_action_cards_are
         assert "app language: Arabic" in note and "reply in Arabic" in note
         content, err = assistant.run_tool(ctx, "log_workout_sets", {"exercise": "bench press", "sets": 3, "reps": 8, "weight": 60})
         assert not err, content
-        assert ctx.actions[0].summary == "Barbell Bench Press: 3 مجموعات من 8 تكرار x 60 kg (بدأ تمريناً)"
+        assert ctx.actions[0].summary == "بنش برس بالبار: 3 مجموعات من 8 تكرار x 60 kg (بدأ تمريناً)"
         assert "⁨" not in ctx.actions[0].summary, "no invisible direction marks in a summary"
         content, err = assistant.run_tool(ctx, "log_weight", {"weight": 93.5})
         assert not err, content

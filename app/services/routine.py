@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from app.models.exercise import Exercise
+from app.models.exercise import Exercise, exercise_label
 from app.i18n import Table, tr, tr_count, weekday_name
 from app.services.schedule import (
     FOCUSES,
@@ -180,7 +180,7 @@ def generate_routine(
             group_count[group] = k + 1
             ex = options[(k + variant) % len(options)]
             used.add(ex.id)
-            day.exercises.append(RoutineExercise(ex.id, ex.name, group, sets, reps, ex.default_rest_seconds or rest))
+            day.exercises.append(RoutineExercise(ex.id, exercise_label(ex), group, sets, reps, ex.default_rest_seconds or rest))
         days.append(day)
 
     notes = [_plain(tr(TEXTS, "sets_note", sets=_plain(tr_count(TEXTS, "sets", sets)), reps=reps))]

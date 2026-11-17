@@ -8,7 +8,7 @@ from sqlmodel import select
 
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
-from app.models.exercise import BODY_REGION, Exercise
+from app.models.exercise import BODY_REGION, Exercise, exercise_label
 from app.models.food import FoodLog
 from app.models.points import PointAward
 from app.models.sleep import SleepEntry
@@ -108,7 +108,7 @@ def logged_exercises(user: CurrentUser, session: SessionDep):
     """Exercises the user has logged, most-logged first (for the progress chart picker)."""
     counts: dict[int, dict] = {}
     for _, _, ex in _user_sets(session, user.id):
-        row = counts.setdefault(ex.id, {"id": ex.id, "name": ex.name, "sets": 0})
+        row = counts.setdefault(ex.id, {"id": ex.id, "name": exercise_label(ex), "sets": 0})
         row["sets"] += 1
     return sorted(counts.values(), key=lambda r: -r["sets"])
 
@@ -127,7 +127,7 @@ def exercise_progress(exercise_id: int, user: CurrentUser, session: SessionDep):
         d["volume"] += s.reps * s.weight_kg
     labels = list(per_day)
     return {
-        "exercise": exercise.name,
+        "exercise": exercise_label(exercise),
         "labels": labels,
         "series": [
             {"name": "Estimated 1RM", "data": [round(per_day[d]["e1rm"], 1) for d in labels]},

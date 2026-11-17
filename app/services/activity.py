@@ -12,7 +12,7 @@ from typing import Annotated
 from fastapi import Query
 from sqlmodel import Session, select
 
-from app.models.exercise import Exercise
+from app.models.exercise import Exercise, exercise_label
 from app.models.sleep import SleepEntry
 from app.models.snap import CustomDay
 from app.models.user import Profile
@@ -137,7 +137,7 @@ def apply_custom_days(session: Session, user_id: int, routine: Routine, catalogu
         for x in json.loads(c.exercises):
             ex = by_id.get(x.get("exercise_id"))
             if ex is not None:
-                items.append(RoutineExercise(ex.id, ex.name, ex.muscle_group, int(x.get("sets", 3)), str(x.get("reps", routine.reps)), ex.default_rest_seconds or rest))
+                items.append(RoutineExercise(ex.id, exercise_label(ex), ex.muscle_group, int(x.get("sets", 3)), str(x.get("reps", routine.reps)), ex.default_rest_seconds or rest))
         if items:
             day.exercises = items
             day.title = c.title

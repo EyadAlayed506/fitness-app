@@ -32,6 +32,9 @@ from app.services.recognition import RecognitionError, Recognizer, image_type
 router = APIRouter(prefix="/exercises", tags=["exercises"])
 
 
+_ARABIC_FORMS = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ة": "ه", "ى": "ي"})
+
+
 @router.get("", response_model=list[ExercisePublic])
 def search_exercises(
     _: CurrentUser,
@@ -49,13 +52,16 @@ def search_exercises(
         return exercises[:limit]
 
     def squash(s: str) -> str:
-        return "".join(ch for ch in s.lower() if ch.isalnum() or ch == " ")
+        # Arabic: one form for alef / taa marbuta / alef maqsura, no diacritics, so spelling variants still match
+        s = s.lower().translate(_ARABIC_FORMS)
+        return "".join(ch for ch in s if (ch.isalnum() or ch == " ") and not "\u064b" <= ch <= "\u0652")
 
     # Score each exercise by its best match among its name and aliases
     best: dict[int, float] = {}
     q = squash(search)
     for ex in exercises:
-        names = [ex.name, *[a for a in ex.aliases.split(",") if a.strip()]]
+        aliases = [*ex.aliases.split(","), *(ex.aliases_ar or "").split(",")]
+        names = [ex.name, *([ex.name_ar] if ex.name_ar else []), *[a for a in aliases if a.strip()]]
         scores = [fuzz.WRatio(q, squash(n)) for n in names]
         scores += [fuzz.ratio(q.replace(" ", ""), squash(n).replace(" ", "")) for n in names]
         best[ex.id] = max(scores)

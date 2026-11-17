@@ -5,7 +5,7 @@ from sqlmodel import Session, delete, func, select
 
 from app.database import SessionDep
 from app.deps import CurrentUser
-from app.models.exercise import Exercise
+from app.models.exercise import Exercise, exercise_label
 from app.models.user import User
 from app.models.workout import (
     WorkoutSession,
@@ -36,12 +36,12 @@ def _set_public(s: WorkoutSet, exercise_name: str) -> WorkoutSetPublic:
 
 def _session_public(session: Session, workout: WorkoutSession, with_sets: bool) -> WorkoutSessionPublic:
     rows = session.exec(
-        select(WorkoutSet, Exercise.name)
+        select(WorkoutSet, Exercise)
         .join(Exercise, Exercise.id == WorkoutSet.exercise_id)
         .where(WorkoutSet.session_id == workout.id)
         .order_by(WorkoutSet.id)
     ).all()
-    sets = [_set_public(s, name) for s, name in rows]
+    sets = [_set_public(s, exercise_label(ex)) for s, ex in rows]
     return WorkoutSessionPublic(
         id=workout.id,
         started_at=workout.started_at,
@@ -130,7 +130,7 @@ def add_set(workout_id: int, data: WorkoutSetIn, user: CurrentUser, session: Ses
     session.add(workout_set)
     session.commit()
     session.refresh(workout_set)
-    return _set_public(workout_set, exercise.name)
+    return _set_public(workout_set, exercise_label(exercise))
 
 
 def _get_owned_set(session: Session, workout_id: int, set_id: int, user: User) -> WorkoutSet:

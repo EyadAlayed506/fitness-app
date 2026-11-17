@@ -34,6 +34,7 @@ from app.services.activity import (
 from app.services.plan import build_plan
 
 from app.i18n import Table, current_language, short_date, tr, tr_count
+from app.models.exercise import exercise_label
 
 MAX_TOOL_ROUNDS = 8  # model calls per question, so a confused loop can't run up the bill
 MAX_TOOL_RESULT_CHARS = 20_000
@@ -534,7 +535,7 @@ def _log_sets(ctx: ToolContext, args: dict) -> Any:
         for _ in range(sets)
     ]
     load = f" x {weight:g} {unit}" if weight else ""
-    summary = tr(TEXTS, "action_sets", exercise=exercise.name, sets=tr_count(TEXTS, "set_count", sets), reps=reps,
+    summary = tr(TEXTS, "action_sets", exercise=exercise_label(exercise), sets=tr_count(TEXTS, "set_count", sets), reps=reps,
                  load=load, started=tr(TEXTS, "started") if started else "")
     ctx.actions.append(Action("sets", _plain(summary), "/workouts", [f"/workouts/{workout_id}/sets/{s.id}" for s in added]))
     return {"workout_id": workout_id, "started_new_workout": started, "sets": added}
