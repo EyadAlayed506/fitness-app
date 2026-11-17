@@ -131,3 +131,21 @@ def test_levels():
     assert level_for(99) == (1, 0, 100)
     assert level_for(100) == (2, 100, 300)
     assert level_for(650) == (4, 600, 1000)
+
+
+def test_points_texts_in_arabic():
+    from app.i18n import reset_language, set_language
+    from app.services.points import RULES, reason_text, rule_public
+
+    token = set_language("ar")
+    try:
+        assert rule_public(RULES["sleep_goal"]).label == "هدف النوم"
+        assert reason_text("sleep_goal", "Slept 7 h 30 min (goal 7 h)") == "نمت 7 س 30 د (الهدف 7 س)"
+        assert reason_text("nutrition", "Ate 2,100 kcal (target 2,000)") == "تناولت 2,100 سعرة (الهدف 2,000)"
+        assert reason_text("full_week", "All 3 planned sessions this week") == "كل الحصص المخططة هذا الأسبوع (3)"
+        assert reason_text("workout", "Finished a workout") == "أكملت تمريناً"
+        assert reason_text("sleep_goal", "Something unexpected") == "Something unexpected", "unknown text is shown as stored"
+    finally:
+        reset_language(token)
+    assert reason_text("workout", "Finished a workout") == "Finished a workout"
+    assert rule_public(RULES["sleep_goal"]).label == "Sleep goal"

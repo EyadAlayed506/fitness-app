@@ -11,11 +11,13 @@ Principles:
 """
 
 import datetime as dt
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
+from app.i18n import Table, current_language, tr
 from app.models.food import FoodLog
 from app.models.points import Achievement, PointAward
 from app.models.user import Profile, User, WeightEntry
@@ -74,6 +76,71 @@ ACHIEVEMENTS = [
     ("well_rested", "Well rested", "Reach your sleep goal on 7 nights.", "sleep_goal", 7),
     ("on_plan", "On plan", "Eat within 10% of your calorie target on 7 days.", "nutrition", 7),
 ]
+
+
+# Rule and achievement names in the language of the request (app.i18n). Award reasons are stored in English
+# when points are given; reason_text() shows them in Arabic by their rule.
+TEXTS: Table = {
+    "en": {},
+    "ar": {
+        "rule.workout": "تمرين مخطط",
+        "rule.workout.desc": "تمرين مكتمل فيه مجموعة واحدة على الأقل. يُحتسب مرة في اليوم، حتى عدد أيام التمرين في خطتك "
+        "كل أسبوع، فلا تكسب الحصص الإضافية أكثر، ولا تُفقدك أيام الراحة شيئاً.",
+        "rule.full_week": "أسبوع كامل",
+        "rule.full_week.desc": "إنجاز كل الحصص المخططة في أسبوع (من الاثنين إلى الأحد).",
+        "rule.sleep_goal": "هدف النوم",
+        "rule.sleep_goal.desc": "ليلة نوم لا تقل عن هدفك، من WHOOP أو Health Connect، أو مسجّلة يدوياً خلال يومين من الاستيقاظ.",
+        "rule.nutrition": "الأكل حسب الخطة",
+        "rule.nutrition.desc": "يوم مكتمل سُجّل فيه صنفان على الأقل (حتى اليوم التالي) وسعراته ضمن 10% من هدفك.",
+        "rule.weigh_in": "الوزن الأسبوعي",
+        "rule.weigh_in.desc": "تسجيل الوزن مرة واحدة على الأقل في الأسبوع.",
+        "ach.first_workout": "أول تمرين",
+        "ach.first_workout.desc": "أكمل أول تمرين مخطط.",
+        "ach.ten_workouts": "عشرة تمارين",
+        "ach.ten_workouts.desc": "أكمل 10 تمارين مخططة.",
+        "ach.full_week": "أسبوع كامل",
+        "ach.full_week.desc": "أنجز كل الحصص المخططة في أسبوع.",
+        "ach.four_full_weeks": "أربعة أسابيع كاملة",
+        "ach.four_full_weeks.desc": "أنجز كل الحصص المخططة في 4 أسابيع مختلفة.",
+        "ach.well_rested": "نوم كافٍ",
+        "ach.well_rested.desc": "حقّق هدف نومك في 7 ليالٍ.",
+        "ach.on_plan": "على الخطة",
+        "ach.on_plan.desc": "تناول طعامك ضمن 10% من هدف سعراتك في 7 أيام.",
+        "reason.workout": "أكملت تمريناً",
+        "reason.full_week": "كل الحصص المخططة هذا الأسبوع ({n})",
+        "reason.sleep_goal": "نمت {slept} (الهدف {goal})",
+        "reason.nutrition": "تناولت {kcal} سعرة (الهدف {target})",
+        "reason.weigh_in": "سجّلت وزنك هذا الأسبوع",
+    },
+}
+
+
+def rule_public(rule: PointsRule) -> PointsRule:
+    """The rule with its name and description in the request's language."""
+    if current_language() == "en":
+        return rule
+    return replace(rule, label=tr(TEXTS, f"rule.{rule.id}"), description=tr(TEXTS, f"rule.{rule.id}.desc"))
+
+
+def _ar_duration(text: str) -> str:
+    """"7 h 30 min" -> "7 س 30 د"."""
+    return re.sub(r"\bmin\b", "د", re.sub(r"\bh\b", "س", text))
+
+
+def reason_text(rule: str, reason: str) -> str:
+    """A stored (English) award reason in the request's language; anything unexpected is shown as stored."""
+    if current_language() == "en":
+        return reason
+    plain = lambda t: t.replace("\u2068", "").replace("\u2069", "")  # noqa: E731
+    if rule in ("workout", "weigh_in"):
+        return tr(TEXTS, f"reason.{rule}")
+    if rule == "full_week" and (m := re.fullmatch(r"All (\d+) planned sessions this week", reason)):
+        return plain(tr(TEXTS, "reason.full_week", n=m[1]))
+    if rule == "sleep_goal" and (m := re.fullmatch(r"Slept (.+) \(goal (.+)\)", reason)):
+        return plain(tr(TEXTS, "reason.sleep_goal", slept=_ar_duration(m[1]), goal=_ar_duration(m[2])))
+    if rule == "nutrition" and (m := re.fullmatch(r"Ate ([\d,]+) kcal \(target ([\d,]+)\)", reason)):
+        return plain(tr(TEXTS, "reason.nutrition", kcal=m[1], target=m[2]))
+    return reason
 
 
 def level_for(total: int) -> tuple[int, int, int]:
@@ -189,7 +256,8 @@ def achievements(awards: list[PointAward]) -> list[Achievement]:
     for a in awards:
         counts[a.rule] = counts.get(a.rule, 0) + 1
     return [
-        Achievement(id=i, title=title, description=desc, earned=counts.get(rule, 0) >= n,
-                    progress=min(counts.get(rule, 0), n), target=n)
+        Achievement(id=i, title=tr(TEXTS, f"ach.{i}") if current_language() != "en" else title,
+                    description=tr(TEXTS, f"ach.{i}.desc") if current_language() != "en" else desc,
+                    earned=counts.get(rule, 0) >= n, progress=min(counts.get(rule, 0), n), target=n)
         for i, title, desc, rule, n in ACHIEVEMENTS
     ]

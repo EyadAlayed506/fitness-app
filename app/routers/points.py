@@ -13,11 +13,18 @@ from app.models.points import (
     PointsRulePublic,
 )
 from app.services.activity import TzOffset, local_today
-from app.services.points import RULES, achievements, evaluate, level_for
+from app.services.points import RULES, achievements, evaluate, level_for, reason_text, rule_public
 
 router = APIRouter(prefix="/points", tags=["points"])
 
 RECENT_DAYS = 14
+
+
+def _public(award: PointAward) -> PointAwardPublic:
+    """An award as shown, with its reason in the request's language (stored in English)."""
+    out = PointAwardPublic.model_validate(award)
+    out.reason = reason_text(award.rule, award.reason)
+    return out
 
 
 @router.get("", response_model=PointsOut)
@@ -30,7 +37,7 @@ def read_points(user: CurrentUser, profile: CurrentProfile, session: SessionDep,
     )
     total = sum(a.points for a in awards)
     level, level_start, next_level_at = level_for(total)
-    todays = [PointAwardPublic.model_validate(a) for a in awards if a.day == today]
+    todays = [_public(a) for a in awards if a.day == today]
     recent_from = today - dt.timedelta(days=RECENT_DAYS - 1)
     return PointsOut(
         total=total,
@@ -38,8 +45,8 @@ def read_points(user: CurrentUser, profile: CurrentProfile, session: SessionDep,
         level_start=level_start,
         next_level_at=next_level_at,
         today=PointsDay(date=today, points=sum(a.points for a in todays), awards=todays),
-        new=[PointAwardPublic.model_validate(a) for a in new],
-        recent=[PointAwardPublic.model_validate(a) for a in awards if a.day >= recent_from],
+        new=[_public(a) for a in new],
+        recent=[_public(a) for a in awards if a.day >= recent_from],
         achievements=achievements(awards),
-        rules=[PointsRulePublic(**vars(r)) for r in RULES.values()],
+        rules=[PointsRulePublic(**vars(rule_public(r))) for r in RULES.values()],
     )
