@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
+import { currentLanguage } from "./i18n/current";
 import { storage } from "./storage";
 
 const SERVER_KEY = "server_url";
@@ -85,6 +86,8 @@ export async function api<T>(path: string, { method = "GET", body, form, upload 
   const headers: Record<string, string> = { Accept: "application/json" };
   const sentToken = token;
   if (sentToken) headers.Authorization = `Bearer ${sentToken}`;
+  // text the server writes (suggestions, plan names, coach replies) comes back in the app's language
+  headers["Accept-Language"] = currentLanguage();
   let payload: string | FormData | undefined;
   if (upload) {
     payload = await uploadBody(upload); // fetch sets the multipart Content-Type itself

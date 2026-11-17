@@ -31,6 +31,7 @@ from app.routers import (
 from app.routers.assistant import chosen_provider
 from app.seed import seed_catalogue
 from app import log_redaction, web_app
+from app.i18n import LanguageMiddleware
 from app.startup_checks import current_commit, pilot_server_problems, pilot_server_warnings
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -66,6 +67,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Fitness App", version=APP_VERSION, lifespan=lifespan)
+app.add_middleware(LanguageMiddleware)  # Accept-Language: text the server writes comes back in ar or en
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,

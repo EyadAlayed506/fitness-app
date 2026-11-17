@@ -2,6 +2,7 @@ import { LocaleProvider } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { I18nManager, Platform } from "react-native";
 
+import { queryClient } from "../query";
 import { storage } from "../storage";
 import { directionOf, intlLocale, pickLanguage, type Direction, type Language, type Params } from "./core";
 import { errorTextFor, setCurrentLanguage, tr, trCount } from "./current";
@@ -74,6 +75,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     applyLanguage(next);
     setLang(next);
     storage.set(KEY, next).catch(() => {});
+    // text the server wrote (suggestions, plan names…) is cached in the old language: fetch it again
+    queryClient.invalidateQueries();
   }, []);
 
   const value = useMemo<I18n | null>(() => {
