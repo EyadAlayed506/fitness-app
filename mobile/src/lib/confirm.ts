@@ -1,4 +1,5 @@
 import { Alert, Platform } from "react-native";
+import { tr } from "./i18n/current";
 
 export interface ConfirmRequest {
   title: string;
@@ -24,8 +25,8 @@ export function setConfirmHandler(h: Handler | null) {
  * Yes/no question in the app's own dialog. If the dialog isn't ready yet (the app is still starting), the
  * question waits for it; only if it never appears does the system's own box ask instead.
  */
-export function confirm(title: string, message: string, okLabel = "OK", destructive = true): Promise<boolean> {
-  const request = { title, message, okLabel, destructive };
+export function confirm(title: string, message: string, okLabel?: string, destructive = true): Promise<boolean> {
+  const request = { title, message, okLabel: okLabel ?? tr("common.ok"), destructive };
   if (handler) return handler(request);
   return new Promise((resolve) => {
     const item = { request, resolve };

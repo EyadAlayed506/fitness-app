@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 
-import { WEEKDAYS, WEEKDAYS_SHORT, dayList } from "@/lib/format";
+import { WEEKDAYS, WEEKDAYS_MIN, dayList } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 
 import { Txt } from "./ui";
@@ -10,6 +11,7 @@ export const MAX_TRAINING_DAYS = 6; // same rule as the backend: at least one re
 /** Pick the weekdays you train. Any combination of up to six days. */
 export function DayPicker({ value, onChange }: { value: number[]; onChange: (days: number[]) => void }) {
   const t = useTheme();
+  const { t: tr, tn } = useI18n();
   const toggle = (d: number) => {
     if (value.includes(d)) onChange(value.filter((x) => x !== d));
     else if (value.length < MAX_TRAINING_DAYS) onChange([...value, d].sort((a, b) => a - b));
@@ -18,10 +20,10 @@ export function DayPicker({ value, onChange }: { value: number[]; onChange: (day
   return (
     <View style={{ marginTop: 10 }}>
       <Txt variant="label" style={{ marginBottom: 6 }}>
-        Which days can you train?
+        {tr("profile.trainingDays")}
       </Txt>
       <View style={{ flexDirection: "row", gap: 6 }} accessibilityRole="none">
-        {WEEKDAYS_SHORT.map((label, d) => {
+        {WEEKDAYS_MIN.map((label, d) => {
           const on = value.includes(d);
           const disabled = !on && value.length >= MAX_TRAINING_DAYS;
           return (
@@ -49,9 +51,9 @@ export function DayPicker({ value, onChange }: { value: number[]; onChange: (day
       </View>
       <Txt variant="tiny" style={{ marginTop: 6 }}>
         {value.length === 0
-          ? "Tap the days you're available. Your plan puts workouts only on these days."
-          : `${value.length} training day${value.length === 1 ? "" : "s"} a week: ${dayList(value)}. Rest: ${rest.length ? dayList(rest) : "none"}.`}
-        {value.length >= MAX_TRAINING_DAYS ? " Up to 6 days, so you keep at least one rest day." : ""}
+          ? tr("days.hint")
+          : tr("days.summary", { count: tn("days.count", value.length), days: dayList(value), rest: rest.length ? dayList(rest) : tr("days.none") })}
+        {value.length >= MAX_TRAINING_DAYS ? tr("days.max") : ""}
       </Txt>
     </View>
   );

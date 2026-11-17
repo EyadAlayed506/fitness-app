@@ -6,19 +6,22 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { DialogProvider, ToastProvider } from "@/components/ui";
 import { AppearanceProvider } from "@/lib/appearance";
 import { AuthProvider } from "@/lib/auth";
+import { LanguageProvider, useI18n } from "@/lib/i18n";
 import { queryClient } from "@/lib/query";
 import { useTheme } from "@/lib/theme";
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AppearanceProvider>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <AppShell />
-          </AuthProvider>
-        </QueryClientProvider>
-      </AppearanceProvider>
+      <LanguageProvider>
+        <AppearanceProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <AppShell />
+            </AuthProvider>
+          </QueryClientProvider>
+        </AppearanceProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
@@ -26,6 +29,7 @@ export default function RootLayout() {
 /** Everything that depends on light/dark mode (it's chosen by AppearanceProvider above). */
 function AppShell() {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const base = t.dark ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,
@@ -47,10 +51,10 @@ function AppShell() {
               headerBackButtonDisplayMode: "minimal",
             }}
           >
-            <Stack.Screen name="qr-stickers" options={{ headerShown: true, title: "QR stickers" }} />
-            <Stack.Screen name="sleep" options={{ headerShown: true, title: "Sleep" }} />
-            <Stack.Screen name="points" options={{ headerShown: true, title: "Wellness points" }} />
-            <Stack.Screen name="gyms" options={{ headerShown: true, title: "Gyms" }} />
+            <Stack.Screen name="qr-stickers" options={{ headerShown: true, title: tr("nav.qrStickers") }} />
+            <Stack.Screen name="sleep" options={{ headerShown: true, title: tr("nav.sleep") }} />
+            <Stack.Screen name="points" options={{ headerShown: true, title: tr("nav.points") }} />
+            <Stack.Screen name="gyms" options={{ headerShown: true, title: tr("nav.gyms") }} />
           </Stack>
         </DialogProvider>
       </ToastProvider>

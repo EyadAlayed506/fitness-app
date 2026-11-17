@@ -1,6 +1,7 @@
 import { View } from "react-native";
 
 import { fmt } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { space, useTheme } from "@/lib/theme";
 import type { Totals } from "@/lib/types";
 
@@ -12,10 +13,11 @@ import { Meter, Txt } from "./ui";
  */
 export function MacroBars({ totals, targetKcal, stacked = false }: { totals: Totals; targetKcal: number; stacked?: boolean }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const rows = [
-    { label: "Protein", eaten: totals.protein_g, goal: (targetKcal * 0.3) / 4, color: t.series[0] },
-    { label: "Carbs", eaten: totals.carbs_g, goal: (targetKcal * 0.4) / 4, color: t.series[1] },
-    { label: "Fat", eaten: totals.fat_g, goal: (targetKcal * 0.3) / 9, color: t.series[2] },
+    { label: tr("macro.protein"), eaten: totals.protein_g, goal: (targetKcal * 0.3) / 4, color: t.series[0] },
+    { label: tr("macro.carbs"), eaten: totals.carbs_g, goal: (targetKcal * 0.4) / 4, color: t.series[1] },
+    { label: tr("macro.fat"), eaten: totals.fat_g, goal: (targetKcal * 0.3) / 9, color: t.series[2] },
   ];
   return (
     <View style={stacked ? { gap: space.md } : { flexDirection: "row", gap: space.md, marginTop: space.lg }}>
@@ -27,7 +29,7 @@ export function MacroBars({ totals, targetKcal, stacked = false }: { totals: Tot
             </Txt>
             <Txt variant="tiny" style={{ color: t.text, fontWeight: "600" }} numberOfLines={1}>
               {fmt(r.eaten)}
-              <Txt variant="tiny">/{fmt(r.goal)} g</Txt>
+              <Txt variant="tiny">/{fmt(r.goal)} {tr("unit.g")}</Txt>
             </Txt>
           </View>
           <Meter value={r.eaten} max={r.goal} color={r.color} height={4} />

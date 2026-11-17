@@ -1,12 +1,12 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 
+import { useI18n } from "@/lib/i18n";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { Recommendation, Recommendations } from "@/lib/types";
 
-import { Button, Card, Divider, Txt, type IconName } from "./ui";
+import { Button, Card, Divider, Icon, Txt, type IconName } from "./ui";
 
 const ICON: Record<Recommendation["kind"], IconName> = {
   plan: "barbell",
@@ -22,6 +22,7 @@ const ICON: Record<Recommendation["kind"], IconName> = {
  */
 export function TodayCard({ data }: { data: Recommendations }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const [why, setWhy] = useState(false);
   const [lead, ...rest] = data.items;
   if (!lead) return null;
@@ -35,11 +36,11 @@ export function TodayCard({ data }: { data: Recommendations }) {
     <Card style={{ padding: space.lg + 2 }}>
       <View style={{ flexDirection: "row", gap: space.md, alignItems: "flex-start" }}>
         <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: soft(lead.kind), alignItems: "center", justifyContent: "center" }}>
-          <Ionicons name={ICON[lead.kind]} size={20} color={tone(lead.kind)} />
+          <Icon name={ICON[lead.kind]} size={20} color={tone(lead.kind)} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-            {training ? "TODAY'S SESSION" : "TODAY"}
+            {tr(training ? "today.session" : "today.today").toLocaleUpperCase()}
           </Txt>
           <Txt style={{ ...typeScale.heading, fontSize: 19, lineHeight: 24, color: t.text }} numberOfLines={2}>
             {lead.title.replace(/^Today:\s*/, "")}
@@ -54,7 +55,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
         <View key={`${r.id}-${r.title}`}>
           <Divider />
           <View style={{ flexDirection: "row", gap: space.md, paddingVertical: space.md, alignItems: "flex-start" }}>
-            <Ionicons name={ICON[r.kind]} size={18} color={tone(r.kind)} style={{ marginTop: 2 }} />
+            <Icon name={ICON[r.kind]} size={18} color={tone(r.kind)} style={{ marginTop: 2 }} />
             <View style={{ flex: 1 }}>
               <Txt style={{ fontWeight: "600" }}>{r.title}</Txt>
               <Txt variant="small">{r.message}</Txt>
@@ -65,7 +66,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
 
       <View style={{ flexDirection: "row", gap: space.sm, marginTop: rest.length ? space.xs : space.lg }}>
         <Button
-          title={training ? "Start workout" : "See this week's plan"}
+          title={tr(training ? "today.start" : "today.seeWeek")}
           icon={training ? "play" : undefined}
           kind={training ? "primary" : "soft"}
           onPress={() => router.navigate(training ? { pathname: "/workouts", params: { start: "today" } } : "/workouts")}
@@ -75,7 +76,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
           onPress={() => setWhy((w) => !w)}
           accessibilityRole="button"
           aria-expanded={why}
-          accessibilityLabel="Why these suggestions"
+          accessibilityLabel={tr("today.whyLabel")}
           style={({ pressed }) => ({
             minHeight: 50,
             paddingHorizontal: space.md,
@@ -87,8 +88,8 @@ export function TodayCard({ data }: { data: Recommendations }) {
             opacity: pressed ? 0.6 : 1,
           })}
         >
-          <Txt variant="label">Why?</Txt>
-          <Ionicons name={why ? "chevron-up" : "chevron-down"} size={14} color={t.text2} />
+          <Txt variant="label">{tr("today.why")}</Txt>
+          <Icon name={why ? "chevron-up" : "chevron-down"} size={14} color={t.text2} />
         </Pressable>
       </View>
 
@@ -104,7 +105,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
                   • {reason}
                 </Txt>
               ))}
-              <Txt variant="tiny">Based on: {r.sources.join(", ")}</Txt>
+              <Txt variant="tiny">{tr("today.basedOn", { sources: r.sources.join(tr("list.separator")) })}</Txt>
             </View>
           ))}
           {/* With the reasons rather than under the card every day: it's read where it matters */}

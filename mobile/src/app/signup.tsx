@@ -2,48 +2,54 @@ import { Redirect, router } from "expo-router";
 import { useState } from "react";
 
 import { AuthScreen, ServerSetting } from "@/components/AuthScreen";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { Button, Checkbox, ErrorText, Field, LinkButton, Row, Txt } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import { space, type as typeScale } from "@/lib/theme";
 
 export default function Signup() {
   const { token, signup } = useAuth();
+  const { t, errorText } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [marketing, setMarketing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   if (token) return <Redirect href="/" />;
 
   const submit = async () => {
     setError(null);
     if (password.length < 8) {
-      setError("The password needs at least 8 characters.");
+      setError("short");
       return;
     }
     try {
-      await signup(email, password, marketing);
+      await signup(email.trim(), password, marketing);
       router.replace("/");
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   };
 
+  // The error is kept as-is and translated when shown, so switching language also switches the message
+  const message = error === null ? null : error === "short" ? t("signup.passwordShort") : errorText(error);
+
   return (
-    <AuthScreen>
+    <AuthScreen top={<LanguageSwitch />}>
       <Txt variant="h2" style={{ ...typeScale.title, fontSize: 28, lineHeight: 34 }}>
-        Create your account
+        {t("signup.title")}
       </Txt>
       <Txt variant="small" style={{ marginTop: space.xs, marginBottom: space.md }}>
-        Get your BMI, daily calories and a workout plan in a minute.
+        {t("signup.subtitle")}
       </Txt>
-      <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
-      <Field label="Password (at least 8 characters)" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" />
-      <Checkbox checked={marketing} onChange={setMarketing} label="Email me ads and discounts. You can unsubscribe at any time." />
-      <ErrorText message={error} />
-      <Button title="Sign up" onPress={submit} style={{ marginTop: space.xl }} />
+      <Field label={t("login.email")} value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
+      <Field label={t("signup.password")} value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" />
+      <Checkbox checked={marketing} onChange={setMarketing} label={t("signup.marketing")} />
+      <ErrorText message={message} />
+      <Button title={t("signup.submit")} onPress={submit} style={{ marginTop: space.xl }} />
       <Row style={{ justifyContent: "center", marginTop: space.lg }} gap={6}>
-        <Txt variant="small">Already have an account?</Txt>
-        <LinkButton title="Log in" onPress={() => router.replace("/login")} />
+        <Txt variant="small">{t("signup.haveAccount")}</Txt>
+        <LinkButton title={t("login.submit")} onPress={() => router.replace("/login")} />
       </Row>
       <ServerSetting />
     </AuthScreen>

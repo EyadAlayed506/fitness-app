@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -26,9 +26,22 @@ import Svg, { Circle } from "react-native-svg";
 
 import { setConfirmHandler, type ConfirmRequest } from "@/lib/confirm";
 import { haptics } from "@/lib/haptics";
+import { useLanguage } from "@/lib/i18n";
+import { tr } from "@/lib/i18n/current";
 import { motion, radius, size, space, type as typeScale, useTheme } from "@/lib/theme";
 
 export type IconName = keyof typeof Ionicons.glyphMap;
+
+// Icons that point along the reading direction (back/forward arrows and chevrons)
+const DIRECTIONAL = /^(chevron|arrow|caret)-(back|forward)/;
+const MIRROR: TextStyle = { transform: [{ scaleX: -1 }] };
+
+/** Ionicons, with back/forward arrows and chevrons mirrored in Arabic so they point the way the page reads. */
+export function Icon(props: ComponentProps<typeof Ionicons>) {
+  const rtl = useLanguage() === "ar";
+  if (!rtl || !DIRECTIONAL.test(String(props.name))) return <Ionicons {...props} />;
+  return <Ionicons {...props} style={[props.style, MIRROR]} />;
+}
 
 // ---------- motion ----------
 
@@ -86,6 +99,7 @@ export function Screen({
   back?: boolean;
 }) {
   const t = useTheme();
+  const joined = useLanguage() === "ar" ? noLetterSpacing : null;
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={["top", "left", "right"]}>
       <ScrollView
@@ -95,17 +109,17 @@ export function Screen({
       >
         {back ? (
           <View style={{ marginBottom: space.md, marginLeft: -2 }}>
-            <IconButton icon="chevron-back" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/home"))} />
+            <IconButton icon="chevron-back" label={tr("common.back")} onPress={() => (router.canGoBack() ? router.back() : router.replace("/home"))} />
           </View>
         ) : null}
         <View style={[styles.row, { justifyContent: "space-between", alignItems: "flex-end", marginBottom: space.lg, gap: space.md }]}>
           <View style={{ flex: 1 }}>
             {subtitle ? (
-              <Text style={[typeScale.overline, { color: t.muted, marginBottom: 2 }]} numberOfLines={1}>
+              <Text style={[typeScale.overline, { color: t.muted, marginBottom: 2 }, joined]} numberOfLines={1}>
                 {subtitle}
               </Text>
             ) : null}
-            <Text style={[typeScale.title, { color: t.text }]} accessibilityRole="header" numberOfLines={2}>
+            <Text style={[typeScale.title, { color: t.text }, joined]} accessibilityRole="header" numberOfLines={2}>
               {title}
             </Text>
           </View>
@@ -196,19 +210,23 @@ export function Txt({
     big: { fontSize: 28, fontWeight: "700", letterSpacing: -0.6, lineHeight: 32, color: t.text, fontVariant: ["tabular-nums"] },
     hero: { ...typeScale.display, fontSize: 44, lineHeight: 48, color: t.text, fontVariant: ["tabular-nums"] },
   };
+  // Arabic letters join up; any letter spacing pulls them apart, so it is turned off in Arabic
+  const joined = useLanguage() === "ar" ? noLetterSpacing : null;
   return (
-    <Text style={[v[variant], style]} numberOfLines={numberOfLines} selectable={selectable}>
+    <Text style={[v[variant], style, joined]} numberOfLines={numberOfLines} selectable={selectable}>
       {children}
     </Text>
   );
 }
+
+const noLetterSpacing: TextStyle = { letterSpacing: 0 };
 
 export function ErrorText({ message }: { message: string | null }) {
   const t = useTheme();
   if (!message) return null;
   return (
     <View style={[styles.row, { gap: 6, marginTop: space.sm, alignItems: "flex-start" }]} accessibilityLiveRegion="polite">
-      <Ionicons name="alert-circle" size={16} color={t.critical} style={{ marginTop: 1 }} />
+      <Icon name="alert-circle" size={16} color={t.critical} style={{ marginTop: 1 }} />
       <Text style={[typeScale.small, { color: t.critical, flex: 1 }]}>{message}</Text>
     </View>
   );
@@ -283,7 +301,7 @@ export function Button({
         <ActivityIndicator color={c.fg} size="small" />
       ) : (
         <>
-          {icon ? <Ionicons name={icon} size={small ? size.iconSmall : 18} color={c.fg} /> : null}
+          {icon ? <Icon name={icon} size={small ? size.iconSmall : 18} color={c.fg} /> : null}
           {title ? (
             <Text style={[small ? typeScale.label : typeScale.bodyStrong, { color: c.fg }]} numberOfLines={1}>
               {title}
@@ -408,11 +426,11 @@ export function Stepper({
       onPressOut={stop}
       delayLongPress={350}
       accessibilityRole="button"
-      accessibilityLabel={`${direction > 0 ? "More" : "Less"} ${label.toLowerCase()}, ${direction > 0 ? "+" : "−"}${step}`}
+      accessibilityLabel={tr(direction > 0 ? "common.more" : "common.less", { label: label.toLocaleLowerCase(), step })}
       hitSlop={4}
       style={({ pressed }) => [styles.stepButton, compact && styles.stepButtonCompact, { backgroundColor: t.surface }, pressed && styles.pressed]}
     >
-      <Ionicons name={direction > 0 ? "add" : "remove"} size={compact ? 18 : 22} color={t.text} />
+      <Icon name={direction > 0 ? "add" : "remove"} size={compact ? 18 : 22} color={t.text} />
     </Pressable>
   );
   return (
@@ -578,7 +596,7 @@ export function Checkbox({ checked, onChange, label }: { checked: boolean; onCha
       style={[styles.row, { gap: space.md, marginTop: space.md, alignItems: "flex-start", minHeight: 24 }]}
     >
       <View style={[styles.checkbox, { borderColor: checked ? t.ink : t.muted, backgroundColor: checked ? t.ink : "transparent" }]}>
-        {checked ? <Ionicons name="checkmark" size={15} color={t.inkText} /> : null}
+        {checked ? <Icon name="checkmark" size={15} color={t.inkText} /> : null}
       </View>
       <Txt style={{ flex: 1 }}>{label}</Txt>
     </Pressable>
@@ -710,7 +728,7 @@ export function ListRow({
     <>
       {icon ? (
         <View style={[styles.rowIcon, { backgroundColor: t.surface2 }]}>
-          <Ionicons name={icon} size={18} color={t.text2} />
+          <Icon name={icon} size={18} color={t.text2} />
         </View>
       ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -737,7 +755,7 @@ export function ListRow({
     return (
       <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [style, { opacity: pressed ? 0.6 : 1 }]}>
         {text}
-        <Ionicons name="chevron-forward" size={18} color={t.muted} />
+        <Icon name="chevron-forward" size={18} color={t.muted} />
       </Pressable>
     );
   // a tappable row with its own buttons on the right: side by side, never a button inside a button
@@ -765,7 +783,7 @@ export function IconButton({ icon, onPress, label }: { icon: IconName; onPress: 
       hitSlop={6}
       style={({ pressed }) => [styles.iconButton, { backgroundColor: t.surface2 }, pressed && styles.pressed]}
     >
-      <Ionicons name={icon} size={18} color={t.text2} />
+      <Icon name={icon} size={18} color={t.text2} />
     </Pressable>
   );
 }
@@ -797,7 +815,7 @@ export function Skeleton({ height = 16, width = "100%", style }: { height?: numb
   }, [pulse, reduced]);
   return (
     <Animated.View
-      accessibilityLabel="Loading"
+      accessibilityLabel={tr("common.loading")}
       style={[{ height, width, borderRadius: radius.sm, backgroundColor: t.surface2, opacity: pulse }, style]}
     />
   );
@@ -836,7 +854,7 @@ export function EmptyState({
   return (
     <View style={{ alignItems: "center", paddingVertical: space.xl, paddingHorizontal: space.lg, gap: space.sm }}>
       <View style={[styles.emptyIcon, { backgroundColor: t.surface2 }]}>
-        <Ionicons name={icon} size={22} color={t.text2} />
+        <Icon name={icon} size={22} color={t.text2} />
       </View>
       <Txt style={{ fontWeight: "600", textAlign: "center" }}>{title}</Txt>
       {text ? (
@@ -887,7 +905,7 @@ export function Sheet({
     <Modal visible={visible} transparent animationType={reduced ? "fade" : "slide"} onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <View style={[styles.backdrop, { backgroundColor: t.overlay }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={tr("common.close")} />
           <Animated.View style={[styles.sheet, { backgroundColor: t.surface, transform: [{ translateY: drag }] }]}>
             {/* the drag area; in a browser, selecting the title text would cancel the drag */}
             <View {...pan.panHandlers} testID="sheet-handle" style={noSelect}>
@@ -896,7 +914,7 @@ export function Sheet({
                 <Txt variant="h2" style={{ flex: 1 }} numberOfLines={2} selectable={false}>
                   {title}
                 </Txt>
-                <IconButton icon="close" label="Close" onPress={onClose} />
+                <IconButton icon="close" label={tr("common.close")} onPress={onClose} />
               </View>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: space.xl + insets.bottom }}>
@@ -937,7 +955,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {children}
       <Modal visible={!!request} transparent animationType={reduced ? "none" : "fade"} onRequestClose={() => answer(false)}>
         <View style={[styles.dialogBackdrop, { backgroundColor: t.overlay }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => answer(false)} accessibilityLabel="Cancel" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => answer(false)} accessibilityLabel={tr("common.cancel")} />
           {request ? (
             <View style={[styles.dialog, { backgroundColor: t.surface }]} accessibilityViewIsModal accessibilityRole="alert">
               <Txt variant="h2">{request.title}</Txt>
@@ -945,7 +963,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                 {request.message}
               </Txt>
               <View style={[styles.row, { marginTop: space.xl, gap: space.sm }]}>
-                <Button title="Cancel" kind="soft" onPress={() => answer(false)} style={{ flex: 1 }} />
+                <Button title={tr("common.cancel")} kind="soft" onPress={() => answer(false)} style={{ flex: 1 }} />
                 <Button
                   title={request.okLabel}
                   kind={request.destructive ? "destructive" : "primary"}
@@ -1001,7 +1019,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toast ? (
           <View pointerEvents="box-none" style={[styles.toastWrap, { bottom: size.tabBar + insets.bottom + space.lg + extraInset }]}>
             <Animated.View style={[styles.toast, { backgroundColor: t.ink, opacity }]} accessibilityLiveRegion="polite">
-              <Ionicons name="checkmark-circle" size={18} color={t.inkText} />
+              <Icon name="checkmark-circle" size={18} color={t.inkText} />
               <Text style={[typeScale.small, { color: t.inkText, flexShrink: 1 }]}>{toast.message}</Text>
               {toast.action ? (
                 <Pressable

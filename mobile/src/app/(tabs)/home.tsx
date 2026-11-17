@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -16,6 +15,7 @@ import {
   ErrorText,
   FadeIn,
   Field,
+  Icon,
   ListRow,
   ProgressRing,
   Row,
@@ -41,18 +41,21 @@ import {
 } from "@/lib/data";
 import { clockOf, fmt, hoursMinutes, shortDate, todayISO, trackerName, units } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useI18n, type MessageKey } from "@/lib/i18n";
+import { currentLocale } from "@/lib/i18n/current";
 import { useHealthConnectAutoSync, useHealthConnectStatus } from "@/lib/healthConnect";
 import { derivedKeys, errorMessage, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 
 
-function greeting(): string {
+function greeting(): MessageKey {
   const h = new Date().getHours();
-  return h < 5 ? "Good evening" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  return h < 5 ? "home.evening" : h < 12 ? "home.morning" : h < 18 ? "home.afternoon" : "home.evening";
 }
 
 export default function Home() {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const toast = useToast();
   const { refresh, user } = useAuth();
   const { profile, plan } = useProfile();
@@ -95,7 +98,7 @@ export default function Home() {
     await refresh();
     invalidate(...derivedKeys);
     haptics.success();
-    toast("Weight saved");
+    toast(tr("home.weightSaved"));
   };
 
   const eaten = day?.totals.calories ?? 0;
@@ -105,13 +108,13 @@ export default function Home() {
 
   return (
     <Screen
-      title={greeting()}
-      subtitle={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }).toUpperCase()}
+      title={tr(greeting())}
+      subtitle={new Date().toLocaleDateString(currentLocale(), { weekday: "long", month: "long", day: "numeric" }).toLocaleUpperCase()}
       right={
         <Pressable
           onPress={() => router.push("/profile")}
           accessibilityRole="button"
-          accessibilityLabel="Profile and settings"
+          accessibilityLabel={tr("home.profileButton")}
           hitSlop={4}
           style={({ pressed }) => [
             { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: t.ink, alignItems: "center", justifyContent: "center" },
@@ -131,7 +134,7 @@ export default function Home() {
       {error ? (
         <Card>
           <ErrorText message={error} />
-          <Button title="Try again" kind="soft" small onPress={load} style={{ marginTop: space.md, alignSelf: "flex-start" }} />
+          <Button title={tr("common.tryAgain")} kind="soft" small onPress={load} style={{ marginTop: space.md, alignSelf: "flex-start" }} />
         </Card>
       ) : null}
 
@@ -145,8 +148,8 @@ export default function Home() {
           {/* Calories: a ring for the headline number, macros beside it */}
           <Card onPress={() => router.push("/food")}>
             <Row style={{ justifyContent: "space-between", marginBottom: space.md }}>
-              <Txt variant="h3">Calories</Txt>
-              <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              <Txt variant="h3">{tr("home.calories")}</Txt>
+              <Icon name="chevron-forward" size={18} color={t.muted} />
             </Row>
             <Row gap={space.lg + 4} style={{ alignItems: "center" }}>
               <ProgressRing
@@ -155,15 +158,15 @@ export default function Home() {
                 diameter={112}
                 stroke={9}
                 color={left < 0 ? t.warn : t.accent}
-                label={`${fmt(eaten)} of ${fmt(target)} calories eaten`}
+                label={tr("home.ringLabel", { eaten: fmt(eaten), target: fmt(target) })}
               >
                 <Txt style={{ ...typeScale.heading, fontSize: 22, lineHeight: 26, fontVariant: ["tabular-nums"] }}>{fmt(Math.abs(left))}</Txt>
-                <Txt variant="tiny">{left >= 0 ? "kcal left" : "kcal over"}</Txt>
+                <Txt variant="tiny">{tr(left >= 0 ? "home.kcalLeft" : "home.kcalOver")}</Txt>
               </ProgressRing>
               <View style={{ flex: 1, minWidth: 0 }}>
                 {day ? <MacroBars totals={day.totals} targetKcal={target} stacked /> : null}
                 <Txt variant="tiny" style={{ marginTop: space.md }}>
-                  {fmt(eaten)} eaten · {fmt(target)} target
+                  {tr("home.eatenTarget", { eaten: fmt(eaten), target: fmt(target) })}
                 </Txt>
               </View>
             </Row>
@@ -172,10 +175,10 @@ export default function Home() {
           {/* Sleep (new users without any nights see the checklist instead) */}
           {checklist && !lastSleep ? null : (
             <Card>
-              <Pressable onPress={() => router.push("/sleep")} accessibilityRole="button" accessibilityLabel="Open sleep">
+              <Pressable onPress={() => router.push("/sleep")} accessibilityRole="button" accessibilityLabel={tr("home.openSleep")}>
                 <Row style={{ justifyContent: "space-between" }}>
-                  <Txt variant="h3">Sleep</Txt>
-                  <Ionicons name="chevron-forward" size={18} color={t.muted} />
+                  <Txt variant="h3">{tr("nav.sleep")}</Txt>
+                  <Icon name="chevron-forward" size={18} color={t.muted} />
                 </Row>
                 {lastSleep ? (
                   <>
@@ -184,7 +187,7 @@ export default function Home() {
                         <Txt variant="big">{hoursMinutes(lastSleep.duration_minutes)}</Txt>
                         <Txt variant="small">
                           {"  "}
-                          {lastSleep.date === todayISO() ? "last night" : `night to ${shortDate(lastSleep.date)}`}
+                          {lastSleep.date === todayISO() ? tr("home.lastNight") : tr("home.nightTo", { date: shortDate(lastSleep.date) })}
                         </Txt>
                       </Txt>
                       <Row gap={6}>
@@ -199,7 +202,7 @@ export default function Home() {
                     {sleepStats?.average_hours_7d != null ? (
                       <Row style={{ justifyContent: "space-between", marginTop: space.md, gap: space.sm }}>
                         <Txt variant="tiny" style={{ flex: 1 }}>
-                          7-day average {hoursMinutes(sleepStats.average_hours_7d * 60)} · goal {goalHours(sleepStats.goal_minutes)}
+                          {tr("home.sleepAverage", { average: hoursMinutes(sleepStats.average_hours_7d * 60), goal: goalHours(sleepStats.goal_minutes) })}
                         </Txt>
                         {rangeBadge(sleepStats.average_hours_7d, sleepStats.recommended_hours)}
                       </Row>
@@ -207,19 +210,19 @@ export default function Home() {
                   </>
                 ) : (
                   <Txt variant="small" style={{ marginTop: space.sm }}>
-                    No sleep logged yet. Add last night by hand, or connect a tracker to import it automatically.
+                    {tr("home.noSleep")}
                   </Txt>
                 )}
               </Pressable>
               {trackerConnected ? null : (
                 <Row style={{ marginTop: space.lg }}>
-                  <Button title="Log sleep" icon="moon" kind="soft" small onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
-                  <Button title="Connect a tracker" kind="ghost" small onPress={() => router.push("/sleep")} style={{ flex: 1 }} />
+                  <Button title={tr("home.logSleep")} icon="moon" kind="soft" small onPress={() => setLoggingSleep(true)} style={{ flex: 1 }} />
+                  <Button title={tr("home.connectTracker")} kind="ghost" small onPress={() => router.push("/sleep")} style={{ flex: 1 }} />
                 </Row>
               )}
             </Card>
           )}
-          <Sheet visible={loggingSleep} title="Log sleep" onClose={() => setLoggingSleep(false)}>
+          <Sheet visible={loggingSleep} title={tr("home.logSleep")} onClose={() => setLoggingSleep(false)}>
             {loggingSleep ? (
               <SleepForm
                 onSaved={async (message) => {
@@ -235,26 +238,26 @@ export default function Home() {
 
           <Shortcut
             icon="chatbubble-ellipses"
-            title="Ask your coach"
-            text="Questions, or “log a banana for breakfast”"
+            title={tr("home.askCoach")}
+            text={tr("home.askCoachHint")}
             onPress={() => router.push("/coach")}
           />
 
-          <Section title="Weigh-in" />
+          <Section title={tr("home.weighIn")} />
           <Card>
             <Row style={{ alignItems: "flex-end" }}>
               <Field
-                label={`Today's weight · last ${u.weight(profile.weight_kg)}`}
-                placeholder={u.w === "kg" ? "e.g. 72.5" : "e.g. 160"}
+                label={tr("home.todayWeight", { weight: u.weight(profile.weight_kg) })}
+                placeholder={tr("common.example", { value: u.w === "kg" ? fmt(72.5, 1) : "160" })}
                 value={weight}
                 onChangeText={setWeight}
                 keyboardType="decimal-pad"
-                suffix={u.w}
+                suffix={u.wLabel}
                 style={{ flex: 1, marginTop: 0 }}
-                accessibilityLabel="Today's weight"
+                accessibilityLabel={tr("home.todayWeightLabel")}
                 onSubmitEditing={saveWeight}
               />
-              <Button title="Save" onPress={saveWeight} disabled={!weight.trim()} />
+              <Button title={tr("common.save")} onPress={saveWeight} disabled={!weight.trim()} />
             </Row>
           </Card>
 
@@ -262,8 +265,8 @@ export default function Home() {
             <ListRow
               first
               icon="body-outline"
-              title="Your plan"
-              subtitle={`${fmt(plan.target_calories)} kcal a day, BMI ${plan.bmi.toFixed(1)}`}
+              title={tr("home.yourPlan")}
+              subtitle={tr("home.planSummary", { kcal: fmt(plan.target_calories), bmi: fmt(plan.bmi, 1) })}
               onPress={() => router.push({ pathname: "/progress", params: { view: "body" } })}
             />
           </Card>
@@ -274,8 +277,9 @@ export default function Home() {
 }
 
 function HomeSkeleton() {
+  const { t: tr } = useI18n();
   return (
-    <View accessibilityLabel="Loading today">
+    <View accessibilityLabel={tr("home.loading")}>
       <Card>
         <Row gap={space.md}>
           <Skeleton width={40} height={40} />
@@ -311,7 +315,7 @@ function Shortcut({ icon, title, text, onPress }: { icon: IconName; title: strin
     <Card onPress={onPress}>
       <Row gap={space.md}>
         <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: t.accentSoft, alignItems: "center", justifyContent: "center" }}>
-          <Ionicons name={icon} size={19} color={t.accent} />
+          <Icon name={icon} size={19} color={t.accent} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt style={{ fontWeight: "600" }}>{title}</Txt>
@@ -319,7 +323,7 @@ function Shortcut({ icon, title, text, onPress }: { icon: IconName; title: strin
             {text}
           </Txt>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={t.muted} />
+        <Icon name="chevron-forward" size={18} color={t.muted} />
       </Row>
     </Card>
   );

@@ -3,6 +3,8 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
 
+import { errorTextFor } from "./i18n/current";
+
 /**
  * Cached server data (TanStack Query).
  *
@@ -97,5 +99,5 @@ export function useRefreshOnFocus(keys: QueryKey[]) {
 }
 
 /** A query's error as a message, or null. */
-export const errorMessage = (e: unknown): string | null =>
-  e == null ? null : e instanceof Error ? e.message : "Something went wrong. Try again.";
+/** A message for a failed query or action, in the app's language (null when there is no error). */
+export const errorMessage = (e: unknown): string | null => (e == null ? null : errorTextFor(e));
