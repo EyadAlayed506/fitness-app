@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from app.i18n import ai_language_line
 from app.models.exercise import Exercise
 from app.services.assistant import ollama_problem
 
@@ -90,7 +91,7 @@ class Recognizer:
         """Machines (from the catalogue) and other equipment the vision model sees in a photo of a gym."""
         listing = "\n".join(f"{e.id}: {e.name}" for e in machines)
         answer = self.ask(
-            image, GYM_PROMPT.format(machines=listing, equipment_keys=", ".join(equipment_keys)), GYM_FORMAT
+            image, GYM_PROMPT.format(machines=listing, equipment_keys=", ".join(equipment_keys)) + ai_language_line('"seen"'), GYM_FORMAT
         )
         by_id = {e.id: e for e in machines}
         found: list[Guess] = []

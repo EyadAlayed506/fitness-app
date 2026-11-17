@@ -113,7 +113,7 @@ def scan_menu(
         remaining_protein_g=round(protein_left),
         seen=seen,
         model=recognizer.model,
-        note="Calories and macros are the AI's estimates from the menu, not measured. Portions vary between restaurants.",
+        note=snap.tr(snap.TEXTS, "menu_note"),
     )
 
 

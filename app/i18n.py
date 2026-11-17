@@ -92,6 +92,13 @@ def tr_count(table: Table, key: str, n: float, **params: object) -> str:
     return _fill(form, lang, {"n": number, **params})
 
 
+def ai_language_line(fields: str) -> str:
+    """Appended to an AI prompt: write the free-text `fields` in the app's language (nothing to add for English)."""
+    if current_language() == "ar":
+        return f"\n\nWrite {fields} in Arabic (simple Modern Standard Arabic). Keep names exactly as printed."
+    return ""
+
+
 _AR_WEEKDAYS = ("الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
 _AR_MONTHS = ("يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر")
 

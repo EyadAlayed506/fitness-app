@@ -6,6 +6,7 @@ the app always shows the result for the user to confirm or correct.
 
 import re
 
+from app.i18n import Table, ai_language_line, tr
 from app.models.exercise import Exercise
 from app.services.recognition import Recognizer
 
@@ -107,7 +108,7 @@ WEIGHT_FORMAT = {
 
 
 def read_weight(recognizer: Recognizer, image: bytes) -> dict:
-    answer = recognizer.ask(image, WEIGHT_PROMPT, WEIGHT_FORMAT)
+    answer = recognizer.ask(image, WEIGHT_PROMPT + ai_language_line('"details"'), WEIGHT_FORMAT)
     kind = answer.get("kind") if answer.get("kind") in ("pin_stack", "barbell", "dumbbell", "other") else "other"
     try:
         weight = float(answer["weight"]) if answer.get("weight") is not None else None
@@ -162,6 +163,28 @@ MENU_FORMAT = {
 
 MAX_DISHES = 25
 
+# The menu scanner's verdicts, in the language of the request (app.i18n)
+TEXTS: Table = {
+    "en": {
+        "at_target": "You're at today's target; about {kcal} kcal",
+        "over_left": "About {kcal} kcal: more than the {left} left today",
+        "big_meal": "About {kcal} kcal: a big meal, {pct}% of the {left} left today",
+        "fits": "About {kcal} of your {left} kcal left, {protein} g protein",
+        "menu_note": "Calories and macros are the AI's estimates from the menu, not measured. Portions vary between restaurants.",
+    },
+    "ar": {
+        "at_target": "وصلت إلى هدف اليوم؛ حوالي {kcal} سعرة",
+        "over_left": "حوالي {kcal} سعرة: أكثر من {left} المتبقية اليوم",
+        "big_meal": "حوالي {kcal} سعرة: وجبة كبيرة، {pct}% من {left} المتبقية اليوم",
+        "fits": "حوالي {kcal} من {left} سعرة متبقية، {protein} غ بروتين",
+        "menu_note": "السعرات والمغذيات تقديرات من الذكاء الاصطناعي بناءً على القائمة، وليست مقاسة. وتختلف الحصص بين المطاعم.",
+    },
+}
+
+
+def _t(key: str, **params: object) -> str:
+    return tr(TEXTS, key, **params).replace("\u2068", "").replace("\u2069", "")
+
 
 def _num(value: object, high: float) -> float | None:
     try:
@@ -172,7 +195,7 @@ def _num(value: object, high: float) -> float | None:
 
 
 def read_menu(recognizer: Recognizer, image: bytes) -> tuple[list[dict], str]:
-    answer = recognizer.ask(image, MENU_PROMPT, MENU_FORMAT)
+    answer = recognizer.ask(image, MENU_PROMPT + ai_language_line('each dish\'s "description" and "seen"'), MENU_FORMAT)
     dishes = []
     for raw in (answer.get("dishes") or [])[:MAX_DISHES]:
         if not isinstance(raw, dict) or not str(raw.get("name") or "").strip():
@@ -208,7 +231,7 @@ def rank_dishes(dishes: list[dict], remaining_kcal: float, remaining_protein: fl
         amount = min(1.0, protein / meal_protein)
         if remaining_kcal <= 0:
             fit = 0.8 * max(0.0, 1 - kcal / 1000) + 0.2 * density
-            verdict = f"You're at today's target; about {round(kcal)} kcal"
+            verdict = _t("at_target", kcal=round(kcal))
         else:
             calorie_fit = 1.0 if kcal <= budget else max(0.0, 1 - 2 * (kcal - budget) / budget)
             if kcal > remaining_kcal:
@@ -217,11 +240,11 @@ def rank_dishes(dishes: list[dict], remaining_kcal: float, remaining_protein: fl
             if kcal > budget:
                 fit = min(fit, 0.65)  # more than a usual meal is never a "good fit", however much protein it has
             if kcal > remaining_kcal:
-                verdict = f"About {round(kcal)} kcal: more than the {round(remaining_kcal)} left today"
+                verdict = _t("over_left", kcal=round(kcal), left=round(remaining_kcal))
             elif kcal > budget:
-                verdict = f"About {round(kcal)} kcal: a big meal, {round(kcal / remaining_kcal * 100)}% of the {round(remaining_kcal)} left today"
+                verdict = _t("big_meal", kcal=round(kcal), pct=round(kcal / remaining_kcal * 100), left=round(remaining_kcal))
             else:
-                verdict = f"About {round(kcal)} of your {round(remaining_kcal)} kcal left, {round(protein)} g protein"
+                verdict = _t("fits", kcal=round(kcal), left=round(remaining_kcal), protein=round(protein))
         ranked.append({**d, "fit": round(fit, 2), "verdict": verdict})
     ranked.sort(key=lambda d: -d["fit"])
     return ranked

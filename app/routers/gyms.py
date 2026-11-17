@@ -11,6 +11,7 @@ from sqlmodel import Session, SQLModel, func, select
 from app.config import get_settings
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
+from app.i18n import Table, tr
 from app.models.exercise import Exercise, ExercisePublic, RecognizedExercise
 from app.models.gym import (
     Gym,
@@ -40,6 +41,27 @@ from app.services.plan import build_plan
 from app.services.recognition import RecognitionError, Recognizer, image_type
 from app.services.routine import RoutineDay, generate_routine
 from app.services.schedule import DayChoice
+
+# The "photograph a gym" session's name and note, in the language of the request (app.i18n)
+GYM_TEXTS: Table = {
+    "en": {
+        "title": "{title} at {gym}",
+        "built": "Built from {n} exercises possible here",
+        "following": ", following today's {focus} plan.",
+        "full_body": " (a full-body session: today isn't a training day).",
+    },
+    "ar": {
+        "title": "{title} في {gym}",
+        "built": "أُعدّت من {n} تمرين ممكن هنا",
+        "following": "، وفق خطة اليوم ({focus}).",
+        "full_body": " (حصة جسم كامل: اليوم ليس يوم تمرين).",
+    },
+}
+
+
+def _plain(text: str) -> str:
+    return text.replace("\u2068", "").replace("\u2069", "")
+
 
 router = APIRouter(tags=["gyms"])
 
@@ -397,11 +419,11 @@ def gym_session(
         {today: DayChoice(focus, None)},
     )
     day = routine.days[0]
-    day.title = f"{day.title} at {gym.name}"
+    day.title = _plain(tr(GYM_TEXTS, "title", title=day.title, gym=gym.name))
     day.custom_name = True
-    note = (
-        f"Built from {len(allowed)} exercises possible here"
-        + (f", following today's {planned.focus_label.lower()} plan." if planned else " (a full-body session: today isn't a training day).")
+    note = _plain(
+        tr(GYM_TEXTS, "built", n=len(allowed))
+        + (tr(GYM_TEXTS, "following", focus=planned.focus_label.lower()) if planned else tr(GYM_TEXTS, "full_body"))
     )
     return GymSessionOut(day=day, possible_exercises=len(allowed), note=note)
 

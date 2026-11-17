@@ -80,3 +80,26 @@ def test_the_request_language_reaches_endpoints_run_in_threads():
         assert client.get(path, headers={"Accept-Language": "en"}).json() == {"lang": "en"}
         assert client.get(path).json() == {"lang": "en"}
     assert current_language() == "en", "a request's language doesn't leak out of it"
+
+
+def test_menu_verdicts_alternatives_and_ai_prompts_in_arabic():
+    from app.i18n import ai_language_line
+    from app.models.exercise import Exercise
+    from app.services.alternatives import find_alternatives
+    from app.services.snap import rank_dishes
+
+    dish = {"name": "Kabsa", "description": "", "portion_g": 400, "calories": 700, "protein_g": 40, "carbs_g": 80, "fat_g": 20}
+    assert rank_dishes([dish], 2000, 120, 2400)[0]["verdict"].startswith("About 700")
+    assert ai_language_line('"seen"') == ""
+    press = Exercise(id=1, name="Chest Press", muscle_group="chest", category="machine", equipment="gym", pattern="horizontal_press")
+    bench = Exercise(id=2, name="Bench Press", muscle_group="chest", category="free weight", equipment="gym", pattern="horizontal_press")
+    assert find_alternatives(press, [press, bench], "gym")[0].reasons[0] == "Same movement (horizontal press)"
+
+    def arabic():
+        assert rank_dishes([dish], 2000, 120, 2400)[0]["verdict"].startswith("حوالي 700")
+        assert "in Arabic" in ai_language_line('"seen"')
+        alt = find_alternatives(press, [press, bench], "gym")[0]
+        assert alt.reasons == ["الحركة نفسها (ضغط أفقي)", "العضلات الرئيسية نفسها (الصدر)"]
+        assert alt.differences[0].startswith("أوزان حرة")
+
+    in_arabic(arabic)

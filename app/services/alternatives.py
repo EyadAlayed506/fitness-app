@@ -7,6 +7,7 @@ Only exercises in the catalogue are suggested, and only these relationships are 
 
 from dataclasses import dataclass, field
 
+from app.i18n import Table, current_language, tr
 from app.models.exercise import Exercise
 from app.services.routine import ALLOWED_EQUIPMENT
 
@@ -43,6 +44,82 @@ RELATED_PATTERNS = {
 
 MAX_PER_KIND = 3
 
+# What the user reads, in the language of the request (app.i18n). IDs (patterns, muscle groups, categories)
+# are translated only for display.
+TEXTS: Table = {
+    "en": {
+        "same_movement": "Same movement ({pattern})",
+        "same_muscles": "Same main muscles ({muscle})",
+        "more_work_on": "Puts more of the work on the {muscle} than the {original}.",
+        "different_movement": "A different movement ({pattern}), not a like-for-like swap.",
+        "another_movement": "another movement",
+        "eq.bodyweight": "Body weight only, so it's usually lighter than the original: use more reps or a slower tempo.",
+        "eq.free_weight": "Free weight: needs more balance and control than a machine, so start lighter.",
+        "eq.machine": "Machine: the path is guided, so the weight you can use will be different. Find a new working weight.",
+        "eq.cable": "Cable: the resistance stays on through the whole movement, so start lighter.",
+        "eq.other": "Uses a {alt} instead of a {original}, so pick a new working weight.",
+        "rel.horizontal_press.incline_press": RELATED_PATTERNS[("horizontal_press", "incline_press")],
+        "rel.incline_press.horizontal_press": RELATED_PATTERNS[("incline_press", "horizontal_press")],
+        "rel.dip.elbow_extension": RELATED_PATTERNS[("dip", "elbow_extension")],
+        "rel.elbow_extension.dip": RELATED_PATTERNS[("elbow_extension", "dip")],
+    },
+    "ar": {
+        "same_movement": "الحركة نفسها ({pattern})",
+        "same_muscles": "العضلات الرئيسية نفسها ({muscle})",
+        "more_work_on": "يضع عبئاً أكبر على {muscle} مقارنة بـ{original}.",
+        "different_movement": "حركة مختلفة ({pattern})، وليست بديلاً مطابقاً.",
+        "another_movement": "حركة أخرى",
+        "eq.bodyweight": "بوزن الجسم فقط، لذا يكون عادةً أخف من الأصلي: زِد التكرارات أو أبطئ الإيقاع.",
+        "eq.free_weight": "أوزان حرة: تحتاج توازناً وتحكماً أكثر من الجهاز، فابدأ بوزن أخف.",
+        "eq.machine": "جهاز: المسار موجَّه، فسيختلف الوزن الذي تستطيع استخدامه. حدّد وزن عمل جديداً.",
+        "eq.cable": "كيبل: تبقى المقاومة طوال الحركة، فابدأ بوزن أخف.",
+        "eq.other": "يستخدم {alt} بدلاً من {original}، فاختر وزن عمل جديداً.",
+        "rel.horizontal_press.incline_press": "ضغط مائل، فيضع عبئاً أكبر على أعلى الصدر والأكتاف.",
+        "rel.incline_press.horizontal_press": "ضغط مستوٍ: تركيز أقل على أعلى الصدر والأكتاف من النسخة المائلة.",
+        "rel.dip.elbow_extension": "يمرّن الترايسبس دون إشراك الكتف والصدر كما في تمرين المتوازي.",
+        "rel.elbow_extension.dip": "يمرّن أيضاً الصدر والأكتاف، ويضع حملاً أكبر على مفصل الكتف.",
+    },
+}
+
+_AR_PATTERNS = {
+    "horizontal_press": "ضغط أفقي", "incline_press": "ضغط مائل", "chest_fly": "فتح للصدر", "vertical_pull": "سحب عمودي",
+    "horizontal_pull": "تجديف", "vertical_press": "ضغط فوق الرأس", "lateral_raise": "رفرفة جانبية",
+    "rear_delt_fly": "فتح للكتف الخلفي", "squat": "قرفصاء", "knee_extension": "مدّ الركبة", "knee_flexion": "ثني الساق",
+    "hip_hinge": "مفصلة الورك", "hip_extension": "دفع الورك / الجسر", "hip_abduction": "إبعاد الورك",
+    "calf_raise": "رفع السمانة", "elbow_flexion": "ثني الذراع", "elbow_extension": "مدّ الترايسبس", "dip": "متوازي",
+    "trunk_flexion": "طحن البطن", "anti_extension": "ثبات الجذع",
+}
+_AR_MUSCLES = {
+    "chest": "الصدر", "back": "الظهر", "shoulders": "الأكتاف", "quads": "الفخذ الأمامي", "hamstrings": "الفخذ الخلفي",
+    "glutes": "الأرداف", "calves": "السمانة", "biceps": "الباي", "triceps": "الترايسبس", "core": "الجذع",
+}
+_AR_CATEGORIES = {"machine": "جهاز", "free weight": "أوزان حرة", "cable": "كيبل", "bodyweight": "وزن الجسم"}
+
+
+def _ar() -> bool:
+    return current_language() == "ar"
+
+
+def _pattern(pattern: str | None) -> str:
+    if not pattern:
+        return tr(TEXTS, "another_movement")
+    if _ar() and pattern in _AR_PATTERNS:
+        return _AR_PATTERNS[pattern]
+    return PATTERN_LABELS.get(pattern, pattern)
+
+
+def _muscle(group: str) -> str:
+    return _AR_MUSCLES.get(group, group) if _ar() else group
+
+
+def _category(category: str) -> str:
+    return _AR_CATEGORIES.get(category, category) if _ar() else category
+
+
+def _t(key: str, **params: object) -> str:
+    """A text without the invisible direction marks: reasons are short lines shown on their own."""
+    return tr(TEXTS, key, **params).replace("\u2068", "").replace("\u2069", "")
+
 
 @dataclass
 class Alternative:
@@ -56,14 +133,14 @@ def _equipment_note(original: Exercise, alt: Exercise) -> str | None:
     if alt.category == original.category:
         return None
     if alt.category == "bodyweight":
-        return "Body weight only, so it's usually lighter than the original: use more reps or a slower tempo."
+        return _t("eq.bodyweight")
     if alt.category == "free weight" and original.category in ("machine", "cable"):
-        return "Free weight: needs more balance and control than a machine, so start lighter."
+        return _t("eq.free_weight")
     if alt.category == "machine" and original.category in ("free weight", "bodyweight"):
-        return "Machine: the path is guided, so the weight you can use will be different. Find a new working weight."
+        return _t("eq.machine")
     if alt.category == "cable":
-        return "Cable: the resistance stays on through the whole movement, so start lighter."
-    return f"Uses a {alt.category} instead of a {original.category}, so pick a new working weight."
+        return _t("eq.cable")
+    return _t("eq.other", alt=_category(alt.category), original=_category(original.category))
 
 
 def find_alternatives(
@@ -77,23 +154,24 @@ def find_alternatives(
         if ex.id == original.id or (not include_all_equipment and ex.equipment not in allowed):
             continue
         same_pattern = bool(original.pattern) and ex.pattern == original.pattern
-        related = RELATED_PATTERNS.get((original.pattern, ex.pattern))
+        related = (original.pattern, ex.pattern) in RELATED_PATTERNS
         same_group = ex.muscle_group == original.muscle_group
-        pattern_label = PATTERN_LABELS.get(ex.pattern or "", ex.pattern or "another movement")
+        pattern_label = _pattern(ex.pattern)
+        same_muscles = _t("same_muscles", muscle=_muscle(ex.muscle_group))
         if same_pattern:
-            alt = Alternative(ex, "similar", reasons=[f"Same movement ({pattern_label})"])
+            alt = Alternative(ex, "similar", reasons=[_t("same_movement", pattern=pattern_label)])
             if same_group:
-                alt.reasons.append(f"Same main muscles ({ex.muscle_group})")
+                alt.reasons.append(same_muscles)
             else:
-                alt.differences.append(f"Puts more of the work on the {ex.muscle_group} than the {original.muscle_group}.")
+                alt.differences.append(_t("more_work_on", muscle=_muscle(ex.muscle_group), original=_muscle(original.muscle_group)))
         elif related and same_group:
-            alt = Alternative(ex, "similar", reasons=[f"Same main muscles ({ex.muscle_group})"], differences=[related])
+            alt = Alternative(ex, "similar", reasons=[same_muscles], differences=[_t(f"rel.{original.pattern}.{ex.pattern}")])
         elif same_group:
             alt = Alternative(
                 ex,
                 "different",
-                reasons=[f"Same main muscles ({ex.muscle_group})"],
-                differences=[f"A different movement ({pattern_label}), not a like-for-like swap."],
+                reasons=[same_muscles],
+                differences=[_t("different_movement", pattern=pattern_label)],
             )
         else:
             continue

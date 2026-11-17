@@ -544,7 +544,7 @@ function SessionChecklist({
       <Row style={{ justifyContent: "space-between" }}>
         <View style={{ flex: 1 }}>
           <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-            {day.custom_name && day.title.includes(" at ") ? tr("today.today").toLocaleUpperCase() : WEEKDAYS_SHORT[day.weekday_index].toLocaleUpperCase()} · {day.title.toLocaleUpperCase()}
+            {day.custom_name && (day.title.includes(" at ") || day.title.includes(" في ")) ? tr("today.today").toLocaleUpperCase() : WEEKDAYS_SHORT[day.weekday_index].toLocaleUpperCase()} · {day.title.toLocaleUpperCase()}
           </Txt>
           <Txt variant="small">
             {tr("workouts.exercisesDone", { done: finished, total: day.exercises.length })}
