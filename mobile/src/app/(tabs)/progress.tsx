@@ -28,6 +28,8 @@ import {
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { fmt, monthLabel, round, shortDate, todayISO, units } from "@/lib/format";
+import { useI18n, useLanguageEnd, type MessageKey } from "@/lib/i18n";
+import { trOr } from "@/lib/i18n/current";
 import { errorMessage, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { useTheme } from "@/lib/theme";
 import type {
@@ -52,18 +54,19 @@ interface Data {
 
 type View_ = "week" | "body" | "food" | "strength" | "sleep";
 // Five tabs fit a phone's width; patterns (insights) sit under the week
-const VIEWS: { value: View_; label: string }[] = [
-  { value: "week", label: "Week" },
-  { value: "body", label: "Body" },
-  { value: "food", label: "Food" },
-  { value: "strength", label: "Strength" },
-  { value: "sleep", label: "Sleep" },
+const VIEWS: { value: View_; label: MessageKey }[] = [
+  { value: "week", label: "progress.week" },
+  { value: "body", label: "progress.body" },
+  { value: "food", label: "nav.food" },
+  { value: "strength", label: "progress.strength" },
+  { value: "sleep", label: "nav.sleep" },
 ];
 
 const hasValues = (series: { data: (number | null)[] }[]) => series.some((s) => s.data.some((v) => v != null && v !== 0));
 
 export default function Progress() {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const { profile } = useProfile();
   const u = units(profile.unit_system);
   const [chosenLift, setLiftId] = useState<number | null>(null);
@@ -122,11 +125,11 @@ export default function Progress() {
 
   if (!data)
     return (
-      <Screen title="Progress">
+      <Screen title={tr("nav.progress")}>
         {error ? (
           <Card>
             <ErrorText message={error} />
-            <Button title="Try again" kind="soft" small onPress={load} style={{ marginTop: 12, alignSelf: "flex-start" }} />
+            <Button title={tr("common.tryAgain")} kind="soft" small onPress={load} style={{ marginTop: 12, alignSelf: "flex-start" }} />
           </Card>
         ) : (
           <SkeletonCards count={3} />
@@ -140,43 +143,44 @@ export default function Progress() {
   // Body weight
   const wLabels = weight.labels.map(shortDate);
   const wSeries: ChartSeries[] = [
-    { name: "Weight", data: kg(weight.series[0].data), color: t.series[0], type: "line", dots: weight.labels.length < 40 },
-    { name: "7-day average", data: kg(weight.series[1].data), color: t.series[1], type: "line" },
+    { name: tr("profile.weight"), data: kg(weight.series[0].data), color: t.series[0], type: "line", dots: weight.labels.length < 40 },
+    { name: tr("progress.avg7"), data: kg(weight.series[1].data), color: t.series[1], type: "line" },
   ];
-  if (weight.target_weight_kg) wSeries.push({ name: "Target", data: [round(u.fromKg(weight.target_weight_kg), 1)], color: t.muted, type: "ref" });
+  if (weight.target_weight_kg) wSeries.push({ name: tr("progress.target"), data: [round(u.fromKg(weight.target_weight_kg), 1)], color: t.muted, type: "ref" });
 
   // Projection
   const pLen = projection.labels.length;
   const pSeries: ChartSeries[] = projection.series.map((s, i) => ({
-    name: s.name.charAt(0).toUpperCase() + s.name.slice(1),
+    // the series are the diet options (light / normal / extreme)
+    name: trOr(`diet.${s.name}`, s.name.charAt(0).toUpperCase() + s.name.slice(1)),
     data: [...kg(s.data), ...Array(pLen - s.data.length).fill(null)],
     color: t.series[i],
     type: "line",
   }));
-  if (pSeries.length) pSeries.push({ name: "Target", data: [round(u.fromKg(projection.target_weight_kg), 1)], color: t.muted, type: "ref" });
+  if (pSeries.length) pSeries.push({ name: tr("progress.target"), data: [round(u.fromKg(projection.target_weight_kg), 1)], color: t.muted, type: "ref" });
 
   // Calories and macros
   const cLabels = calories.labels.map(shortDate);
-  const cSeries: ChartSeries[] = [{ name: "Calories", data: calories.series[0].data, color: t.series[0], type: "bar" }];
-  if (calories.target_calories) cSeries.push({ name: "Target", data: [calories.target_calories], color: t.muted, type: "ref" });
-  const mSeries: ChartSeries[] = calories.macros.map((m, i) => ({ name: m.name, data: m.data, color: t.series[i], type: "bar" }));
+  const cSeries: ChartSeries[] = [{ name: tr("food.calories"), data: calories.series[0].data, color: t.series[0], type: "bar" }];
+  if (calories.target_calories) cSeries.push({ name: tr("progress.target"), data: [calories.target_calories], color: t.muted, type: "ref" });
+  const mSeries: ChartSeries[] = calories.macros.map((m, i) => ({ name: trOr(`macro.${m.name.toLowerCase()}`, m.name), data: m.data, color: t.series[i], type: "bar" }));
 
   // Lift progress
   const lSeries: ChartSeries[] = lift
     ? [
-        { name: "Estimated 1RM", data: kg(lift.series[0].data), color: t.series[0], type: "line", dots: true },
-        { name: "Heaviest set", data: kg(lift.series[1].data), color: t.series[1], type: "line", dots: true },
+        { name: tr("progress.e1rm"), data: kg(lift.series[0].data), color: t.series[0], type: "line", dots: true },
+        { name: tr("progress.heaviest"), data: kg(lift.series[1].data), color: t.series[1], type: "line", dots: true },
       ]
     : [];
   const lLabels = lift?.labels.map(shortDate) ?? [];
 
   // Weekly volume
   const vLabels = volume.labels.map((l) => shortDate(l));
-  const vSeries: ChartSeries[] = volume.series.map((s, i) => ({ name: s.name, data: kg(s.data), color: t.series[i], type: "bar" }));
+  const vSeries: ChartSeries[] = volume.series.map((s, i) => ({ name: trOr(`region.${s.name.toLowerCase()}`, s.name), data: kg(s.data), color: t.series[i], type: "bar" }));
 
   return (
     <Screen
-      title="Progress"
+      title={tr("nav.progress")}
       refreshing={refreshing}
       onRefresh={async () => {
         setRefreshing(true);
@@ -184,13 +188,13 @@ export default function Progress() {
         setRefreshing(false);
       }}
     >
-      <Segmented options={VIEWS} value={view} onChange={setView} style={{ marginBottom: 16 }} />
+      <Segmented options={VIEWS.map((v) => ({ value: v.value, label: tr(v.label) }))} value={view} onChange={setView} style={{ marginBottom: 16 }} />
       <ErrorText message={error} />
 
       {view === "week" ? (
         <>
           <WeeklySummaryCard />
-          <Section title="Patterns" />
+          <Section title={tr("progress.patterns")} />
           <InsightsView />
         </>
       ) : null}
@@ -198,28 +202,28 @@ export default function Progress() {
       {view === "body" ? (
         <FadeIn key="body">
           <PlanCards />
-          <Section title="Weight" />
+          <Section title={tr("profile.weight")} />
           <ChartCard
-            title={`Body weight (${u.w})`}
-            subtitle="Each weigh-in, the 7-day average and your BMI 22 target"
+            title={tr("progress.bodyWeight", { unit: u.wLabel })}
+            subtitle={tr("progress.bodyWeightHint")}
             empty={!hasValues(wSeries.filter((s) => s.type !== "ref"))}
-            emptyText="Log your weight on the Today tab to see the trend."
+            emptyText={tr("progress.bodyWeightEmpty")}
             table={{ labels: wLabels, series: wSeries }}
           >
             <Chart labels={wLabels} series={wSeries} />
           </ChartCard>
 
           <ChartCard
-            title={`Projected weight (${u.w})`}
+            title={tr("progress.projected", { unit: u.wLabel })}
             subtitle={projection.note}
             empty={!pSeries.length}
-            emptyText="You're at a healthy weight, so there's nothing to project."
+            emptyText={tr("progress.projectedEmpty")}
             table={{ labels: projection.labels.map(String), series: pSeries }}
           >
-            <Chart labels={projection.labels.map(String)} series={pSeries} xTitle="Weeks from today" />
+            <Chart labels={projection.labels.map(String)} series={pSeries} xTitle={tr("progress.weeksFromToday")} />
           </ChartCard>
 
-          <Section title="Body measurements" action="Add" onAction={() => setAdding(true)} />
+          <Section title={tr("progress.measurements")} action={tr("food.add")} onAction={() => setAdding(true)} />
           <Measurements
             compare={compare}
             onAdd={() => setAdding(true)}
@@ -231,19 +235,19 @@ export default function Progress() {
       {view === "food" ? (
         <FadeIn key="food">
           <ChartCard
-            title="Calories, last 14 days"
-            subtitle="Daily intake against your target"
+            title={tr("progress.calories14")}
+            subtitle={tr("progress.caloriesHint")}
             empty={!hasValues(cSeries.filter((s) => s.type !== "ref"))}
-            emptyText="Log food to see your daily calories."
+            emptyText={tr("progress.caloriesEmpty")}
             table={{ labels: cLabels, series: cSeries, digits: 0 }}
           >
             <Chart labels={cLabels} series={cSeries} digits={0} />
           </ChartCard>
 
           <ChartCard
-            title="Macros, last 14 days (g)"
+            title={tr("progress.macros14")}
             empty={!hasValues(mSeries)}
-            emptyText="Log food to see your macros."
+            emptyText={tr("progress.macrosEmpty")}
             table={{ labels: cLabels, series: mSeries, digits: 0 }}
           >
             <Chart labels={cLabels} series={mSeries} stacked digits={0} />
@@ -254,10 +258,10 @@ export default function Progress() {
       {view === "strength" ? (
         <FadeIn key="strength">
           <ChartCard
-            title={`Lift progress (${u.w})`}
-            subtitle="Estimated 1-rep max (Epley) and heaviest set per workout"
+            title={tr("progress.lift", { unit: u.wLabel })}
+            subtitle={tr("progress.liftHint")}
             empty={!lifts.length}
-            emptyText="Log a workout to see your strength progress."
+            emptyText={tr("progress.liftEmpty")}
             table={{ labels: lLabels, series: lSeries }}
           >
             <Chips
@@ -270,16 +274,16 @@ export default function Progress() {
               <Chart labels={lLabels} series={lSeries} />
             ) : (
               <Txt variant="small" style={{ paddingVertical: 16, textAlign: "center" }}>
-                No sets with weight for this exercise yet.
+                {tr("progress.noWeightedSets")}
               </Txt>
             )}
           </ChartCard>
 
           <ChartCard
-            title="Weekly training volume"
-            subtitle={`Reps × weight (${u.w}) per body region, weeks starting`}
+            title={tr("progress.volume")}
+            subtitle={tr("progress.volumeHint", { unit: u.wLabel })}
             empty={!hasValues(vSeries)}
-            emptyText="Log workouts to see your weekly volume."
+            emptyText={tr("progress.volumeEmpty")}
             table={{ labels: vLabels, series: vSeries, digits: 0 }}
           >
             <Chart labels={vLabels} series={vSeries} stacked digits={0} />
@@ -293,7 +297,7 @@ export default function Progress() {
         </FadeIn>
       ) : null}
 
-      <Sheet visible={adding} title="Add measurements" onClose={() => setAdding(false)}>
+      <Sheet visible={adding} title={tr("progress.addMeasurements")} onClose={() => setAdding(false)}>
         {adding ? (
           <MeasurementForm
             onSaved={async () => {
@@ -320,6 +324,8 @@ function Measurements({
   onAdd: () => void;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
+  const end = useLanguageEnd();
   const { profile } = useProfile();
   const u = units(profile.unit_system);
   if (!compare.rows.length) {
@@ -327,11 +333,9 @@ function Measurements({
       <Card>
         <EmptyState
           icon="resize-outline"
-          title="Compare your measurements"
-          text={`Add measurements (waist, shoulders…) at least once a month to compare months.${
-            compare.available_months.length === 1 ? " You have one month so far." : ""
-          }`}
-          action="Add measurements"
+          title={tr("progress.compareTitle")}
+          text={tr("progress.compareText") + (compare.available_months.length === 1 ? tr("progress.oneMonth") : "")}
+          action={tr("progress.addMeasurements")}
           onAction={onAdd}
         />
       </Card>
@@ -341,25 +345,25 @@ function Measurements({
   const monthOptions = compare.available_months.map((m) => ({ value: m, label: monthLabel(m) }));
   const val = (field: string, v: number | null) =>
     v == null ? "–" : field === "body_fat_pct" ? fmt(v, 1) : fmt(u.fromCm(v), 1);
-  const unitFor = (field: string) => (field === "body_fat_pct" ? "%" : u.l);
+  const unitFor = (field: string) => (field === "body_fat_pct" ? "%" : u.lLabel);
   const lengthRows = compare.rows.filter((r) => r.field !== "body_fat_pct");
   const series: ChartSeries[] = [
     { name: monthLabel(a).split(" ")[0], data: lengthRows.map((r) => round(u.fromCm(r.first), 1)), color: t.series[0], type: "bar" },
     { name: monthLabel(b).split(" ")[0], data: lengthRows.map((r) => round(u.fromCm(r.second), 1)), color: t.series[1], type: "bar" },
   ];
-  const cell = { flex: 1, textAlign: "right" as const, color: t.text, fontSize: 13, fontVariant: ["tabular-nums" as const] };
+  const cell = { flex: 1, textAlign: end, color: t.text, fontSize: 13, fontVariant: ["tabular-nums" as const] };
   return (
     <Card>
-      <Chips label="Compare" value={a} onChange={(m) => onChangeMonths([m, b])} options={monthOptions} />
-      <Chips label="with" value={b} onChange={(m) => onChangeMonths([a, m])} options={monthOptions} />
+      <Chips label={tr("progress.compare")} value={a} onChange={(m) => onChangeMonths([m, b])} options={monthOptions} />
+      <Chips label={tr("progress.with")} value={b} onChange={(m) => onChangeMonths([a, m])} options={monthOptions} />
       <View style={{ marginTop: 10 }}>
-        <Chart labels={lengthRows.map((r) => r.label)} series={series} />
+        <Chart labels={lengthRows.map((r) => trOr(`measure.${r.field}`, r.label))} series={series} />
       </View>
       <Row style={{ paddingVertical: 6, marginTop: 8 }}>
         <Text style={{ flex: 1.2 }} />
         <Text style={[cell, { color: t.text2, fontSize: 12 }]}>{monthLabel(a).split(" ")[0]}</Text>
         <Text style={[cell, { color: t.text2, fontSize: 12 }]}>{monthLabel(b).split(" ")[0]}</Text>
-        <Text style={[cell, { color: t.text2, fontSize: 12 }]}>Change</Text>
+        <Text style={[cell, { color: t.text2, fontSize: 12 }]}>{tr("progress.change")}</Text>
       </Row>
       {compare.rows.map((r) => {
         const d = r.difference;
@@ -367,7 +371,7 @@ function Measurements({
         const color = d == null || d === 0 ? t.text : good ? t.goodInk : t.critical;
         return (
           <Row key={r.field} style={{ paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }}>
-            <Text style={{ flex: 1.2, color: t.text, fontSize: 13 }}>{r.label}</Text>
+            <Text style={{ flex: 1.2, color: t.text, fontSize: 13 }}>{trOr(`measure.${r.field}`, r.label)}</Text>
             <Text style={cell}>{val(r.field, r.first)}</Text>
             <Text style={cell}>{val(r.field, r.second)}</Text>
             <Text style={[cell, { color }]}>
@@ -377,49 +381,50 @@ function Measurements({
         );
       })}
       <Txt variant="tiny" style={{ marginTop: 8 }}>
-        Body fat is estimated with the U.S. Navy formula from waist, neck{profile.sex === "female" ? ", hips" : ""} and height.
+        {tr(profile.sex === "female" ? "progress.bodyFatNoteHips" : "progress.bodyFatNote")}
       </Txt>
     </Card>
   );
 }
 
-const FIELDS: [string, string][] = [
-  ["waist_cm", "Waist"],
-  ["shoulders_cm", "Shoulders"],
-  ["chest_cm", "Chest"],
-  ["hips_cm", "Hips"],
-  ["neck_cm", "Neck"],
-  ["arm_cm", "Arm"],
-  ["thigh_cm", "Thigh"],
+const FIELDS: [string, MessageKey][] = [
+  ["waist_cm", "measure.waist_cm"],
+  ["shoulders_cm", "measure.shoulders_cm"],
+  ["chest_cm", "measure.chest_cm"],
+  ["hips_cm", "measure.hips_cm"],
+  ["neck_cm", "measure.neck_cm"],
+  ["arm_cm", "measure.arm_cm"],
+  ["thigh_cm", "measure.thigh_cm"],
 ];
 
 function MeasurementForm({ onSaved }: { onSaved: () => void }) {
   const toast = useToast();
+  const { t: tr, errorText } = useI18n();
   const { profile } = useProfile();
   const u = units(profile.unit_system);
   const [values, setValues] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const save = async () => {
     setError(null);
     const body: Record<string, unknown> = { date: todayISO(), unit: u.l };
     for (const [k] of FIELDS) body[k] = values[k] ? Number(values[k].replace(",", ".")) : null;
     try {
       await api("/measurements", { method: "POST", body });
-      toast("Measurements saved");
+      toast(tr("progress.measurementsSaved"));
       onSaved();
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     }
   };
   return (
     <View>
-      <Txt variant="small">Fill in any you have, in {u.l}. Measure in the morning, relaxed, tape snug but not tight.</Txt>
+      <Txt variant="small">{tr("progress.measureHint", { unit: u.lLabel })}</Txt>
       <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 8 }}>
         {FIELDS.map(([k, label]) => (
           <Field
             key={k}
-            label={label}
-            suffix={u.l}
+            label={tr(label)}
+            suffix={u.lLabel}
             value={values[k] ?? ""}
             onChangeText={(v) => setValues((old) => ({ ...old, [k]: v }))}
             keyboardType="decimal-pad"
@@ -427,8 +432,8 @@ function MeasurementForm({ onSaved }: { onSaved: () => void }) {
           />
         ))}
       </View>
-      <ErrorText message={error} />
-      <Button title="Save" onPress={save} style={{ marginTop: 16 }} />
+      <ErrorText message={error == null ? null : errorText(error)} />
+      <Button title={tr("common.save")} onPress={save} style={{ marginTop: 16 }} />
     </View>
   );
 }

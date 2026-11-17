@@ -57,6 +57,9 @@ Status: **draft for review** (APP-01, 2026-11-18). Reviewers: Nawaf (language/co
 - **Text aligns with the page, not with its own script:** `Txt` sets `textAlign` left (English) or right (Arabic),
   so an Arabic product name in the English app, or an English exercise name in the Arabic app, lines up with the
   rest of the row. Pass `textAlign` in `style` to centre. Plain `Text` elsewhere should do the same.
+- **Charts and number lines stay left-to-right** in Arabic (time runs left → right, like the BMI scale 15 → 40).
+  Their containers set `direction: "ltr"`; legends, titles and tables around them follow the page.
+  *Decision to confirm with an Arabic-speaking reviewer.*
 - Arabic text is often longer/taller: no fixed widths on text, allow two lines on buttons and labels where space is tight.
 
 ## States

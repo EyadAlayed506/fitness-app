@@ -99,6 +99,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** textAlign for the end of a line: "right" in English, "left" in Arabic (e.g. numbers in a table). */
+export const useLanguageEnd = (): "left" | "right" => (useLanguage() === "ar" ? "left" : "right");
+
 /** The current language, or English outside the provider (safe for low-level UI components). */
 export const useLanguage = (): Language => useContext(I18nContext)?.lang ?? "en";
 

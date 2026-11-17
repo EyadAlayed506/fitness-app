@@ -3,11 +3,33 @@
 | Field | Value |
 |---|---|
 | Owner | Samer |
-| Branch | `samer/app-bilingual-foundation` (same branch as APP-01; local, not committed or pushed) |
+| Branch | `samer/app-bilingual-foundation` (same branch as APP-01; committed locally, not pushed) |
 | Base | `origin/merged_branch` @ `de689db` |
 | Date | 2026-11-18 |
 | Platform | Web app for the pilot (WEB-01) |
-| Status | **Partly done.** Sign-up → onboarding → Today → Profile → Workouts → **Food** work in Arabic and English against the real local backend. Progress, coach, sleep screens still English. Arabic text not yet human-reviewed. |
+| Status | **Partly done.** Sign-up → onboarding → Today → Profile → Workouts → Food → **Progress** work in Arabic and English against the real local backend. Coach and sleep screens still English. Arabic text not yet human-reviewed. |
+
+## Update 2026-11-18 (part 4): Progress
+
+- Translated: Progress tab (Week, Body, Food, Strength views), the weekly summary (training days, sessions,
+  lifts, sleep, weight goal, points, planned vs done), patterns (insights: headings, strength badges, empty
+  states), plan cards (BMI, daily calories, diet options), body weight / projection / calories / macros / lift /
+  volume charts, measurement comparison and form, chart readout and table.
+- Server names translated in the app with a fallback (`trOr`): chart series (macros, body regions, diet options),
+  measurement fields, weekly record badges ("Heaviest weight yet").
+- **Fixed for Arabic:** the BMI scale (bars mirrored but marker and numbers didn't — the marker would have
+  pointed at the wrong zone) is now a left-to-right number line; chart drawing area kept left-to-right (outer
+  date labels were cut off); x-axis label count now depends on label length (Arabic month names overlapped);
+  table numbers sit on the end side.
+- Browser check (demo account, 10 weeks of data, 375×812): Week, Body (BMI scale, diet options), Strength
+  (chart, tap readout) in Arabic; Strength in English unchanged. Signed numbers ("−250") measured in the
+  rendered page: correct order.
+- Checks: **96/96** unit tests, typecheck, lint, web export.
+- **Still English in Progress:** the Sleep view (`SleepChart`, Badr's area), and server text — insight titles,
+  explanations and cautions, the projection note, plan disclaimer and diet warnings, weekly notes.
+
+Screenshots: [week](APP-02/progress-week-ar.jpg) · [body](APP-02/progress-body-ar.jpg) ·
+[chart](APP-02/progress-chart-ar.png) · [English](APP-02/progress-strength-en.jpg)
 
 ## Update 2026-11-18 (part 2): Workouts
 
@@ -104,7 +126,7 @@ Still no new dependencies; `package.json`, `app.json`, `eas.json`, `api.ts` unto
 | Server-generated text | today's suggestion titles/messages/reasons, plan disclaimer, routine split and day titles ("Full body"), exercise names | **Alzoman / Nawaf** — needs a decision: server returns text per `lang`, or stable IDs the app translates |
 | Workouts (rest of) | `HandsFree`, `SetHelpers` (voice + weight from photo) — **done otherwise** | Samer; Nawaf for voice language |
 | Food | **done** (server/AI text excepted) | Samer |
-| Progress | `progress.tsx`, `WeeklySummary`, `Insights`, `charts` | Samer |
+| Progress | **done** (Sleep view and server text excepted) | Samer |
 | Sleep / points | `SleepParts` (quality, "In range", goal "7 h"), `SleepDashboard`, `WhoopCard`, `HealthConnectCard`, `PointsParts` | Badr (meanings) |
 | Coach | `coach.tsx` + reply language | Nawaf |
 | Machine photos / gyms | `ExercisePhoto`, `SnapParts`, `GymParts`, `gyms.tsx` | Eyad (names) |

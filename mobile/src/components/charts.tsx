@@ -4,6 +4,8 @@ import { Platform, Text, View, type LayoutChangeEvent } from "react-native";
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 
 import { fmt } from "@/lib/format";
+import { useLanguageEnd } from "@/lib/i18n";
+import { tr } from "@/lib/i18n/current";
 import { useTheme } from "@/lib/theme";
 
 import { Card, LinkButton, Row, Txt } from "./ui";
@@ -93,8 +95,11 @@ export function Chart({ labels, series, stacked = false, height = 200, xTitle, d
   // Bars sit in bands; line-only charts span the full width
   const x = (i: number) => (hasBars ? PAD.left + band * (i + 0.5) : PAD.left + (n > 1 ? (plotW * i) / (n - 1) : plotW / 2));
 
-  // Up to ~5 x labels so they never overlap; add the last one if there's room
-  const labelEvery = Math.max(1, Math.ceil(n / 5));
+  // Up to ~5 x labels so they never overlap; fewer when labels are long (Arabic month names are
+  // wider than "Sep 12"). About 6 px per character at this size, plus room between labels.
+  const longest = Math.max(1, ...labels.map((l) => l.length));
+  const fits = Math.max(2, Math.floor(plotW / (longest * 6 * 1.3)));
+  const labelEvery = Math.max(1, Math.ceil(n / Math.min(5, fits)));
   const labelled = new Set<number>();
   for (let i = 0; i < n; i += labelEvery) labelled.add(i);
   const lastLabelled = Math.max(...labelled, 0);
@@ -131,17 +136,19 @@ export function Chart({ labels, series, stacked = false, height = 200, xTitle, d
             })}
           </Row>
         ) : (
-          <Txt variant="tiny">Tap the chart to see values</Txt>
+          <Txt variant="tiny">{tr("chart.tap")}</Txt>
         )}
       </View>
       <View
         onLayout={onLayout}
-        style={{ height }}
+        // Time runs left to right in both languages; without this the page's right-to-left direction
+        // flips the SVG text anchors in Arabic and the outer axis labels fall off the edge.
+        style={{ height, direction: "ltr" }}
         onStartShouldSetResponder={() => true}
         onResponderGrant={(e) => pick(e.nativeEvent.locationX)}
         onResponderMove={(e) => pick(e.nativeEvent.locationX)}
         accessibilityRole="image"
-        accessibilityLabel={`Chart: ${series.map((s) => s.name).join(", ")}`}
+        accessibilityLabel={tr("chart.label", { names: series.map((s) => s.name).join(tr("list.separator")) })}
       >
         {width > 0 ? (
           <Svg width={width} height={height} pointerEvents="none">
@@ -307,7 +314,7 @@ export function ChartCard({
         <Txt variant="h3" style={{ flex: 1 }}>
           {title}
         </Txt>
-        {!empty && table ? <LinkButton title={showTable ? "Chart" : "Table"} onPress={() => setShowTable(!showTable)} /> : null}
+        {!empty && table ? <LinkButton title={tr(showTable ? "chart.chart" : "chart.table")} onPress={() => setShowTable(!showTable)} /> : null}
       </Row>
       {subtitle ? (
         <Txt variant="tiny" style={{ marginBottom: 8 }}>
@@ -332,7 +339,8 @@ export function ChartCard({
 
 function DataTable({ labels, series, digits }: { labels: string[]; series: ChartSeries[]; digits: number }) {
   const t = useTheme();
-  const cell = { flex: 1, textAlign: "right" as const, fontSize: 13, color: t.text, fontVariant: ["tabular-nums" as const] };
+  const end = useLanguageEnd();
+  const cell = { flex: 1, textAlign: end, fontSize: 13, color: t.text, fontVariant: ["tabular-nums" as const] };
   return (
     <View style={{ marginTop: 6 }}>
       <Row style={{ paddingVertical: 6 }}>

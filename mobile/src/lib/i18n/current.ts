@@ -24,6 +24,9 @@ export const tr = (key: MessageKey, params?: Params): string => translate(DICTS[
 /** Text for a count in the current language ("3 days", "3 أيام"). */
 export const trCount = (key: MessageKey, n: number, params?: Params): string => translateCount(DICTS[lang], lang, key, n, params);
 
+/** A name from the server shown translated when the app has a text for it ("region.chest"), else as it came. */
+export const trOr = (key: string, fallback: string): string => (key in en ? tr(key as MessageKey) : fallback);
+
 /** A message for an error from the API helper (or anything thrown), in the current language. */
 export function errorTextFor(err: unknown): string {
   const e = err as { status?: number; message?: string; code?: string } | null;
