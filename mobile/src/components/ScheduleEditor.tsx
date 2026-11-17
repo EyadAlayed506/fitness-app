@@ -3,6 +3,7 @@ import { View } from "react-native";
 
 import { api } from "@/lib/api";
 import { WEEKDAYS } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import type { Routine } from "@/lib/types";
 
@@ -23,10 +24,11 @@ const fromRoutine = (r: Routine): Record<number, Choice> =>
  */
 export function ScheduleEditor({ routine, onSaved }: { routine: Routine; onSaved: (r: Routine, message: string) => void }) {
   const t = useTheme();
+  const { t: tr, errorText } = useI18n();
   const [days, setDays] = useState<number[]>(routine.training_days);
   const [choices, setChoices] = useState<Record<number, Choice>>(() => fromRoutine(routine));
   const [preview, setPreview] = useState<Routine>(routine);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ key: "profile.needDays" } | { error: unknown } | null>(null);
 
   const body = useMemo(
     () => ({
@@ -44,7 +46,7 @@ export function ScheduleEditor({ routine, onSaved }: { routine: Routine; onSaved
           setError(null);
           setPreview(r);
         })
-        .catch((e) => setError((e as Error).message));
+        .catch((e) => setError({ error: e }));
     }, 250);
     return () => clearTimeout(id);
   }, [body, days.length]);
@@ -56,13 +58,13 @@ export function ScheduleEditor({ routine, onSaved }: { routine: Routine; onSaved
 
   const save = async () => {
     if (!days.length) {
-      setError("Pick at least one day you can train.");
+      setError({ key: "profile.needDays" });
       return;
     }
     try {
-      onSaved(await api<Routine>("/me/schedule", { method: "PUT", body }), "Plan saved");
+      onSaved(await api<Routine>("/me/schedule", { method: "PUT", body }), tr("schedule.saved"));
     } catch (e) {
-      setError((e as Error).message);
+      setError({ error: e });
     }
   };
 
@@ -78,9 +80,9 @@ export function ScheduleEditor({ routine, onSaved }: { routine: Routine; onSaved
             <Row style={{ justifyContent: "space-between" }}>
               <Txt style={{ fontWeight: "700" }}>{WEEKDAYS[d]}</Txt>
               {recommended && current !== recommended ? (
-                <LinkButton title={`Use recommended (${label(recommended)})`} onPress={() => set(d, { focus: null })} />
+                <LinkButton title={tr("schedule.useRecommendedFor", { label: label(recommended) })} onPress={() => set(d, { focus: null })} />
               ) : recommended ? (
-                <Txt variant="tiny">Recommended</Txt>
+                <Txt variant="tiny">{tr("schedule.recommended")}</Txt>
               ) : null}
             </Row>
             <Chips
@@ -93,35 +95,35 @@ export function ScheduleEditor({ routine, onSaved }: { routine: Routine; onSaved
               style={{ marginTop: 4 }}
             />
             <Field
-              label="Name (optional)"
+              label={tr("schedule.name")}
               value={choices[d]?.name ?? ""}
               onChangeText={(name) => set(d, { name })}
               placeholder={label(current)}
               maxLength={40}
-              accessibilityLabel={`Name for ${WEEKDAYS[d]}`}
+              accessibilityLabel={tr("schedule.nameFor", { day: WEEKDAYS[d] })}
             />
           </View>
         );
       })}
       <Txt variant="tiny" style={{ marginTop: 10 }}>
-        ★ = recommended. {preview.split_reason}
+        {tr("schedule.star")} {preview.split_reason}
       </Txt>
       {preview.warnings.map((w) => (
         <Txt key={w} variant="small" style={{ marginTop: 6, color: t.warnInk }}>
           {w}
         </Txt>
       ))}
-      <ErrorText message={error} />
+      <ErrorText message={error == null ? null : "key" in error ? tr(error.key) : errorText(error.error)} />
       <Row style={{ marginTop: 14 }}>
         <Button
-          title="Use recommended"
+          title={tr("schedule.useRecommended")}
           kind="ghost"
           onPress={() => setChoices(Object.fromEntries(days.map((d) => [d, { focus: null, name: "" }])))}
         />
-        <Button title="Save plan" onPress={save} style={{ flex: 1 }} />
+        <Button title={tr("schedule.save")} onPress={save} style={{ flex: 1 }} />
       </Row>
       <Txt variant="tiny" style={{ marginTop: 8 }}>
-        Changing the plan never changes workouts you already logged.
+        {tr("schedule.never")}
       </Txt>
     </View>
   );

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useWorkouts } from "@/lib/data";
+import { tr, trCount } from "@/lib/i18n/current";
 import { cancelRestEnd, scheduleRestEnd } from "@/lib/restNotifications";
 import { formatRest, remainingMs, type RestTimerState } from "@/lib/restTimer";
 import { speak } from "@/lib/speech";
@@ -58,7 +59,7 @@ export function WorkoutSessionProvider({ children }: { children: ReactNode }) {
     setNextSet(text);
   }, []);
   const timer = useRestTimer((name, late) => {
-    toast(name ? `Rest is over. Time for your next set of ${name}` : "Rest is over. Time for your next set");
+    toast(name ? tr("session.restOverName", { name }) : tr("session.restOver"));
     const text = announcement.current;
     announcement.current = null;
     if (text && !late) void speak(`Rest is over. ${text}`);
@@ -168,14 +169,14 @@ export function WorkoutMiniBar({ extra }: { extra?: ReactNode }) {
     <Pressable
       onPress={() => router.navigate("/workouts")}
       accessibilityRole="button"
-      accessibilityLabel="Workout in progress. Open it"
+      accessibilityLabel={tr("session.open")}
       style={({ pressed }) => [
         styles.bar,
         { backgroundColor: t.surface, borderTopColor: t.border, opacity: pressed ? 0.8 : 1 },
       ]}
     >
       <View style={[styles.dot, { backgroundColor: t.good }]} />
-      <Text style={[typeScale.label, { color: t.text }]}>Workout</Text>
+      <Text style={[typeScale.label, { color: t.text }]}>{tr("workouts.workout")}</Text>
       <Elapsed since={active.started_at} />
       {extra}
       <View style={{ flex: 1 }} />
@@ -183,18 +184,18 @@ export function WorkoutMiniBar({ extra }: { extra?: ReactNode }) {
         <View style={[styles.pill, { backgroundColor: t.accentSoft }]}>
           <Ionicons name="timer-outline" size={14} color={t.accent} />
           <Text style={[typeScale.label, { color: t.accent, fontVariant: ["tabular-nums"] }]}>
-            Rest {formatRest(remainingMs(timer.state, timer.now))}
-            {timer.state.status === "paused" ? " · paused" : ""}
+            {tr("session.rest", { time: formatRest(remainingMs(timer.state, timer.now)) })}
+            {timer.state.status === "paused" ? tr("session.pausedSuffix") : ""}
           </Text>
         </View>
       ) : restDone ? (
         <View style={[styles.pill, { backgroundColor: t.goodSoft }]}>
           <Ionicons name="checkmark" size={14} color={t.goodInk} />
-          <Text style={[typeScale.label, { color: t.goodInk }]}>Next set</Text>
+          <Text style={[typeScale.label, { color: t.goodInk }]}>{tr("session.nextSet")}</Text>
         </View>
       ) : (
         <Text style={[typeScale.small, { color: t.text2 }]}>
-          {active.set_count} {active.set_count === 1 ? "set" : "sets"}
+          {trCount("workouts.setCount", active.set_count)}
         </Text>
       )}
       <Ionicons name="chevron-up" size={18} color={t.muted} />

@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -18,6 +17,7 @@ import {
   ErrorText,
   FadeIn,
   Field,
+  Icon,
   IconButton,
   LinkButton,
   ListRow,
@@ -48,8 +48,9 @@ import {
   useRoutine,
   useWorkouts,
 } from "@/lib/data";
-import { WEEKDAYS_SHORT, duration, longDateTime, plural, timeOf, tzOffset, units, weekdayIndex } from "@/lib/format";
+import { WEEKDAYS, WEEKDAYS_MIN, WEEKDAYS_SHORT, duration, longDateTime, timeOf, tzOffset, units, weekdayIndex } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useI18n } from "@/lib/i18n";
 import { errorMessage, invalidate, qk, queryClient, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { Points, Routine, RoutineDay, WorkoutSet } from "@/lib/types";
@@ -70,6 +71,7 @@ type SheetState =
 
 export default function Workouts() {
   const t = useTheme();
+  const { t: tr, tn } = useI18n();
   const toast = useToast();
   const { profile } = useProfile();
   const u = units(profile.unit_system);
@@ -139,7 +141,7 @@ export default function Workouts() {
       }
       haptics.impact();
     } catch (e) {
-      toast(errorMessage(e) ?? "Couldn't start the workout");
+      toast(errorMessage(e) ?? tr("workouts.couldntStart"));
     }
   };
 
@@ -158,7 +160,7 @@ export default function Workouts() {
 
   const logExercise = (exercise: PickedExercise, via: Via) => {
     if (!active) {
-      toast("Start a workout first, then tap an exercise to log it");
+      toast(tr("workouts.startFirst"));
       return;
     }
     timer.loadExercise(exercise.id, exercise.name).catch(() => {});
@@ -174,9 +176,9 @@ export default function Workouts() {
   const removeSet = async (workoutId: number, s: WorkoutSet) => {
     try {
       await deleteSet(workoutId, s);
-      toast("Set deleted", { action: { label: "Undo", onPress: () => void restoreSet(workoutId, s).catch(() => {}) } });
+      toast(tr("sets.deleted"), { action: { label: tr("common.undo"), onPress: () => void restoreSet(workoutId, s).catch(() => {}) } });
     } catch (e) {
-      toast(errorMessage(e) ?? "Couldn't delete the set");
+      toast(errorMessage(e) ?? tr("workouts.couldntDeleteSet"));
     }
   };
 
@@ -185,8 +187,8 @@ export default function Workouts() {
 
   return (
     <Screen
-      title="Workouts"
-      subtitle={routine ? `${routine.split} · ${routine.days_per_week} days a week`.toUpperCase() : undefined}
+      title={tr("nav.workouts")}
+      subtitle={routine ? `${routine.split} · ${tn("plan.daysPerWeek", routine.days_per_week)}`.toLocaleUpperCase() : undefined}
       refreshing={refreshing}
       onRefresh={async () => {
         setRefreshing(true);
@@ -198,7 +200,7 @@ export default function Workouts() {
         <Card>
           <ErrorText message={loadError} />
           <Button
-            title="Try again"
+            title={tr("common.tryAgain")}
             kind="soft"
             small
             onPress={async () => {
@@ -218,27 +220,27 @@ export default function Workouts() {
                 <Row gap={space.sm}>
                   <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.good }} />
                   <Txt variant="tiny" style={{ ...typeScale.overline, color: t.goodInk }}>
-                    IN PROGRESS
+                    {tr("workouts.inProgress").toLocaleUpperCase()}
                   </Txt>
                 </Row>
                 <Row gap={6}>
-                  <Txt variant="tiny">Started {timeOf(active.started_at)} ·</Txt>
+                  <Txt variant="tiny">{tr("workouts.startedAt", { time: timeOf(active.started_at) })}</Txt>
                   <Elapsed since={active.started_at} />
                 </Row>
               </Row>
               <Row style={{ marginTop: space.md }}>
-                <Stat label="Sets" value={String(active.set_count)} />
-                <Stat label="Volume" value={u.weight(active.volume_kg, 0)} />
-                <Stat label="Exercises" value={String(new Set(active.sets.map((x) => x.exercise_id)).size)} />
+                <Stat label={tr("workouts.sets")} value={String(active.set_count)} />
+                <Stat label={tr("workouts.volume")} value={u.weight(active.volume_kg, 0)} />
+                <Stat label={tr("workouts.exercises")} value={String(new Set(active.sets.map((x) => x.exercise_id)).size)} />
               </Row>
               <HandsFreePanel />
               {gym ? (
                 <Row gap={space.sm} style={{ marginTop: space.md }}>
-                  <Ionicons name="location-outline" size={16} color={t.text2} />
+                  <Icon name="location-outline" size={16} color={t.text2} />
                   <Txt variant="small" style={{ flex: 1 }} numberOfLines={1}>
-                    At {gym.name}
+                    {tr("workouts.atGym", { gym: gym.name })}
                   </Txt>
-                  <Button title="Change" kind="ghost" small onPress={() => setSheet({ kind: "gym-pick" })} style={{ borderColor: "transparent" }} accessibilityLabel="Change the gym of this workout" />
+                  <Button title={tr("common.change")} kind="ghost" small onPress={() => setSheet({ kind: "gym-pick" })} style={{ borderColor: "transparent" }} accessibilityLabel={tr("workouts.changeGymLabel")} />
                 </Row>
               ) : null}
 
@@ -253,8 +255,8 @@ export default function Workouts() {
                 />
               ) : routine && routine.days.length ? (
                 <View style={{ marginTop: space.lg }}>
-                  <Txt variant="label">Follow a plan day</Txt>
-                  <Txt variant="tiny">Shows its exercises as a checklist, with targets for each.</Txt>
+                  <Txt variant="label">{tr("workouts.followDay")}</Txt>
+                  <Txt variant="tiny">{tr("workouts.followDayHint")}</Txt>
                   <Chips<number>
                     value={-1}
                     onChange={(d) => {
@@ -270,16 +272,16 @@ export default function Workouts() {
               {followed ? (
                 // The plan's exercises are already listed; adding one is the exception, so it stays quiet
                 <Row style={{ marginTop: space.md, justifyContent: "center", flexWrap: "wrap" }} gap={space.lg}>
-                  <LinkButton title="Add another exercise" onPress={() => setSheet({ kind: "search" })} />
-                  <LinkButton title="Scan QR" onPress={() => setSheet({ kind: "scan" })} />
-                  <LinkButton title="From photo" onPress={() => setSheet({ kind: "photo" })} />
+                  <LinkButton title={tr("workouts.addAnother")} onPress={() => setSheet({ kind: "search" })} />
+                  <LinkButton title={tr("workouts.scanQr")} onPress={() => setSheet({ kind: "scan" })} />
+                  <LinkButton title={tr("workouts.fromPhoto")} onPress={() => setSheet({ kind: "photo" })} />
                 </Row>
               ) : (
                 <>
-                  <Button title="Add exercise" icon="add" onPress={() => setSheet({ kind: "search" })} style={{ marginTop: space.lg }} />
+                  <Button title={tr("workouts.addExercise")} icon="add" onPress={() => setSheet({ kind: "search" })} style={{ marginTop: space.lg }} />
                   <Row style={{ marginTop: space.sm }}>
-                    <Button title="Scan QR" icon="qr-code" kind="soft" small onPress={() => setSheet({ kind: "scan" })} style={{ flex: 1 }} />
-                    <Button title="From photo" icon="image" kind="soft" small onPress={() => setSheet({ kind: "photo" })} style={{ flex: 1 }} />
+                    <Button title={tr("workouts.scanQr")} icon="qr-code" kind="soft" small onPress={() => setSheet({ kind: "scan" })} style={{ flex: 1 }} />
+                    <Button title={tr("workouts.fromPhoto")} icon="image" kind="soft" small onPress={() => setSheet({ kind: "photo" })} style={{ flex: 1 }} />
                   </Row>
                 </>
               )}
@@ -295,21 +297,21 @@ export default function Workouts() {
                 </View>
               ) : null}
               <Field
-                label="Notes"
+                label={tr("workouts.notes")}
                 value={notes}
                 onChangeText={(text) => setNotesDraft({ workoutId: active.id, text, base: active.notes ?? "" })}
-                placeholder="How did it go?"
+                placeholder={tr("workouts.notesHint")}
                 multiline
               />
               <Button
-                title="Finish workout"
+                title={tr("workouts.finish")}
                 icon="checkmark"
                 style={{ marginTop: space.lg }}
                 onPress={async () => {
                   try {
                     await finishWorkout(active.id, notes);
                   } catch (e) {
-                    toast(errorMessage(e) ?? "Couldn't save the workout");
+                    toast(errorMessage(e) ?? tr("workouts.couldntSave"));
                     return;
                   }
                   clearPlanDay(active.id);
@@ -318,23 +320,23 @@ export default function Workouts() {
                   const points = await api<Points>(`/points?tz_offset=${tzOffset()}`).catch(() => null);
                   if (points) queryClient.setQueryData(qk.points, points);
                   const earned = points?.new.reduce((sum, x) => sum + x.points, 0) ?? 0;
-                  toast(earned ? `Workout saved. +${earned} wellness points` : "Workout saved. Nice work!");
+                  toast(earned ? tr("workouts.savedPoints", { points: earned }) : tr("workouts.saved"));
                 }}
               />
               <Button
-                title="Discard workout"
+                title={tr("workouts.discard")}
                 kind="danger"
                 small
                 style={{ marginTop: space.sm, alignSelf: "center", borderColor: "transparent" }}
                 onPress={async () => {
-                  if (!(await confirm("Discard workout?", "The sets you logged in this workout will be deleted.", "Discard"))) return;
+                  if (!(await confirm(tr("workouts.discardTitle"), tr("workouts.discardText"), tr("workouts.discardConfirm")))) return;
                   try {
                     await deleteWorkout(active.id);
                     clearPlanDay(active.id);
                     timer.dispatch({ type: "skip" });
-                    toast("Workout discarded");
+                    toast(tr("workouts.discarded"));
                   } catch (e) {
-                    toast(errorMessage(e) ?? "Couldn't discard the workout");
+                    toast(errorMessage(e) ?? tr("workouts.couldntDiscard"));
                   }
                 }}
               />
@@ -342,23 +344,23 @@ export default function Workouts() {
           ) : (
             <Card style={{ padding: space.lg + 2 }}>
               <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-                {todayPlan ? "TODAY'S SESSION" : "REST DAY"}
+                {tr(todayPlan ? "today.session" : "workouts.restDay").toLocaleUpperCase()}
               </Txt>
               <Txt style={{ ...typeScale.heading, fontSize: 19, lineHeight: 24, marginTop: 2 }}>
-                {todayPlan ? todayPlan.title : "Nothing planned today"}
+                {todayPlan ? todayPlan.title : tr("workouts.nothingPlanned")}
               </Txt>
               <Txt variant="small" style={{ marginTop: space.sm }}>
                 {todayPlan
-                  ? `${plural(todayPlan.exercises.length, "exercise")}${todayPlan.cardio_minutes ? ` + ${todayPlan.cardio_minutes} min cardio` : ""}: ${todayPlan.exercises
+                  ? `${tn("workouts.exerciseCount", todayPlan.exercises.length)}${todayPlan.cardio_minutes ? tr("workouts.plusCardio", { n: todayPlan.cardio_minutes }) : ""}: ${todayPlan.exercises
                       .slice(0, 3)
                       .map((x) => x.name)
-                      .join(", ")}${todayPlan.exercises.length > 3 ? "…" : ""}`
-                  : "You can still log a workout. Add exercises by name, by scanning a machine’s QR code, or from a photo."}
+                      .join(tr("list.separator"))}${todayPlan.exercises.length > 3 ? "…" : ""}`
+                  : tr("workouts.restDayText")}
               </Txt>
               {todayPlan ? (
-                <Button title="Start today's session" icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(today)} />
+                <Button title={tr("workouts.startToday")} icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(today)} />
               ) : (
-                <Button title="Start workout" icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(null)} />
+                <Button title={tr("today.start")} icon="play" style={{ marginTop: space.lg }} onPress={() => startSession(null)} />
               )}
             </Card>
           )}
@@ -375,7 +377,7 @@ export default function Workouts() {
             />
           ) : null}
 
-          <Section title="History" />
+          <Section title={tr("workouts.history")} />
           <Card style={{ paddingVertical: history.length ? space.xs : space.lg }}>
             {history.length ? (
               history.map((w, i) => (
@@ -384,31 +386,31 @@ export default function Workouts() {
                   first={i === 0}
                   icon="barbell-outline"
                   title={longDateTime(w.started_at)}
-                  subtitle={`${plural(w.set_count, "set")} · ${u.weight(w.volume_kg, 0)}${w.ended_at ? ` · ${duration(w.started_at, w.ended_at)}` : ""}`}
+                  subtitle={`${tn("workouts.setCount", w.set_count)} · ${u.weight(w.volume_kg, 0)}${w.ended_at ? ` · ${duration(w.started_at, w.ended_at)}` : ""}`}
                   onPress={() => setSheet({ kind: "history", id: w.id })}
                 />
               ))
             ) : (
-              <EmptyState icon="barbell-outline" title="No finished workouts yet" text="Finished workouts show up here with their sets and volume." />
+              <EmptyState icon="barbell-outline" title={tr("workouts.noHistory")} text={tr("workouts.noHistoryText")} />
             )}
           </Card>
           <Card onPress={() => router.push("/qr-stickers")}>
             <Row gap={space.md}>
-              <Ionicons name="qr-code-outline" size={20} color={t.text2} />
-              <Txt style={{ flex: 1 }}>Print QR stickers for the machines</Txt>
-              <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              <Icon name="qr-code-outline" size={20} color={t.text2} />
+              <Txt style={{ flex: 1 }}>{tr("workouts.printQr")}</Txt>
+              <Icon name="chevron-forward" size={18} color={t.muted} />
             </Row>
           </Card>
         </FadeIn>
       ) : null}
 
-      <Sheet visible={sheet?.kind === "search"} title="Add exercise" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "search"} title={tr("workouts.addExercise")} onClose={() => setSheet(null)}>
         <ExerciseSearch onPick={(e) => logExercise(e, "name")} />
       </Sheet>
-      <Sheet visible={sheet?.kind === "scan"} title="Scan machine QR code" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "scan"} title={tr("workouts.scanTitle")} onClose={() => setSheet(null)}>
         {sheet?.kind === "scan" ? <QrScanner onFound={(e) => logExercise({ id: e.id, name: e.name }, "qr")} /> : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "photo"} title="What machine is this?" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "photo"} title={tr("workouts.photoTitle")} onClose={() => setSheet(null)}>
         {sheet?.kind === "photo" ? (
           <ExercisePhoto onPick={(e) => logExercise(e, "photo")} onSearch={() => setSheet({ kind: "search" })} gymId={active?.gym_id ?? gym?.id ?? null} />
         ) : null}
@@ -441,7 +443,7 @@ export default function Workouts() {
           <ExerciseInfo exerciseId={sheet.exercise.id} onUse={active ? (e) => logExercise(e, "name") : undefined} />
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "plan"} title="Your plan" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "plan"} title={tr("home.yourPlan")} onClose={() => setSheet(null)}>
         {sheet?.kind === "plan" && routine ? (
           <ScheduleEditor
             routine={routine}
@@ -455,7 +457,7 @@ export default function Workouts() {
           />
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "history"} title="Workout" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "history"} title={tr("workouts.workout")} onClose={() => setSheet(null)}>
         {sheet?.kind === "history" ? (
           <WorkoutDetail
             workoutId={sheet.id}
@@ -464,7 +466,7 @@ export default function Workouts() {
           />
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "taken"} title={sheet?.kind === "taken" ? `${sheet.exercise.name} taken?` : ""} onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "taken"} title={sheet?.kind === "taken" ? tr("workouts.takenTitle", { name: sheet.exercise.name }) : ""} onClose={() => setSheet(null)}>
         {sheet?.kind === "taken" ? (
           <MachineTaken
             exercise={sheet.exercise}
@@ -474,13 +476,13 @@ export default function Workouts() {
               if (active && followed && followed.exercises.some((x) => x.exercise_id === sheet.exercise.id)) {
                 swap(active.id, plannedId(sheet.exercise.id), to);
               }
-              toast(`${to.name} instead of ${sheet.exercise.name}`);
+              toast(tr("workouts.instead", { to: to.name, from: sheet.exercise.name }));
               logExercise(to, "name");
             }}
           />
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "gym-pick"} title="Which gym are you at?" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "gym-pick"} title={tr("workouts.whichGym")} onClose={() => setSheet(null)}>
         {sheet?.kind === "gym-pick" && active ? (
           <View>
             <GymPicker
@@ -489,19 +491,19 @@ export default function Workouts() {
                 try {
                   await setWorkoutGym(active.id, g.id);
                   setSheet(null);
-                  toast(`This workout is at ${g.name}`);
+                  toast(tr("workouts.gymChanged", { gym: g.name }));
                 } catch (e) {
-                  toast(errorMessage(e) ?? "Couldn't change the gym");
+                  toast(errorMessage(e) ?? tr("workouts.couldntChangeGym"));
                 }
               }}
             />
             <Txt variant="tiny" style={{ marginTop: space.md }}>
-              Machine settings and saved photos are kept per gym. Add or rename gyms in Profile → Gyms.
+              {tr("workouts.gymHint")}
             </Txt>
           </View>
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "edit-set"} title="Edit set" onClose={() => setSheet(sheet?.kind === "edit-set" ? sheet.back : null)}>
+      <Sheet visible={sheet?.kind === "edit-set"} title={tr("workouts.editSet")} onClose={() => setSheet(sheet?.kind === "edit-set" ? sheet.back : null)}>
         {sheet?.kind === "edit-set" ? (
           <SetEditForm
             key={sheet.set.id}
@@ -510,8 +512,8 @@ export default function Workouts() {
             onDone={() => setSheet(sheet.back)}
             onDeleted={(s) => {
               setSheet(sheet.back);
-              toast("Set deleted", {
-                action: { label: "Undo", onPress: () => void restoreSet(sheet.workoutId, s).catch(() => {}) },
+              toast(tr("sets.deleted"), {
+                action: { label: tr("common.undo"), onPress: () => void restoreSet(sheet.workoutId, s).catch(() => {}) },
               });
             }}
           />
@@ -539,19 +541,20 @@ function SessionChecklist({
   onChange: () => void;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const finished = day.exercises.filter((x) => done(x.exercise_id) >= x.sets).length;
   return (
     <View style={{ marginTop: space.lg }}>
       <Row style={{ justifyContent: "space-between" }}>
         <View style={{ flex: 1 }}>
           <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-            {day.custom_name && day.title.includes(" at ") ? "TODAY" : WEEKDAYS_SHORT[day.weekday_index].toUpperCase()} · {day.title.toUpperCase()}
+            {day.custom_name && day.title.includes(" at ") ? tr("today.today").toLocaleUpperCase() : WEEKDAYS_SHORT[day.weekday_index].toLocaleUpperCase()} · {day.title.toLocaleUpperCase()}
           </Txt>
           <Txt variant="small">
-            {finished} of {day.exercises.length} exercises done
+            {tr("workouts.exercisesDone", { done: finished, total: day.exercises.length })}
           </Txt>
         </View>
-        <Button title="Change" kind="ghost" small onPress={onChange} style={{ borderColor: "transparent" }} accessibilityLabel="Follow a different plan day" />
+        <Button title={tr("common.change")} kind="ghost" small onPress={onChange} style={{ borderColor: "transparent" }} accessibilityLabel={tr("workouts.followOther")} />
       </Row>
       <View style={{ marginTop: space.sm }}>
         {day.exercises.map((x, i) => {
@@ -564,7 +567,7 @@ function SessionChecklist({
               key={x.exercise_id}
               onPress={() => onPick({ id: x.exercise_id, name: x.name })}
               accessibilityRole="button"
-              accessibilityLabel={`${x.name}: ${n} of ${x.sets} sets done${next ? ", up next" : ""}`}
+              accessibilityLabel={tr(next ? "workouts.checkLabelNext" : "workouts.checkLabel", { name: x.name, done: n, sets: x.sets })}
               style={({ pressed }) => [
                 styles.checkRow,
                 {
@@ -575,7 +578,7 @@ function SessionChecklist({
                 },
               ]}
             >
-              <Ionicons name={icon} size={22} color={complete ? t.good : n > 0 ? t.accent : t.muted} />
+              <Icon name={icon} size={22} color={complete ? t.good : n > 0 ? t.accent : t.muted} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Txt
                   style={{ fontWeight: next ? "600" : "400", color: complete ? t.text2 : t.text }}
@@ -584,20 +587,20 @@ function SessionChecklist({
                   {x.name}
                 </Txt>
                 <Txt variant="tiny" numberOfLines={1}>
-                  {n} of {x.sets} sets · {x.reps} reps
-                  {swappedFrom[x.exercise_id] ? ` · instead of ${swappedFrom[x.exercise_id]}` : ""}
+                  {tr("workouts.setsReps", { done: n, sets: x.sets, reps: x.reps })}
+                  {swappedFrom[x.exercise_id] ? tr("workouts.insteadOf", { name: swappedFrom[x.exercise_id] }) : ""}
                 </Txt>
               </View>
-              {next ? <Badge label="Up next" tone="info" /> : null}
-              <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              {next ? <Badge label={tr("workouts.upNext")} tone="info" /> : null}
+              <Icon name="chevron-forward" size={18} color={t.muted} />
             </Pressable>
           );
         })}
         {day.cardio_minutes ? (
           <Row gap={space.md} style={[styles.checkRow, { borderTopColor: t.border, borderTopWidth: StyleSheet.hairlineWidth }]}>
-            <Ionicons name="bicycle-outline" size={22} color={t.muted} />
+            <Icon name="bicycle-outline" size={22} color={t.muted} />
             <Txt variant="small" style={{ flex: 1 }}>
-              Finish with {day.cardio_minutes} min of cardio
+              {tr("workouts.finishCardio", { n: day.cardio_minutes })}
             </Txt>
           </Row>
         ) : null}
@@ -625,17 +628,18 @@ function WeekPlan({
   onEdit: () => void;
 }) {
   const t = useTheme();
+  const { t: tr, tn } = useI18n();
   return (
     <>
-      <Section title="Your week" action="Edit plan" onAction={onEdit} />
+      <Section title={tr("workouts.yourWeek")} action={tr("workouts.editPlan")} onAction={onEdit} />
       <Card>
         <WeekStrip routine={routine} />
         <Txt variant="small" style={{ marginTop: space.md }}>
-          {routine.exercises_per_day} exercises per session · about {routine.minutes_per_session} min
+          {tr("workouts.perSession", { count: tn("workouts.exerciseCount", routine.exercises_per_day), min: routine.minutes_per_session })}
         </Txt>
         {routine.warnings.map((w) => (
           <Row key={w} gap={6} style={{ marginTop: space.xs, alignItems: "flex-start" }}>
-            <Ionicons name="warning" size={14} color={t.warnInk} style={{ marginTop: 2 }} />
+            <Icon name="warning" size={14} color={t.warnInk} style={{ marginTop: 2 }} />
             <Txt variant="small" style={{ color: t.warnInk, flex: 1 }}>
               {w}
             </Txt>
@@ -657,7 +661,7 @@ function WeekPlan({
               >
                 <View style={{ width: 40 }}>
                   <Txt variant="tiny" style={{ ...typeScale.overline, color: isToday ? t.accent : t.muted }}>
-                    {d.weekday.slice(0, 3).toUpperCase()}
+                    {WEEKDAYS_SHORT[d.weekday_index].toLocaleUpperCase()}
                   </Txt>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -665,22 +669,22 @@ function WeekPlan({
                     {d.title}
                   </Txt>
                   <Txt variant="tiny" numberOfLines={1}>
-                    {d.custom_exercises ? "Your own exercises · " : d.custom_name ? `${d.focus_label} · ` : ""}
-                    {plural(d.exercises.length, "exercise")}
-                    {d.cardio_minutes ? ` · ${d.cardio_minutes} min cardio` : ""}
+                    {d.custom_exercises ? tr("workouts.ownExercises") : d.custom_name ? `${d.focus_label} · ` : ""}
+                    {tn("workouts.exerciseCount", d.exercises.length)}
+                    {d.cardio_minutes ? tr("workouts.cardioSuffix", { n: d.cardio_minutes }) : ""}
                   </Txt>
                 </View>
-                {isToday ? <Badge label="Today" tone="info" /> : null}
-                <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={t.muted} />
+                {isToday ? <Badge label={tr("today.today")} tone="info" /> : null}
+                <Icon name={open ? "chevron-up" : "chevron-down"} size={18} color={t.muted} />
               </Pressable>
               {open ? (
-                <View style={{ paddingBottom: space.md, paddingLeft: 40 + space.md }}>
+                <View style={{ paddingBottom: space.md, paddingStart: 40 + space.md }}>
                   {d.exercises.map((x) => (
                     <Row key={x.exercise_id} gap={space.sm} style={{ minHeight: 44 }}>
                       <Pressable
                         onPress={() => onLog({ id: x.exercise_id, name: x.name })}
                         accessibilityRole="button"
-                        accessibilityLabel={`Log ${x.name}`}
+                        accessibilityLabel={tr("workouts.logExercise", { name: x.name })}
                         style={({ pressed }) => ({ flex: 1, minWidth: 0, opacity: pressed ? 0.5 : 1, paddingVertical: space.xs })}
                       >
                         <Txt style={{ color: canLog ? t.accent : t.text }} numberOfLines={2}>
@@ -692,7 +696,7 @@ function WeekPlan({
                       </Pressable>
                       <IconButton
                         icon="information-circle-outline"
-                        label={`How to do ${x.name}, and alternatives`}
+                        label={tr("workouts.howToLabel", { name: x.name })}
                         onPress={() => onInfo({ id: x.exercise_id, name: x.name })}
                       />
                     </Row>
@@ -724,25 +728,27 @@ function WeekPlan({
 /** A day with the user's own exercises: switch back to the suggested ones. */
 function CustomDayNote({ day }: { day: RoutineDay }) {
   const toast = useToast();
+  const { t: tr } = useI18n();
+  const weekday = WEEKDAYS[day.weekday_index];
   const restore = async () => {
     const ok = await confirm(
-      `Use the suggested exercises on ${day.weekday}?`,
-      `“${day.title}” is replaced by the exercises the app picks for your plan.`,
-      "Use suggested",
+      tr("workouts.useSuggestedTitle", { day: weekday }),
+      tr("workouts.useSuggestedText", { title: day.title }),
+      tr("workouts.useSuggestedConfirm"),
       false,
     );
     if (!ok) return;
     try {
       await removeCustomDay(day.weekday_index);
-      toast(`${day.weekday} uses the suggested exercises again`);
+      toast(tr("workouts.suggestedAgain", { day: weekday }));
     } catch (e) {
-      toast(errorMessage(e) ?? "Couldn't change the day");
+      toast(errorMessage(e) ?? tr("workouts.couldntChangeDay"));
     }
   };
   return (
     <View style={{ marginTop: space.sm, gap: space.xs }}>
-      <Txt variant="tiny">You chose these exercises yourself.</Txt>
-      <LinkButton title="Use the suggested exercises instead" onPress={restore} />
+      <Txt variant="tiny">{tr("workouts.chosenYourself")}</Txt>
+      <LinkButton title={tr("workouts.useSuggestedInstead")} onPress={restore} />
     </View>
   );
 }
@@ -760,11 +766,12 @@ function nextTrainingDay(routine: Routine): number {
 /** Monday to Sunday: training days with their session, rest days, and today. */
 function WeekStrip({ routine }: { routine: Routine }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const today = weekdayIndex();
   const titles = new Map(routine.days.map((d) => [d.weekday_index, d.title]));
   return (
-    <View style={{ flexDirection: "row", gap: 4 }} accessibilityLabel={`Training days: ${routine.days.map((d) => d.weekday).join(", ")}`}>
-      {WEEKDAYS_SHORT.map((label, d) => {
+    <View style={{ flexDirection: "row", gap: 4 }} accessibilityLabel={tr("workouts.trainingDaysLabel", { days: routine.days.map((d) => WEEKDAYS[d.weekday_index]).join(tr("list.separator")) })}>
+      {WEEKDAYS_MIN.map((label, d) => {
         const title = titles.get(d);
         const isToday = d === today;
         return (
@@ -783,10 +790,10 @@ function WeekStrip({ routine }: { routine: Routine }) {
                 backgroundColor: title ? (isToday ? t.ink : t.accentSoft) : t.surface2,
               }}
             >
-              <Ionicons name={title ? "barbell" : "remove"} size={14} color={title ? (isToday ? t.inkText : t.accent) : t.muted} />
+              <Icon name={title ? "barbell" : "remove"} size={14} color={title ? (isToday ? t.inkText : t.accent) : t.muted} />
             </View>
             <Txt variant="tiny" style={{ color: title ? t.text2 : t.muted, fontSize: 10, lineHeight: 12, textAlign: "center" }} numberOfLines={2}>
-              {title ?? "Rest"}
+              {title ?? tr("workouts.rest")}
             </Txt>
           </View>
         );

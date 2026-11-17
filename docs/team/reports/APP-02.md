@@ -7,7 +7,28 @@
 | Base | `origin/merged_branch` @ `de689db` |
 | Date | 2026-11-18 |
 | Platform | Web app for the pilot (WEB-01) |
-| Status | **Partly done.** Sign-up → onboarding → Today → Profile work in Arabic and English against the real local backend. Workouts, food, progress, coach, sleep screens still English. Arabic text not yet human-reviewed. |
+| Status | **Partly done.** Sign-up → onboarding → Today → Profile → **Workouts** work in Arabic and English against the real local backend. Food, progress, coach, sleep screens still English. Arabic text not yet human-reviewed. |
+
+## Update 2026-11-18 (part 2): Workouts
+
+- Translated: Workouts screen (today's session, week strip and plan, history, empty state, all sheets),
+  logging a set (targets, last time, suggestion, steppers, kg/lb, effort, notes, "same again", next), editing and
+  deleting sets, finished-workout detail, the session checklist, rest timer, the "workout in progress" bar,
+  plan editor, exercise how-to and alternatives, QR scanner, exercise search. Undo toasts and confirm dialogs too.
+- Muscle groups and exercise categories from the server are shown translated (`idLabel`, falls back to the ID for new ones).
+- Rest timer panel and the open day's exercise list use start/end spacing, so they mirror in Arabic.
+- Browser check (Arabic, 375×812, local backend, throwaway account): start today's session → log a set
+  (toast, counter, rest timer, sets list) → close → active card → discard with confirm dialog → empty history.
+  Ranges like `10-15` and the `−15` timer button display in the right order. English re-checked: unchanged.
+- Checks: **95/95** unit tests, typecheck, lint, web export.
+- **Still English in Workouts:** hands-free voice (the speech recogniser and spoken replies are English-only;
+  needs a decision before translating its labels), weight-from-a-photo helper, machine-settings card (`GymParts`,
+  Eyad), and server text (exercise names and instructions, plan explanation and notes, focus labels).
+- Arabic users can't search exercises in Arabic yet (names are English in the library); the empty-search hint says so.
+
+Screenshots: [workouts](APP-02/workouts-ar.jpg) · [log a set](APP-02/log-set-ar.jpg) ·
+[active workout](APP-02/active-workout-ar.jpg) · [discard dialog](APP-02/discard-dialog-ar.jpg) ·
+[English](APP-02/workouts-en.jpg)
 
 ## What changed for users
 
@@ -58,7 +79,7 @@ Still no new dependencies; `package.json`, `app.json`, `eas.json`, `api.ts` unto
 | Area | Where | Owner of meaning |
 |---|---|---|
 | Server-generated text | today's suggestion titles/messages/reasons, plan disclaimer, routine split and day titles ("Full body"), exercise names | **Alzoman / Nawaf** — needs a decision: server returns text per `lang`, or stable IDs the app translates |
-| Workouts | `workouts.tsx`, `WorkoutParts`, `SetHelpers`, `RestTimer`, `PlanCards`, `ScheduleEditor`, `HandsFree`, `ExerciseInfo` | Samer |
+| Workouts (rest of) | `HandsFree`, `SetHelpers` (voice + weight from photo) — **done otherwise** | Samer; Nawaf for voice language |
 | Food | `food.tsx`, `FoodParts`, `MacroText` | Samer |
 | Progress | `progress.tsx`, `WeeklySummary`, `Insights`, `charts` | Samer |
 | Sleep / points | `SleepParts` (quality, "In range", goal "7 h"), `SleepDashboard`, `WhoopCard`, `HealthConnectCard`, `PointsParts` | Badr (meanings) |

@@ -4,6 +4,7 @@ import { Platform, Pressable, Text, Vibration, View } from "react-native";
 
 import { api } from "@/lib/api";
 import { haptics } from "@/lib/haptics";
+import { useI18n } from "@/lib/i18n";
 import {
   clampRest,
   formatRest,
@@ -130,6 +131,7 @@ function beep() {
  */
 export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; compact?: boolean }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const { state, dispatch, adjust } = timer;
   const left = remainingMs(state, timer.now);
   const running = state.status === "running";
@@ -141,15 +143,15 @@ export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; c
   if (compact && state.status === "idle") return null;
 
   const play = running
-    ? { icon: "pause" as const, label: "Pause the rest", onPress: () => dispatch({ type: "pause", now: Date.now() }) }
+    ? { icon: "pause" as const, label: tr("timer.pause"), onPress: () => dispatch({ type: "pause", now: Date.now() }) }
     : paused
-      ? { icon: "play" as const, label: "Resume the rest", onPress: () => dispatch({ type: "resume", now: Date.now() }) }
-      : { icon: "play" as const, label: done ? "Start the rest again" : "Start the rest", onPress: () => dispatch({ type: "start", now: Date.now() }) };
+      ? { icon: "play" as const, label: tr("timer.resume"), onPress: () => dispatch({ type: "resume", now: Date.now() }) }
+      : { icon: "play" as const, label: tr(done ? "timer.again" : "timer.start"), onPress: () => dispatch({ type: "start", now: Date.now() }) };
 
   return (
     <View
-      style={{ marginTop: space.md, paddingVertical: space.sm, paddingLeft: space.md, paddingRight: space.sm, borderRadius: radius.md, backgroundColor: done ? t.accentSoft : t.surface2 }}
-      accessibilityLabel={`Rest timer, ${formatRest(left)} left`}
+      style={{ marginTop: space.md, paddingVertical: space.sm, paddingStart: space.md, paddingEnd: space.sm, borderRadius: radius.md, backgroundColor: done ? t.accentSoft : t.surface2 }}
+      accessibilityLabel={tr("timer.label", { time: formatRest(left) })}
     >
       <Row gap={space.sm} style={{ alignItems: "center" }}>
         <Ionicons name="timer-outline" size={18} color={done ? t.accentText : t.text2} />
@@ -160,15 +162,15 @@ export function RestTimerPanel({ timer, compact = false }: { timer: RestTimer; c
           {done ? "0:00" : formatRest(left)}
         </Text>
         <Txt variant="tiny" style={{ flex: 1 }} numberOfLines={1}>
-          {done ? "Rest over" : paused ? "Paused" : running ? `of ${formatRest(total)}` : "rest"}
+          {done ? tr("timer.over") : paused ? tr("timer.paused") : running ? tr("timer.of", { time: formatRest(total) }) : tr("timer.rest")}
         </Txt>
-        <TimerButton text="−15" label="Shorter rest, 15 seconds less" onPress={() => adjust(-15)} />
-        <TimerButton text="+15" label="Longer rest, 15 seconds more" onPress={() => adjust(15)} />
+        <TimerButton text="−15" label={tr("timer.shorter")} onPress={() => adjust(-15)} />
+        <TimerButton text="+15" label={tr("timer.longer")} onPress={() => adjust(15)} />
         <TimerButton icon={play.icon} label={play.label} onPress={play.onPress} />
-        {running || paused || done ? <TimerButton icon="close" label={done ? "Dismiss" : "Skip the rest"} onPress={() => dispatch({ type: "skip" })} /> : null}
+        {running || paused || done ? <TimerButton icon="close" label={tr(done ? "timer.dismiss" : "timer.skip")} onPress={() => dispatch({ type: "skip" })} /> : null}
       </Row>
       {running || paused ? (
-        <View style={{ marginTop: 6, marginRight: space.xs }}>
+        <View style={{ marginTop: 6, marginEnd: space.xs }}>
           <Meter value={total - left} max={total} height={3} />
         </View>
       ) : null}

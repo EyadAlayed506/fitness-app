@@ -1,4 +1,5 @@
 import { currentLocale, onLanguageChange, tr, trCount } from "./i18n/current.ts";
+import { en, type MessageKey } from "./i18n/en.ts";
 import type { SleepSource, UnitSystem } from "./types";
 
 // Display text follows the language chosen in the app (lib/i18n). Values sent to the server never do.
@@ -37,6 +38,12 @@ export function fmt(n: number | null | undefined, digits = 0): string {
 }
 
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** A server ID shown in the current language ("chest" → "الصدر"); an ID without a translation is shown capitalised. */
+export function idLabel(prefix: "muscle" | "category", id: string): string {
+  const key = `${prefix}.${id}` as MessageKey;
+  return key in en ? tr(key) : cap(id);
+}
 /** English only — for translated screens use tn() from useI18n() with a count key. */
 export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 

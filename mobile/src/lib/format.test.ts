@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { WEEKDAYS, WEEKDAYS_MIN, WEEKDAYS_SHORT, dayList, duration, fmt, hoursMinutes, shortDate, timeAgo, units } from "./format.ts";
+import { WEEKDAYS, WEEKDAYS_MIN, WEEKDAYS_SHORT, dayList, duration, fmt, hoursMinutes, idLabel, shortDate, timeAgo, units } from "./format.ts";
 import { setCurrentLanguage } from "./i18n/current.ts";
 
 // strip the invisible direction marks Arabic placeholders are wrapped in
@@ -50,6 +50,16 @@ test("Arabic numbers and dates use Western digits", () => {
   assert.match(fmt(1234), /^1.?234$/);
   assert.match(shortDate("2026-11-18"), /18/);
   assert.doesNotMatch(shortDate("2026-11-18"), /[٠-٩]/);
+});
+
+test("server IDs (muscle group, category) are shown translated, unknown ones as they are", () => {
+  assert.equal(idLabel("muscle", "chest"), "Chest");
+  assert.equal(idLabel("category", "free weight"), "free weight");
+  assert.equal(idLabel("muscle", "forearms"), "Forearms");
+  setCurrentLanguage("ar");
+  assert.equal(idLabel("muscle", "chest"), "الصدر");
+  assert.equal(idLabel("category", "free weight"), "أوزان حرة");
+  assert.equal(idLabel("muscle", "forearms"), "Forearms", "a new ID from the server still shows something");
 });
 
 test("'days ago' uses Arabic plural forms", () => {

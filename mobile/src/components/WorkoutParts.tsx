@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useEffect, useRef, useState } from "react";
@@ -8,8 +7,10 @@ import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
 import { addSet, deleteSet, deleteWorkout, restoreSet, updateSet, useExerciseHistory, useRoutine } from "@/lib/data";
-import { KG_PER_LB, cap, duration, longDateTime, shortDate, units } from "@/lib/format";
+import { KG_PER_LB, duration, idLabel, longDateTime, shortDate, units } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useI18n } from "@/lib/i18n";
+import { tr } from "@/lib/i18n/current";
 import { betterBest, bestOf, isNewBest, parseRepRange, suggestNext, type Best } from "@/lib/progression";
 import { errorMessage, qk } from "@/lib/query";
 import { spokenWeight } from "@/lib/speech";
@@ -28,6 +29,7 @@ import {
   EmptyState,
   ErrorText,
   Field,
+  Icon,
   IconButton,
   LinkButton,
   ListRow,
@@ -44,7 +46,9 @@ export type PickedExercise = { id: number; name: string };
 
 /** A weight in kg shown in the chosen unit, rounded to 0.1. */
 const inUnit = (kg: number, unit: string) => Math.round((unit === "lb" ? kg / KG_PER_LB : kg) * 10) / 10;
-const weightText = (kg: number, unit: string) => (kg > 0 ? `${inUnit(kg, unit)} ${unit}` : "bodyweight");
+/** The unit as the user reads it ("kg" / "كغ"); the ID itself is what the API gets. */
+const unitLabel = (unit: string) => tr(unit === "lb" ? "unit.lb" : "unit.kg");
+const weightText = (kg: number, unit: string) => (kg > 0 ? `${inUnit(kg, unit)} ${unitLabel(unit)}` : tr("sets.bodyweight"));
 const RPE_CHOICES = [6, 7, 8, 9, 10];
 
 // ---------- list of sets, grouped by exercise ----------
@@ -62,6 +66,7 @@ export function SetsList({
   onDelete?: (s: WorkoutSet) => void;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const { profile } = useProfile();
   const unit = units(profile.unit_system).w;
   const groups: { id: number; name: string; sets: WorkoutSet[] }[] = [];
@@ -70,7 +75,7 @@ export function SetsList({
     if (!g) groups.push((g = { id: s.exercise_id, name: s.exercise_name, sets: [] }));
     g.sets.push(s);
   }
-  if (!groups.length) return <Txt variant="small">No sets yet.</Txt>;
+  if (!groups.length) return <Txt variant="small">{tr("sets.none")}</Txt>;
   return (
     <View style={{ gap: space.lg }}>
       {groups.map((g) => (
@@ -79,12 +84,12 @@ export function SetsList({
             <Txt style={{ fontWeight: "600", flex: 1 }}>{g.name}</Txt>
             {onAddSet ? (
               <Button
-                title="Set"
+                title={tr("sets.set")}
                 icon="add"
                 kind="soft"
                 small
                 onPress={() => onAddSet({ id: g.id, name: g.name })}
-                accessibilityLabel={`Add a set of ${g.name}`}
+                accessibilityLabel={tr("sets.addSetOf", { name: g.name })}
               />
             ) : null}
           </Row>
@@ -102,8 +107,8 @@ export function SetsList({
                   {s.rpe ? <Txt variant="small"> · RPE {s.rpe}</Txt> : null}
                   {s.notes ? <Txt variant="small"> · {s.notes}</Txt> : null}
                 </Txt>
-                {s.added_via === "qr" ? <Badge label="QR" /> : s.added_via === "photo" ? <Badge label="Photo" /> : null}
-                {onEdit && !saving ? <Ionicons name="create-outline" size={16} color={t.muted} /> : null}
+                {s.added_via === "qr" ? <Badge label="QR" /> : s.added_via === "photo" ? <Badge label={tr("sets.photo")} /> : null}
+                {onEdit && !saving ? <Icon name="create-outline" size={16} color={t.muted} /> : null}
               </>
             );
             return (
@@ -112,7 +117,7 @@ export function SetsList({
                   <Pressable
                     onPress={() => onEdit(s)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Edit set ${i + 1} of ${g.name}: ${s.reps} reps, ${weightText(s.weight_kg, unit)}`}
+                    accessibilityLabel={tr("sets.editLabel", { n: i + 1, name: g.name, reps: s.reps, weight: weightText(s.weight_kg, unit) })}
                     style={({ pressed }) => [styles.setEdit, { opacity: pressed ? 0.6 : 1 }]}
                   >
                     {content}
@@ -120,7 +125,7 @@ export function SetsList({
                 ) : (
                   <View style={styles.setEdit}>{content}</View>
                 )}
-                {onDelete && !saving ? <IconButton icon="close" label={`Delete set ${i + 1} of ${g.name}`} onPress={() => onDelete(s)} /> : null}
+                {onDelete && !saving ? <IconButton icon="close" label={tr("sets.deleteLabel", { n: i + 1, name: g.name })} onPress={() => onDelete(s)} /> : null}
               </Row>
             );
           })}
@@ -133,6 +138,7 @@ export function SetsList({
 // ---------- find an exercise by name ----------
 
 export function ExerciseSearch({ onPick }: { onPick: (e: PickedExercise) => void }) {
+  const { t: tr } = useI18n();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Exercise[]>([]);
   useEffect(() => {
@@ -145,7 +151,7 @@ export function ExerciseSearch({ onPick }: { onPick: (e: PickedExercise) => void
   }, [query]);
   return (
     <View>
-      <Field label="Machine or exercise name" value={query} onChangeText={setQuery} placeholder="e.g. lat pulldown" autoFocus autoCorrect={false} />
+      <Field label={tr("search.label")} value={query} onChangeText={setQuery} placeholder={tr("search.placeholder")} autoFocus autoCorrect={false} />
       <View style={{ marginTop: space.sm }}>
         {results.length ? (
           results.map((x, i) => (
@@ -153,12 +159,12 @@ export function ExerciseSearch({ onPick }: { onPick: (e: PickedExercise) => void
               key={x.id}
               first={i === 0}
               title={x.name}
-              subtitle={`${cap(x.muscle_group)} · ${x.category}`}
+              subtitle={`${idLabel("muscle", x.muscle_group)} · ${idLabel("category", x.category)}`}
               onPress={() => onPick({ id: x.id, name: x.name })}
             />
           ))
         ) : (
-          <EmptyState icon="search" title="No match" text="Try another name, e.g. “chest press”." />
+          <EmptyState icon="search" title={tr("search.noMatch")} text={tr("search.noMatchText")} />
         )}
       </View>
     </View>
@@ -169,9 +175,10 @@ export function ExerciseSearch({ onPick }: { onPick: (e: PickedExercise) => void
 
 export function QrScanner({ onFound }: { onFound: (e: Exercise) => void }) {
   const t = useTheme();
+  const { t: tr, errorText } = useI18n();
   const [permission, requestPermission] = useCameraPermissions();
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const busy = useRef(false);
   const lastFailed = useRef<string | null>(null);
 
@@ -182,7 +189,7 @@ export function QrScanner({ onFound }: { onFound: (e: Exercise) => void }) {
       onFound(await api<Exercise>(`/exercises/qr/${encodeURIComponent(text.trim())}`));
     } catch (e) {
       lastFailed.current = text;
-      setError((e as Error).message);
+      setError(e);
     } finally {
       busy.current = false;
     }
@@ -205,20 +212,20 @@ export function QrScanner({ onFound }: { onFound: (e: Exercise) => void }) {
         <View style={{ padding: space.lg, borderRadius: radius.lg, backgroundColor: t.surface2, gap: space.md }}>
           <Txt variant="small">
             {permission && !permission.canAskAgain
-              ? "Camera access is turned off for this app. Allow it in your phone's settings, or type the code below."
-              : "Allow the camera to scan the QR sticker on the machine."}
+              ? tr("qr.cameraOff")
+              : tr("qr.allowHint")}
           </Txt>
-          {!permission || permission.canAskAgain ? <Button title="Allow camera" icon="camera" onPress={async () => { await requestPermission(); }} /> : null}
+          {!permission || permission.canAskAgain ? <Button title={tr("qr.allow")} icon="camera" onPress={async () => { await requestPermission(); }} /> : null}
         </View>
       )}
       <Txt variant="small" style={{ marginTop: 10 }}>
-        Point the camera at the sticker, or type the code printed under it:
+        {tr("qr.pointOrType")}
       </Txt>
       <Row style={{ alignItems: "flex-end" }}>
-        <Field value={code} onChangeText={setCode} placeholder="e.g. leg-press" autoCapitalize="none" autoCorrect={false} style={{ flex: 1, marginTop: 6 }} accessibilityLabel="Machine code" onSubmitEditing={() => lookup(code)} />
-        <Button title="Find" onPress={() => lookup(code)} style={{ marginTop: 6 }} />
+        <Field value={code} onChangeText={setCode} placeholder={tr("qr.codePlaceholder")} autoCapitalize="none" autoCorrect={false} style={{ flex: 1, marginTop: 6 }} accessibilityLabel={tr("qr.codeLabel")} onSubmitEditing={() => lookup(code)} />
+        <Button title={tr("qr.find")} onPress={() => lookup(code)} style={{ marginTop: 6 }} />
       </Row>
-      <ErrorText message={error} />
+      <ErrorText message={error == null ? null : errorText(error)} />
     </View>
   );
 }
@@ -251,7 +258,7 @@ export function SetForm(props: SetFormProps) {
   const routine = useRoutine();
   if (history.isPending)
     return (
-      <View style={{ gap: space.md }} accessibilityLabel="Loading">
+      <View style={{ gap: space.md }} accessibilityLabel={tr("common.loading")}>
         <Skeleton height={64} />
         <Skeleton height={56} />
         <Skeleton height={50} />
@@ -275,6 +282,7 @@ function SetFormBody({
   planReps,
 }: SetFormProps & { history: ExerciseHistory | null; planReps: string | null }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const toast = useToast();
   const { profile } = useProfile();
   const { timer, announceAfterRest } = useWorkoutSession();
@@ -315,13 +323,13 @@ function SetFormBody({
     haptics.success();
     try {
       const saved = await addSet(workout.id, { exercise_id: exercise.id, exercise_name: exercise.name, added_via: addedVia, ...values });
-      const label = `${saved.weight_kg > 0 ? `${inUnit(saved.weight_kg, values.unit)} ${values.unit}` : "bodyweight"} × ${saved.reps}`;
-      const undo = { label: "Undo", onPress: () => void deleteSet(workout.id, saved).catch(() => {}) };
+      const label = `${weightText(saved.weight_kg, values.unit)} × ${saved.reps}`;
+      const undo = { label: tr("common.undo"), onPress: () => void deleteSet(workout.id, saved).catch(() => {}) };
       if (isNewBest(saved, before)) {
-        setRecord((r) => ({ text: `New best: ${label}`, n: (r?.n ?? 0) + 1 }));
-        toast(`New best: ${label}`, { action: undo });
+        setRecord((r) => ({ text: tr("sets.newBest", { set: label }), n: (r?.n ?? 0) + 1 }));
+        toast(tr("sets.newBest", { set: label }), { action: undo });
       } else {
-        toast(`Set saved: ${label}`, { action: undo });
+        toast(tr("sets.saved", { set: label }), { action: undo });
       }
       setNotes("");
       return saved;
@@ -381,12 +389,12 @@ function SetFormBody({
     <View>
       <Row style={{ justifyContent: "space-between", marginBottom: space.md, flexWrap: "wrap" }} gap={space.sm}>
         <Row gap={space.lg} style={{ flexWrap: "wrap" }}>
-          <LinkButton title="How to do it" onPress={onInfo} />
-          {onTaken ? <LinkButton title="Machine taken?" onPress={onTaken} /> : null}
+          <LinkButton title={tr("sets.howTo")} onPress={onInfo} />
+          {onTaken ? <LinkButton title={tr("sets.taken")} onPress={onTaken} /> : null}
         </Row>
         {target ? (
           <Txt variant="small" style={{ color: targetDone ? t.goodInk : t.text2, fontWeight: "600" }}>
-            {targetDone ? `All ${target.sets} sets done` : `Set ${mine.length + 1} of ${target.sets} · ${target.reps} reps`}
+            {targetDone ? tr("sets.allDone", { n: target.sets }) : tr("sets.progress", { n: mine.length + 1, total: target.sets, reps: target.reps })}
           </Txt>
         ) : null}
       </Row>
@@ -397,19 +405,19 @@ function SetFormBody({
       {lastTime ? (
         <View style={[styles.lastTime, { backgroundColor: t.surface2 }]}>
           <Txt variant="small" style={{ fontVariant: ["tabular-nums"] }} numberOfLines={2}>
-            Last time ({shortDate(lastTime.started_at.slice(0, 10))}):{" "}
+            {tr("sets.lastTime", { date: shortDate(lastTime.started_at.slice(0, 10)) })}
             <Txt variant="small" style={{ color: t.text }}>
               {lastSessionText(lastTime.sets, unit)}
             </Txt>
           </Txt>
           {suggestion ? (
             <Row gap={space.sm} style={{ marginTop: 4 }}>
-              <Ionicons name={suggestion.kind === "weight" ? "trending-up" : "add-circle-outline"} size={16} color={t.goodInk} />
+              <Icon name={suggestion.kind === "weight" ? "trending-up" : "add-circle-outline"} size={16} color={t.goodInk} />
               <Txt variant="small" style={{ flex: 1, fontWeight: "600", color: t.text }} numberOfLines={1}>
-                Try {suggestion.weight > 0 ? `${suggestion.weight} ${unit}` : "bodyweight"} × {suggestion.reps}
+                {tr("sets.try", { set: `${suggestion.weight > 0 ? `${suggestion.weight} ${unitLabel(unit)}` : tr("sets.bodyweight")} × ${suggestion.reps}` })}
               </Txt>
               <LinkButton
-                title="Use"
+                title={tr("sets.use")}
                 onPress={() => {
                   setReps(String(suggestion.reps));
                   setWeight(String(suggestion.weight));
@@ -421,28 +429,28 @@ function SetFormBody({
         </View>
       ) : (
         <Txt variant="small" style={{ marginBottom: space.xs }}>
-          {addedVia === "qr" ? "Found by QR code. " : addedVia === "photo" ? "Picked from your photo. " : ""}
-          First time logging this exercise: pick a weight you can lift for {range ? `${range[0]}–${range[1]}` : "10"} good reps.
+          {addedVia === "qr" ? tr("sets.foundQr") : addedVia === "photo" ? tr("sets.fromPhoto") : ""}
+          {tr("sets.firstTime", { range: range ? `${range[0]}–${range[1]}` : "10" })}
         </Txt>
       )}
 
       <Row gap={space.md} style={{ alignItems: "flex-start" }}>
-        <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={0} max={200} decimals={0} compact style={{ flex: 1 }} />
+        <Stepper label={tr("sets.reps")} value={reps} onChange={setReps} step={1} min={0} max={200} decimals={0} compact style={{ flex: 1 }} />
         <Stepper
-          label="Weight"
+          label={tr("profile.weight")}
           value={weight}
           onChange={setWeight}
           step={unit === "lb" ? 5 : 2.5}
           min={0}
           max={1000}
-          suffix={unit}
+          suffix={unitLabel(unit)}
           compact
           style={{ flex: 1.15 }}
         />
       </Row>
       <Row style={{ marginTop: space.sm, flexWrap: "wrap" }} gap={space.lg}>
         <LinkButton
-          title={unit === "kg" ? "Use lb" : "Use kg"}
+          title={tr(unit === "kg" ? "sets.useLb" : "sets.useKg")}
           onPress={() => {
             // keep the same weight, shown in the other unit
             const u = unit === "kg" ? "lb" : "kg";
@@ -451,8 +459,8 @@ function SetFormBody({
             setUnit(u);
           }}
         />
-        {!snapWeight ? <LinkButton title="Weight from a photo" onPress={() => setSnapWeight(true)} /> : null}
-        {!showMore ? <LinkButton title="Effort or note" onPress={() => setShowMore(true)} /> : null}
+        {!snapWeight ? <LinkButton title={tr("sets.weightFromPhoto")} onPress={() => setSnapWeight(true)} /> : null}
+        {!showMore ? <LinkButton title={tr("sets.effortOrNote")} onPress={() => setShowMore(true)} /> : null}
       </Row>
       {snapWeight ? (
         <WeightFromPhoto
@@ -467,7 +475,7 @@ function SetFormBody({
       {showMore ? (
         <>
           <Chips<number>
-            label="Effort (RPE, optional)"
+            label={tr("sets.effort")}
             value={rpe ?? 0}
             onChange={(v) => setRpe(v === 0 ? null : v)}
             options={[
@@ -477,13 +485,13 @@ function SetFormBody({
                 .map((v) => ({ value: v, label: String(v) })),
             ]}
           />
-          <Field label="Note (optional)" value={notes} onChangeText={setNotes} placeholder="e.g. seat at 4, felt easy" />
+          <Field label={tr("sets.noteOptional")} value={notes} onChangeText={setNotes} placeholder={tr("sets.notePlaceholder")} />
         </>
       ) : null}
       <ErrorText message={error} />
 
       <Button
-        title={`Add set ${mine.length + 1}`}
+        title={tr("sets.add", { n: mine.length + 1 })}
         icon="checkmark"
         kind={targetDone && next ? "soft" : "primary"}
         onPress={async () => {
@@ -496,7 +504,7 @@ function SetFormBody({
         <Row style={{ marginTop: space.sm, flexWrap: "wrap" }} gap={space.sm}>
           {lastHere ? (
             <Button
-              title={`Same again · ${lastHere.reps} × ${weightText(lastHere.weight_kg, unit)}`}
+              title={tr("sets.same", { set: `${lastHere.reps} × ${weightText(lastHere.weight_kg, unit)}` })}
               icon="copy-outline"
               kind="soft"
               small
@@ -508,7 +516,7 @@ function SetFormBody({
           ) : null}
           {next && onNext ? (
             <Button
-              title={`Next: ${next.name}`}
+              title={tr("sets.next", { name: next.name })}
               icon="arrow-forward"
               kind={targetDone ? "primary" : "ghost"}
               small
@@ -523,7 +531,7 @@ function SetFormBody({
       {mine.length ? (
         <View style={{ marginTop: space.xl }}>
           <Txt variant="label" style={{ marginBottom: space.sm }}>
-            This workout
+            {tr("sets.thisWorkout")}
           </Txt>
           <SetsList
             sets={mine}
@@ -531,8 +539,8 @@ function SetFormBody({
             onDelete={async (s) => {
               try {
                 await deleteSet(workout.id, s);
-                toast("Set deleted", {
-                  action: { label: "Undo", onPress: () => void restoreSet(workout.id, s).catch(() => {}) },
+                toast(tr("sets.deleted"), {
+                  action: { label: tr("common.undo"), onPress: () => void restoreSet(workout.id, s).catch(() => {}) },
                 });
               } catch (e) {
                 setError(errorMessage(e));
@@ -566,7 +574,7 @@ function RecordBanner({ text }: { text: string }) {
       accessibilityLiveRegion="polite"
       style={[styles.record, { backgroundColor: t.warnSoft, transform: [{ scale }] }]}
     >
-      <Ionicons name="trophy" size={20} color={t.warnInk} />
+      <Icon name="trophy" size={20} color={t.warnInk} />
       <Txt style={{ fontWeight: "700", color: t.warnInk, flex: 1 }}>{text}</Txt>
     </Animated.View>
   );
@@ -586,6 +594,7 @@ export function SetEditForm({
   onDeleted: (s: WorkoutSet) => void;
 }) {
   const toast = useToast();
+  const { t: tr } = useI18n();
   const { profile } = useProfile();
   const imperial = units(profile.unit_system).imperial;
   const [unit, setUnit] = useState<string>(imperial ? "lb" : "kg");
@@ -606,7 +615,7 @@ export function SetEditForm({
         notes: notes.trim(),
       });
       haptics.success();
-      toast("Set updated");
+      toast(tr("sets.updated"));
       onDone();
     } catch (e) {
       setError(errorMessage(e));
@@ -625,13 +634,13 @@ export function SetEditForm({
   return (
     <View>
       <Row gap={space.md} style={{ alignItems: "flex-start" }}>
-        <Stepper label="Reps" value={reps} onChange={setReps} step={1} min={0} max={200} decimals={0} style={{ flex: 1 }} />
+        <Stepper label={tr("sets.reps")} value={reps} onChange={setReps} step={1} min={0} max={200} decimals={0} style={{ flex: 1 }} />
         <Stepper
-          label="Weight"
+          label={tr("profile.weight")}
           value={weight}
           onChange={setWeight}
           step={unit === "lb" ? 5 : 2.5}
-          suffix={unit}
+          suffix={unitLabel(unit)}
           max={1000}
           style={{ flex: 1.15 }}
         />
@@ -644,13 +653,13 @@ export function SetEditForm({
           setUnit(u);
         }}
         options={[
-          { value: "kg", label: "kg" },
-          { value: "lb", label: "lb" },
+          { value: "kg", label: tr("unit.kg") },
+          { value: "lb", label: tr("unit.lb") },
         ]}
         style={{ marginTop: space.sm }}
       />
       <Chips<number>
-        label="Effort (RPE, optional)"
+        label={tr("sets.effort")}
         value={rpe ?? 0}
         onChange={(v) => setRpe(v === 0 ? null : v)}
         options={[
@@ -660,10 +669,10 @@ export function SetEditForm({
             .map((v) => ({ value: v, label: String(v) })),
         ]}
       />
-      <Field label="Note" value={notes} onChangeText={setNotes} placeholder="e.g. seat at 4, felt easy" />
+      <Field label={tr("sets.note")} value={notes} onChangeText={setNotes} placeholder={tr("sets.notePlaceholder")} />
       <ErrorText message={error} />
-      <Button title="Save changes" icon="checkmark" onPress={save} style={{ marginTop: space.lg }} />
-      <Button title="Delete set" icon="trash-outline" kind="danger" onPress={remove} style={{ marginTop: space.sm, borderColor: "transparent" }} />
+      <Button title={tr("profile.saveChanges")} icon="checkmark" onPress={save} style={{ marginTop: space.lg }} />
+      <Button title={tr("sets.delete")} icon="trash-outline" kind="danger" onPress={remove} style={{ marginTop: space.sm, borderColor: "transparent" }} />
     </View>
   );
 }
@@ -680,13 +689,14 @@ export function WorkoutDetail({
   onEditSet: (s: WorkoutSet) => void;
 }) {
   const { profile } = useProfile();
+  const { t: tr } = useI18n();
   const u = units(profile.unit_system);
   const toast = useToast();
   const { data: w, error } = useQuery({ queryKey: qk.workout(workoutId), queryFn: () => api<Workout>(`/workouts/${workoutId}`) });
   if (!w && error) return <ErrorText message={errorMessage(error)} />;
   if (!w)
     return (
-      <View style={{ gap: space.md }} accessibilityLabel="Loading workout">
+      <View style={{ gap: space.md }} accessibilityLabel={tr("workouts.loading")}>
         <Skeleton width="60%" />
         <Skeleton height={40} />
         <Skeleton height={40} />
@@ -696,23 +706,23 @@ export function WorkoutDetail({
     <View>
       <Txt variant="small">{longDateTime(w.started_at)}</Txt>
       <Row style={{ marginTop: space.md }}>
-        <Stat label="Sets" value={String(w.set_count)} />
-        <Stat label="Volume" value={u.weight(w.volume_kg, 0)} />
-        {w.ended_at ? <Stat label="Duration" value={duration(w.started_at, w.ended_at)} /> : null}
+        <Stat label={tr("workouts.sets")} value={String(w.set_count)} />
+        <Stat label={tr("workouts.volume")} value={u.weight(w.volume_kg, 0)} />
+        {w.ended_at ? <Stat label={tr("workouts.duration")} value={duration(w.started_at, w.ended_at)} /> : null}
       </Row>
       {w.notes ? <Txt style={{ marginTop: space.md }}>{w.notes}</Txt> : null}
       <View style={{ marginTop: space.lg }}>
         <SetsList sets={w.sets} onEdit={onEditSet} />
       </View>
       <Button
-        title="Delete workout"
+        title={tr("workouts.delete")}
         kind="danger"
         icon="trash-outline"
         style={{ marginTop: space.xl }}
         onPress={async () => {
-          if (!(await confirm("Delete workout?", "This removes the workout and all its sets.", "Delete"))) return;
+          if (!(await confirm(tr("workouts.deleteTitle"), tr("workouts.deleteText"), tr("settings.deleteConfirm")))) return;
           await deleteWorkout(w.id);
-          toast("Workout deleted");
+          toast(tr("workouts.deleted"));
           onDeleted();
         }}
       />
