@@ -3,15 +3,34 @@
 from dataclasses import dataclass, field
 
 from app.models.exercise import Exercise
+from app.i18n import Table, tr, tr_count, weekday_name
 from app.services.schedule import (
     FOCUSES,
-    WEEKDAY_NAMES,
     DayChoice,
     cycle_order,
     day_names,
+    focus_label,
     plan_warnings,
     recommend_focus,
 )
+
+# The plan's notes, in the language of the request (app.i18n)
+TEXTS: Table = {
+    "en": {
+        "sets_note": "{sets} of {reps} reps. Each exercise has its own rest time; the rest timer starts after every set.",
+        "sets": "{n} set|{n} sets",
+        "cardio_note": "Finish each session with {cardio} min of cardio (bike, rower or brisk walk).",
+        "progress_note": "When you hit the top of the rep range on every set, add weight next time.",
+        "own_plan": "Your own plan. Recommended for these days: {split}.",
+    },
+    "ar": {
+        "sets_note": "{sets} من {reps} تكرار. لكل تمرين وقت راحة خاص به، ويبدأ مؤقّت الراحة بعد كل مجموعة.",
+        "sets": "لا مجموعات|مجموعة واحدة|مجموعتان|{n} مجموعات|{n} مجموعة|{n} مجموعة",
+        "cardio_note": "اختم كل حصة بـ {cardio} د من الكارديو (دراجة، تجديف أو مشي سريع).",
+        "progress_note": "عندما تصل إلى أعلى نطاق التكرارات في كل مجموعة، زِد الوزن في المرة القادمة.",
+        "own_plan": "خطتك الخاصة. المقترح لهذه الأيام: {split}.",
+    },
+}
 
 # Which equipment levels each profile setting may use
 ALLOWED_EQUIPMENT = {
@@ -83,7 +102,12 @@ class Routine:
     customized: bool = False  # the user changed a session type or named a day
     recommended_split: str = ""
     warnings: list[str] = field(default_factory=list)
-    focus_options: list[FocusOption] = field(default_factory=lambda: [FocusOption(k, v) for k, v in FOCUSES.items()])
+    focus_options: list[FocusOption] = field(default_factory=lambda: [FocusOption(k, focus_label(k)) for k in FOCUSES])
+
+
+def _plain(text: str) -> str:
+    """Without the invisible direction marks: notes are shown on their own."""
+    return text.replace("\u2068", "").replace("\u2069", "")
 
 
 def exercises_per_session(minutes: int, cardio_minutes: int = 0) -> int:
@@ -135,11 +159,11 @@ def generate_routine(
         template_use[title] = variant + 1
         name = choices[weekday_index].name if weekday_index in choices else None
         day = RoutineDay(
-            weekday=WEEKDAY_NAMES[weekday_index],
+            weekday=weekday_name(weekday_index),
             weekday_index=weekday_index,
-            title=name or FOCUSES[focus[weekday_index]],
+            title=name or focus_label(focus[weekday_index]),
             focus=focus[weekday_index],
-            focus_label=FOCUSES[focus[weekday_index]],
+            focus_label=focus_label(focus[weekday_index]),
             recommended_focus=recommended[weekday_index],
             custom_name=bool(name),
             cardio_minutes=cardio,
@@ -159,14 +183,14 @@ def generate_routine(
             day.exercises.append(RoutineExercise(ex.id, ex.name, group, sets, reps, ex.default_rest_seconds or rest))
         days.append(day)
 
-    notes = [f"{sets} sets of {reps} reps. Each exercise has its own rest time; the rest timer starts after every set."]
+    notes = [_plain(tr(TEXTS, "sets_note", sets=_plain(tr_count(TEXTS, "sets", sets)), reps=reps))]
     if cardio:
-        notes.append(f"Finish each session with {cardio} min of cardio (bike, rower or brisk walk).")
-    notes.append("When you hit the top of the rep range on every set, add weight next time.")
+        notes.append(_plain(tr(TEXTS, "cardio_note", cardio=cardio)))
+    notes.append(tr(TEXTS, "progress_note"))
 
     if any(focus[d] != recommended[d] for d in training_days):
-        your_split = " / ".join(FOCUSES[focus[d]] for d in cycle_order(training_days))
-        your_reason = f"Your own plan. Recommended for these days: {split_name}."
+        your_split = " / ".join(focus_label(focus[d]) for d in cycle_order(training_days))
+        your_reason = _plain(tr(TEXTS, "own_plan", split=split_name))
     else:
         your_split, your_reason = split_name, split_reason
     return Routine(

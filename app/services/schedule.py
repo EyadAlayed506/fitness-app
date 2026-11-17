@@ -7,7 +7,14 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from app.i18n import Table, tr, weekday_name
+
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
+def _plain(text: str) -> str:
+    """Without the invisible direction marks: for names and notes shown on their own."""
+    return text.replace("\u2068", "").replace("\u2069", "")
 MAX_TRAINING_DAYS = 6  # keep at least one rest day a week
 
 # Only used for profiles saved before training days could be chosen (they stored a count only).
@@ -74,7 +81,8 @@ def cycle_order(days: list[int]) -> list[int]:
 
 # ---------- what each training day trains ----------
 
-# Session types the user can pick for a day, and what they train (used for warnings)
+# Session types the user can pick for a day (English names; focus_label() gives the request's language),
+# and what they train (used for warnings)
 FOCUSES = {
     "full_body": "Full body",
     "upper": "Upper body",
@@ -83,6 +91,59 @@ FOCUSES = {
     "pull": "Pull",
     "legs": "Legs",
 }
+
+# What the user reads about their plan, in the language of the request (app.i18n)
+TEXTS: Table = {
+    "en": {
+        **{f"focus.{k}": v for k, v in FOCUSES.items()},
+        "split.full_body": "Full body",
+        "split.full_body_n": "Full body x{n}",
+        "split.4": "Upper / Lower",
+        "split.5": "Upper / Lower / Push / Pull / Legs",
+        "split.6": "Push / Pull / Legs x2",
+        "why.1_3": "Training 1-3 days a week, a full-body session each day trains every muscle group more than "
+        "once a week. Full-body days alternate between two exercise variations.",
+        "why.back_to_back": " Some of your days are back to back: keep one of them lighter, or pick Upper / Lower for them.",
+        "why.4": "Four days: upper and lower body alternate, so back-to-back days train different muscles.",
+        "why.5": "Five days: each session trains different muscles from the one before.",
+        "why.6": "Six days: push, pull and legs twice, so each muscle gets two days of rest before it's trained again.",
+        "warn.back_to_back": "{a} ({a_focus}) and {b} ({b_focus}) are back to back and train some of the same muscles. "
+        "Fine if one of them is lighter.",
+        "warn.no_legs": "No day in your week trains the legs.",
+        "warn.no_push": "No day in your week has pushing exercises (chest, shoulders, triceps).",
+        "warn.no_pull": "No day in your week has pulling exercises (back, biceps).",
+    },
+    "ar": {
+        "focus.full_body": "الجسم كامل",
+        "focus.upper": "الجزء العلوي",
+        "focus.lower": "الجزء السفلي",
+        "focus.push": "دفع",
+        "focus.pull": "سحب",
+        "focus.legs": "الأرجل",
+        "split.full_body": "الجسم كامل",
+        "split.full_body_n": "الجسم كامل ×{n}",
+        "split.4": "علوي / سفلي",
+        "split.5": "علوي / سفلي / دفع / سحب / أرجل",
+        "split.6": "دفع / سحب / أرجل ×2",
+        "why.1_3": "عند التمرين 1-3 أيام في الأسبوع، تمرّن حصة الجسم الكامل كل مجموعة عضلية أكثر من مرة في الأسبوع. "
+        "وتتناوب أيام الجسم الكامل بين نسختين من التمارين.",
+        "why.back_to_back": " بعض أيامك متتالية: اجعل أحدها أخف، أو اختر علوي / سفلي لها.",
+        "why.4": "أربعة أيام: يتناوب الجزء العلوي والسفلي، فتمرّن الأيام المتتالية عضلات مختلفة.",
+        "why.5": "خمسة أيام: كل حصة تمرّن عضلات مختلفة عن الحصة السابقة.",
+        "why.6": "ستة أيام: دفع وسحب وأرجل مرتين، فتحصل كل عضلة على يومي راحة قبل تمرينها مجدداً.",
+        "warn.back_to_back": "{a} ({a_focus}) و{b} ({b_focus}) متتاليان ويمرّنان بعض العضلات نفسها. "
+        "لا بأس إن كان أحدهما أخف.",
+        "warn.no_legs": "لا يوجد يوم في أسبوعك يمرّن الأرجل.",
+        "warn.no_push": "لا يوجد يوم في أسبوعك فيه تمارين دفع (الصدر، الأكتاف، الترايسبس).",
+        "warn.no_pull": "لا يوجد يوم في أسبوعك فيه تمارين سحب (الظهر، الباي).",
+    },
+}
+
+
+def focus_label(focus: str) -> str:
+    """The session type's name in the request's language ("Full body" / "الجسم كامل")."""
+    key = f"focus.{focus}"
+    return tr(TEXTS, key) if key in TEXTS["en"] else focus
 _UPPER = {"chest", "back", "shoulders", "biceps", "triceps"}
 _LOWER = {"quads", "hamstrings", "glutes", "calves"}
 FOCUS_MUSCLES = {
@@ -113,22 +174,19 @@ def recommend_focus(days: list[int]) -> tuple[dict[int, str], str, str]:
     order = cycle_order(days)
     if n <= 3:
         focuses = ["full_body"] * n
-        name = "Full body" if n == 1 else f"Full body x{n}"
-        why = (
-            "Training 1-3 days a week, a full-body session each day trains every muscle group more than "
-            "once a week. Full-body days alternate between two exercise variations."
-        )
+        name = tr(TEXTS, "split.full_body") if n == 1 else _plain(tr(TEXTS, "split.full_body_n", n=n))
+        why = tr(TEXTS, "why.1_3")
         if back_to_back_pairs(days):
-            why += " Some of your days are back to back: keep one of them lighter, or pick Upper / Lower for them."
+            why += tr(TEXTS, "why.back_to_back")
     elif n == 4:
-        focuses, name = ["upper", "lower", "upper", "lower"], "Upper / Lower"
-        why = "Four days: upper and lower body alternate, so back-to-back days train different muscles."
+        focuses, name = ["upper", "lower", "upper", "lower"], tr(TEXTS, "split.4")
+        why = tr(TEXTS, "why.4")
     elif n == 5:
-        focuses, name = ["upper", "lower", "push", "pull", "legs"], "Upper / Lower / Push / Pull / Legs"
-        why = "Five days: each session trains different muscles from the one before."
+        focuses, name = ["upper", "lower", "push", "pull", "legs"], tr(TEXTS, "split.5")
+        why = tr(TEXTS, "why.5")
     else:
-        focuses, name = ["push", "pull", "legs", "push", "pull", "legs"], "Push / Pull / Legs x2"
-        why = "Six days: push, pull and legs twice, so each muscle gets two days of rest before it's trained again."
+        focuses, name = ["push", "pull", "legs", "push", "pull", "legs"], tr(TEXTS, "split.6")
+        why = tr(TEXTS, "why.6")
     return dict(zip(order, focuses)), name, why
 
 
@@ -171,17 +229,15 @@ def plan_warnings(focus_by_day: dict[int, str]) -> list[str]:
     for a, b in back_to_back_pairs(days):
         shared = FOCUS_MUSCLES[focus_by_day[a]] & FOCUS_MUSCLES[focus_by_day[b]]
         if shared:
-            notes.append(
-                f"{WEEKDAY_NAMES[a]} ({FOCUSES[focus_by_day[a]]}) and {WEEKDAY_NAMES[b]} ({FOCUSES[focus_by_day[b]]}) "
-                "are back to back and train some of the same muscles. Fine if one of them is lighter."
-            )
+            notes.append(_plain(tr(TEXTS, "warn.back_to_back", a=weekday_name(a), a_focus=focus_label(focus_by_day[a]),
+                                   b=weekday_name(b), b_focus=focus_label(focus_by_day[b]))))
     trained = set().union(*(FOCUS_MUSCLES[f] for f in focus_by_day.values())) if focus_by_day else set()
     if days and not trained & _LOWER:
-        notes.append("No day in your week trains the legs.")
+        notes.append(tr(TEXTS, "warn.no_legs"))
     if days and not trained & {"chest", "shoulders", "triceps"}:
-        notes.append("No day in your week has pushing exercises (chest, shoulders, triceps).")
+        notes.append(tr(TEXTS, "warn.no_push"))
     if days and not trained & {"back", "biceps"}:
-        notes.append("No day in your week has pulling exercises (back, biceps).")
+        notes.append(tr(TEXTS, "warn.no_pull"))
     return notes
 
 
