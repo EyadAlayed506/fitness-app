@@ -1,5 +1,7 @@
 import { Platform } from "react-native";
 
+import { tr } from "./i18n/current";
+
 /**
  * A local notification for the end of a rest, so the phone tells you even when the app is in the
  * background or the screen is locked. While the app is open the in-app alert is used instead.
@@ -27,7 +29,7 @@ function load(): Promise<Notifications | null> {
       });
       if (Platform.OS === "android") {
         await N.setNotificationChannelAsync(CHANNEL, {
-          name: "Rest timer",
+          name: tr("notify.channel"),
           importance: N.AndroidImportance.HIGH,
           vibrationPattern: [0, 400, 200, 400],
           sound: "default",
@@ -53,8 +55,8 @@ export async function scheduleRestEnd(seconds: number, exerciseName: string, nex
     if (!granted) return null;
     return await N.scheduleNotificationAsync({
       content: {
-        title: "Rest is over",
-        body: next ?? (exerciseName ? `Time for your next set of ${exerciseName}` : "Time for your next set"),
+        title: tr("notify.restOver"),
+        body: next ?? (exerciseName ? tr("notify.nextOf", { name: exerciseName }) : tr("notify.next")),
         sound: "default",
       },
       trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: Math.round(seconds), channelId: CHANNEL },

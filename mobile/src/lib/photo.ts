@@ -2,6 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Platform } from "react-native";
 
 import { api } from "./api";
+import { tr } from "./i18n/current";
 
 export interface Photo {
   uri: string;
@@ -15,7 +16,7 @@ export interface Photo {
 export async function choosePhoto(source: "library" | "camera" = "library"): Promise<Photo | null> {
   if (source === "camera" && Platform.OS !== "web") {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) throw new Error("Allow the camera in your phone's settings, or choose a photo instead.");
+    if (!permission.granted) throw new Error(tr("photo.allowCamera"));
   }
   const options: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], quality: 0.7 };
   const picked =

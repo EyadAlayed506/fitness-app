@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
@@ -6,20 +5,22 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, View } from "react-nat
 
 import { api } from "@/lib/api";
 import { useAlternatives, useGymInventory, useGyms, useMachineSetting, usePhotoStatus } from "@/lib/data";
-import { cap } from "@/lib/format";
+import { idLabel } from "@/lib/format";
+import { useI18n, type MessageKey } from "@/lib/i18n";
+import { trOr } from "@/lib/i18n/current";
 import { haptics } from "@/lib/haptics";
 import { errorMessage, invalidate, qk, queryClient } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { Exercise, Gym, GymScan, GymSession, MachineSetting, PhotoMatchStatus, RoutineDay } from "@/lib/types";
 
-import { Badge, Button, Checkbox, Chips, ErrorText, Field, LinkButton, ListRow, Meter, Row, Skeleton, Txt, useToast } from "./ui";
+import { Badge, Button, Checkbox, Chips, ErrorText, Field, Icon, LinkButton, ListRow, Meter, Row, Skeleton, Txt, useToast } from "./ui";
 import type { PickedExercise } from "./WorkoutParts";
 
-const SETTING_FIELDS: { key: keyof Pick<MachineSetting, "seat" | "pins" | "back_pad" | "handle">; label: string; short: string; hint: string }[] = [
-  { key: "seat", label: "Seat", short: "Seat", hint: "e.g. 4" },
-  { key: "pins", label: "Pins / weight stack", short: "Pins", hint: "e.g. arm at 3" },
-  { key: "back_pad", label: "Back pad", short: "Back pad", hint: "e.g. 2" },
-  { key: "handle", label: "Handle", short: "Handle", hint: "e.g. wide grip" },
+const SETTING_FIELDS: { key: keyof Pick<MachineSetting, "seat" | "pins" | "back_pad" | "handle">; label: MessageKey; short: MessageKey; hint: MessageKey }[] = [
+  { key: "seat", label: "setting.seatLong", short: "setting.seat", hint: "setting.seatHint" },
+  { key: "pins", label: "setting.pinsLong", short: "setting.pins", hint: "setting.pinsHint" },
+  { key: "back_pad", label: "setting.back_padLong", short: "setting.back_pad", hint: "setting.back_padHint" },
+  { key: "handle", label: "setting.handleLong", short: "setting.handle", hint: "setting.handleHint" },
 ];
 
 // ---------- machine settings ----------
@@ -27,13 +28,14 @@ const SETTING_FIELDS: { key: keyof Pick<MachineSetting, "seat" | "pins" | "back_
 /** How the user sets up this machine at this gym: shown when it's picked, editable in place. */
 export function MachineSettingsCard({ gym, exercise }: { gym: Gym | null; exercise: PickedExercise }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const toast = useToast();
   const setting = useMachineSetting(gym?.id ?? null, exercise.id);
   const [editing, setEditing] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string | null>(null);
   if (!gym || !setting.data) return null;
   const s = setting.data;
-  const parts = SETTING_FIELDS.filter((f) => s[f.key]).map((f) => `${f.short} ${s[f.key]}`);
+  const parts = SETTING_FIELDS.filter((f) => s[f.key]).map((f) => tr("setting.value", { label: tr(f.short), value: s[f.key] }));
 
   const save = async () => {
     if (!editing) return;
@@ -44,7 +46,7 @@ export function MachineSettingsCard({ gym, exercise }: { gym: Gym | null; exerci
       invalidate(qk.gyms, qk.gymInventory(gym.id));
       setEditing(null);
       haptics.success();
-      toast(saved.saved ? "Machine settings saved" : "Machine settings cleared");
+      toast(tr(saved.saved ? "setting.saved" : "setting.cleared"));
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -53,25 +55,25 @@ export function MachineSettingsCard({ gym, exercise }: { gym: Gym | null; exerci
   if (editing) {
     return (
       <View style={[styles.box, { backgroundColor: t.surface2 }]}>
-        <Txt variant="label">Your setup at {gym.name}</Txt>
+        <Txt variant="label">{tr("setting.yourSetup", { gym: gym.name })}</Txt>
         <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: space.sm }}>
           {SETTING_FIELDS.map((f) => (
             <Field
               key={f.key}
-              label={f.label}
+              label={tr(f.label)}
               value={editing[f.key] ?? ""}
               onChangeText={(v) => setEditing({ ...editing, [f.key]: v })}
-              placeholder={f.hint}
+              placeholder={tr(f.hint)}
               maxLength={f.key === "handle" ? 60 : 40}
               style={{ width: "48%", flexGrow: 1 }}
             />
           ))}
         </View>
-        <Field label="Notes" value={editing.notes ?? ""} onChangeText={(v) => setEditing({ ...editing, notes: v })} placeholder="e.g. feet high on the platform" maxLength={300} />
+        <Field label={tr("workouts.notes")} value={editing.notes ?? ""} onChangeText={(v) => setEditing({ ...editing, notes: v })} placeholder={tr("setting.notesPlaceholder")} maxLength={300} />
         <ErrorText message={error} />
         <Row style={{ marginTop: space.md }}>
-          <Button title="Cancel" kind="ghost" small onPress={() => setEditing(null)} style={{ flex: 1 }} />
-          <Button title="Save" icon="checkmark" small onPress={save} style={{ flex: 1 }} />
+          <Button title={tr("common.cancel")} kind="ghost" small onPress={() => setEditing(null)} style={{ flex: 1 }} />
+          <Button title={tr("common.save")} icon="checkmark" small onPress={save} style={{ flex: 1 }} />
         </Row>
       </View>
     );
@@ -81,9 +83,9 @@ export function MachineSettingsCard({ gym, exercise }: { gym: Gym | null; exerci
   if (!s.saved)
     return (
       <Pressable onPress={start} accessibilityRole="button" style={({ pressed }) => [styles.add, { opacity: pressed ? 0.6 : 1 }]}>
-        <Ionicons name="options-outline" size={16} color={t.accent} />
+        <Icon name="options-outline" size={16} color={t.accent} />
         <Txt variant="label" style={{ color: t.accent }}>
-          Save your machine settings (seat, pins…)
+          {tr("setting.addPrompt")}
         </Txt>
       </Pressable>
     );
@@ -91,14 +93,14 @@ export function MachineSettingsCard({ gym, exercise }: { gym: Gym | null; exerci
     <Pressable
       onPress={start}
       accessibilityRole="button"
-      accessibilityLabel={`Your setup at ${gym.name}: ${parts.join(", ")}${s.notes ? `, ${s.notes}` : ""}. Edit`}
+      accessibilityLabel={tr("setting.editLabel", { gym: gym.name, settings: [...parts, s.notes].filter(Boolean).join(tr("list.separator")) })}
       style={({ pressed }) => [styles.box, { backgroundColor: t.accentSoft, opacity: pressed ? 0.7 : 1 }]}
     >
       <Row style={{ justifyContent: "space-between" }}>
         <Txt variant="tiny" style={{ ...typeScale.overline, color: t.accent }}>
-          YOUR SETUP · {gym.name.toUpperCase()}
+          {tr("setting.overline", { gym: gym.name }).toLocaleUpperCase()}
         </Txt>
-        <Ionicons name="create-outline" size={16} color={t.accent} />
+        <Icon name="create-outline" size={16} color={t.accent} />
       </Row>
       {parts.length ? (
         <Txt style={{ fontWeight: "600", marginTop: 2 }} numberOfLines={2}>
@@ -129,6 +131,7 @@ export function MachineTaken({
   swapsPlan: boolean;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const alternatives = useAlternatives(exercise.id);
   const inventory = useGymInventory(gym?.id ?? null);
   if (alternatives.isPending)
@@ -150,34 +153,34 @@ export function MachineTaken({
       key={a.exercise.id}
       first={i === 0}
       title={a.exercise.name}
-      subtitle={[a.match === "similar" ? "Similar movement" : "Different movement, same muscles", ...a.reasons.slice(0, 1)].join(" · ")}
+      subtitle={[tr(a.match === "similar" ? "taken.similar" : "taken.different"), ...a.reasons.slice(0, 1)].join(" · ")}
       onPress={() => {
         haptics.selection();
         onSwap({ id: a.exercise.id, name: a.exercise.name });
       }}
-      right={<Badge label={a.match === "similar" ? "Similar" : "Different"} tone={a.match === "similar" ? "good" : "warn"} />}
+      right={<Badge label={tr(a.match === "similar" ? "taken.similarShort" : "taken.differentShort")} tone={a.match === "similar" ? "good" : "warn"} />}
     />
   );
   return (
     <View>
       <Txt variant="small">
-        Someone&apos;s on it? Do one of these instead{swapsPlan ? "; it replaces it in today's checklist for this workout only" : ""}.
+        {tr(swapsPlan ? "taken.introPlan" : "taken.intro")}
       </Txt>
       {here.length ? (
         <View style={{ marginTop: space.md }}>
-          <Txt variant="label">At {gym?.name ?? "this gym"}</Txt>
+          <Txt variant="label">{tr("taken.atGym", { gym: gym?.name ?? tr("taken.thisGym") })}</Txt>
           {here.map(row)}
         </View>
       ) : null}
       {elsewhere.length ? (
         <View style={{ marginTop: space.md }}>
-          <Txt variant="label">{here.length ? "Other options" : "Options (not yet seen at this gym)"}</Txt>
+          <Txt variant="label">{tr(here.length ? "taken.other" : "taken.notSeen")}</Txt>
           {elsewhere.map(row)}
         </View>
       ) : null}
       {!list.length ? (
         <Txt variant="small" style={{ marginTop: space.md, color: t.muted }}>
-          No alternatives in the library for this one.
+          {tr("taken.none")}
         </Txt>
       ) : null}
     </View>
@@ -206,6 +209,7 @@ export function GymPicker({ value, onChange }: { value: number | null; onChange:
 /** Whether photos can be matched to earlier ones yet, with the one-time download. */
 export function PhotoMatchStatusCard({ compact = false }: { compact?: boolean }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const status = usePhotoStatus();
   const [error, setError] = useState<string | null>(null);
   const s = status.data;
@@ -213,8 +217,8 @@ export function PhotoMatchStatusCard({ compact = false }: { compact?: boolean })
   if (s.ready)
     return compact ? null : (
       <Row gap={space.sm} style={{ marginTop: space.sm }}>
-        <Ionicons name="checkmark-circle" size={16} color={t.good} />
-        <Txt variant="small">Photo matching is on: earlier photos are checked first (on this server, in about 0.05 s).</Txt>
+        <Icon name="checkmark-circle" size={16} color={t.good} />
+        <Txt variant="small">{tr("match.ready")}</Txt>
       </Row>
     );
   const start = async () => {
@@ -227,18 +231,18 @@ export function PhotoMatchStatusCard({ compact = false }: { compact?: boolean })
   };
   return (
     <View style={[styles.box, { backgroundColor: t.surface2 }]}>
-      <Txt variant="label">{s.downloading ? "Getting photo matching ready…" : "Recognise your machines faster"}</Txt>
+      <Txt variant="label">{tr(s.downloading ? "match.preparing" : "match.faster")}</Txt>
       <Txt variant="small">
         {s.downloading
-          ? `Downloading the photo model: ${Math.round(s.downloaded_mb)} of ${Math.round(s.size_mb)} MB (one time).`
-          : `A small model (${Math.round(s.size_mb)} MB, one time) lets the app match a new photo with your earlier ones, so a machine it learned is recognised even if the classifier gets it wrong.`}
+          ? tr("match.downloading", { done: Math.round(s.downloaded_mb), total: Math.round(s.size_mb) })
+          : tr("match.explain", { size: Math.round(s.size_mb) })}
       </Txt>
       {s.downloading ? (
         <View style={{ marginTop: space.sm }}>
           <Meter value={s.downloaded_mb} max={s.size_mb} height={4} />
         </View>
       ) : (
-        <Button title={`Download (${Math.round(s.size_mb)} MB)`} icon="download-outline" kind="soft" small onPress={start} style={{ marginTop: space.sm, alignSelf: "flex-start" }} />
+        <Button title={tr("match.download", { size: Math.round(s.size_mb) })} icon="download-outline" kind="soft" small onPress={start} style={{ marginTop: space.sm, alignSelf: "flex-start" }} />
       )}
       <ErrorText message={error ?? (s.problem && !s.downloading && s.problem.startsWith("Couldn't") ? s.problem : null)} />
     </View>
@@ -253,6 +257,7 @@ export function PhotoMatchStatusCard({ compact = false }: { compact?: boolean })
  */
 export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: RoutineDay, gym: Gym) => void }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const toast = useToast();
   const machinesQuery = useQuery({
     queryKey: ["exercises", "machines"],
@@ -267,12 +272,13 @@ export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: Routine
   const [showAll, setShowAll] = useState(false);
   const [session, setSession] = useState<GymSession | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const choices: Record<string, string> = scan?.equipment_choices ?? {
-    dumbbells: "Dumbbells",
-    barbell: "Barbell and rack",
-    cable_station: "Cable station",
-    pull_up_bar: "Pull-up bar",
-  };
+  // the equipment IDs, shown in the app's language (the server's English names for any new ones)
+  const choices: Record<string, string> = Object.fromEntries(
+    Object.entries(scan?.equipment_choices ?? { dumbbells: "", barbell: "", cable_station: "", pull_up_bar: "" }).map(([key, label]) => [
+      key,
+      trOr(`equip.${key}`, label || key),
+    ]),
+  );
 
   const pick = async () => {
     setError(null);
@@ -293,7 +299,7 @@ export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: Routine
       setMachines((m) => new Set([...m, ...result.machines.filter((x) => x.confidence >= 0.5).map((x) => x.exercise.id)]));
       setEquipment((e) => new Set([...e, ...result.equipment.filter((x) => x.confidence >= 0.5).map((x) => x.key)]));
     } catch (e) {
-      setProblem(`${errorMessage(e)} Tick what's there yourself instead.`);
+      setProblem(tr("scan.problem", { error: errorMessage(e) ?? "" }));
       setShowAll(true);
     } finally {
       setBusy(false);
@@ -317,7 +323,7 @@ export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: Routine
     return (
       <View>
         <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-          TODAY AT {gym.name.toUpperCase()}
+          {tr("scan.today", { gym: gym.name }).toLocaleUpperCase()}
         </Txt>
         <Txt variant="h2" style={{ marginTop: 2 }}>
           {session.day.title}
@@ -327,12 +333,12 @@ export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: Routine
         </Txt>
         <View style={{ marginTop: space.md }}>
           {session.day.exercises.map((x, i) => (
-            <ListRow key={x.exercise_id} first={i === 0} title={x.name} subtitle={`${x.sets} × ${x.reps} · ${cap(x.muscle_group)}`} />
+            <ListRow key={x.exercise_id} first={i === 0} title={x.name} subtitle={`${x.sets} × ${x.reps} · ${idLabel("muscle", x.muscle_group)}`} />
           ))}
-          {session.day.cardio_minutes ? <Txt variant="small">+ {session.day.cardio_minutes} min cardio</Txt> : null}
+          {session.day.cardio_minutes ? <Txt variant="small">{tr("scan.cardio", { n: session.day.cardio_minutes })}</Txt> : null}
         </View>
-        <Button title="Start this session" icon="play" onPress={() => onStart(session.day, gym)} style={{ marginTop: space.lg }} />
-        <LinkButton title="Change what's there" onPress={() => setSession(null)} />
+        <Button title={tr("scan.start")} icon="play" onPress={() => onStart(session.day, gym)} style={{ marginTop: space.lg }} />
+        <LinkButton title={tr("scan.change")} onPress={() => setSession(null)} />
       </View>
     );
 
@@ -341,22 +347,22 @@ export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: Routine
   return (
     <View>
       <Txt variant="small">
-        Take or choose a photo of the room. The AI on your PC lists the equipment it sees; tick what&apos;s right and you get today&apos;s session using only that.
+        {tr("scan.intro")}
       </Txt>
       <Row style={{ marginTop: space.md }} gap={space.md}>
-        {photo ? <Image source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: t.surface2 }} accessibilityLabel="Your photo of the gym" /> : null}
+        {photo ? <Image source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: radius.md, backgroundColor: t.surface2 }} accessibilityLabel={tr("scan.photoLabel")} /> : null}
         <View style={{ flex: 1 }}>
           {busy ? (
             <Row gap={space.sm}>
               <ActivityIndicator size="small" color={t.muted} />
               <Txt variant="small" style={{ flex: 1 }}>
-                Looking at the room… (up to a minute on a PC without a strong graphics card)
+                {tr("scan.looking")}
               </Txt>
             </Row>
           ) : (
-            <Button title={photo ? "Another photo" : "Choose a photo of the gym"} icon="image-outline" kind={photo ? "soft" : "primary"} small={!!photo} onPress={() => pick().catch((e) => setError(errorMessage(e)))} />
+            <Button title={tr(photo ? "scan.another" : "scan.choose")} icon="image-outline" kind={photo ? "soft" : "primary"} small={!!photo} onPress={() => pick().catch((e) => setError(errorMessage(e)))} />
           )}
-          {scan?.seen ? <Txt variant="tiny" style={{ marginTop: space.xs }}>The AI saw: {scan.seen}</Txt> : null}
+          {scan?.seen ? <Txt variant="tiny" style={{ marginTop: space.xs }}>{tr("menu.seen", { seen: scan.seen })}</Txt> : null}
         </View>
       </Row>
       {problem ? <ErrorText message={problem} /> : null}
@@ -364,18 +370,18 @@ export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: Routine
       {scan || problem || gym.machines.length || gym.equipment.length ? (
         <>
           <Txt variant="label" style={{ marginTop: space.lg }}>
-            Equipment
+            {tr("scan.equipment")}
           </Txt>
           {Object.entries(choices).map(([key, label]) => (
             <Checkbox
               key={key}
               checked={equipment.has(key)}
               onChange={(on) => setEquipment((e) => (on ? new Set([...e, key]) : new Set([...e].filter((k) => k !== key))))}
-              label={scan && scan.equipment.some((x) => x.key === key) ? `${label} (seen)` : label}
+              label={scan && scan.equipment.some((x) => x.key === key) ? tr("scan.seen", { label }) : label}
             />
           ))}
           <Txt variant="label" style={{ marginTop: space.lg }}>
-            Machines
+            {tr("scan.machines")}
           </Txt>
           {machineList.length ? (
             machineList.map((m) => (
@@ -383,20 +389,20 @@ export function GymScanFlow({ gym, onStart }: { gym: Gym; onStart: (day: Routine
                 key={m.id}
                 checked={machines.has(m.id)}
                 onChange={(on) => setMachines((s) => (on ? new Set([...s, m.id]) : new Set([...s].filter((x) => x !== m.id))))}
-                label={detected.has(m.id) ? `${m.name} (seen, ${Math.round((detected.get(m.id) ?? 0) * 100)}%)` : m.name}
+                label={detected.has(m.id) ? tr("scan.seenPercent", { label: m.name, percent: Math.round((detected.get(m.id) ?? 0) * 100) }) : m.name}
               />
             ))
           ) : (
             <Txt variant="small" style={{ marginTop: space.xs }}>
-              No machines seen.
+              {tr("scan.noMachines")}
             </Txt>
           )}
-          {!showAll ? <LinkButton title="Show all machines" onPress={() => setShowAll(true)} /> : null}
+          {!showAll ? <LinkButton title={tr("scan.showAll")} onPress={() => setShowAll(true)} /> : null}
           <Txt variant="tiny" style={{ marginTop: space.md }}>
-            Bodyweight exercises (push-ups, squats, planks…) are always included.
+            {tr("scan.bodyweight")}
           </Txt>
           <ErrorText message={error} />
-          <Button title="Save and plan today" icon="sparkles-outline" onPress={() => build().catch(() => toast("Couldn't build the session"))} style={{ marginTop: space.lg }} />
+          <Button title={tr("scan.build")} icon="sparkles-outline" onPress={() => build().catch(() => toast(tr("scan.couldntBuild")))} style={{ marginTop: space.lg }} />
         </>
       ) : null}
     </View>

@@ -5,12 +5,14 @@ import { Image, ScrollView, Text, View } from "react-native";
 import { Loading, SkeletonCards, Txt } from "@/components/ui";
 import { api, qrImageUrl } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 import { radius, space, useTheme } from "@/lib/theme";
 import type { Exercise } from "@/lib/types";
 
 /** A QR code for every machine, to print and stick on it. Stickers stay black on white in dark mode so they scan and print. */
 export default function QrStickers() {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const { ready, token } = useAuth();
   const [list, setList] = useState<Exercise[]>([]);
   useEffect(() => {
@@ -21,14 +23,13 @@ export default function QrStickers() {
   return (
     <ScrollView style={{ backgroundColor: t.bg }} contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl, maxWidth: 720, width: "100%", alignSelf: "center" }}>
       <Txt variant="small" style={{ marginBottom: space.lg }}>
-        Scanning a sticker in the app opens that machine. The text under each code can also be typed in. To print them, open
-        this page in a browser on your computer.
+        {tr("qr.intro")}
       </Txt>
       {list.length ? null : <SkeletonCards count={2} />}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.md, justifyContent: "center" }}>
         {list.map((x) => (
           <View key={x.id} style={{ width: 150, backgroundColor: "#fff", borderRadius: radius.md, padding: space.md, alignItems: "center", borderWidth: 1, borderColor: t.border }}>
-            <Image source={{ uri: qrImageUrl(x.id) }} style={{ width: 128, height: 128 }} accessibilityLabel={`QR code for ${x.name}`} />
+            <Image source={{ uri: qrImageUrl(x.id) }} style={{ width: 128, height: 128 }} accessibilityLabel={tr("qr.codeFor", { name: x.name })} />
             <Text style={{ color: "#111", fontWeight: "600", fontSize: 12, textAlign: "center" }}>{x.name}</Text>
             <Text style={{ color: "#444", fontSize: 11 }}>{x.qr_code}</Text>
           </View>

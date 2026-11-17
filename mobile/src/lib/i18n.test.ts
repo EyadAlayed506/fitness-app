@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 import { ar } from "./i18n/ar.ts";
 import { directionOf, errorKey, intlLocale, isLanguage, pickLanguage, translate, translateCount, urlIn } from "./i18n/core.ts";
+import { errorTextFor, setCurrentLanguage } from "./i18n/current.ts";
 import { en } from "./i18n/en.ts";
 
 test("a saved choice wins over the device language", () => {
@@ -93,6 +94,16 @@ test("counts pick the right plural form in each language", () => {
 test("every Arabic count text has all six plural forms", () => {
   for (const key of Object.keys(en) as (keyof typeof en)[]) {
     if (en[key].includes("|")) assert.equal(ar[key].split("|").length, 6, key);
+  }
+});
+
+test("an error message that is already in Arabic is shown as it is", () => {
+  setCurrentLanguage("ar");
+  try {
+    assert.equal(errorTextFor(new Error("اسمح باستخدام الكاميرا.")), "اسمح باستخدام الكاميرا.");
+    assert.equal(errorTextFor(new Error("boom")), "حدث خطأ ما. حاول مرة أخرى.", "English text from elsewhere still becomes the general message");
+  } finally {
+    setCurrentLanguage("en");
   }
 });
 

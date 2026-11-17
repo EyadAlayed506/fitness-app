@@ -34,7 +34,8 @@ export function errorTextFor(err: unknown): string {
   const message = typeof e?.message === "string" ? e.message : "";
   const key = errorKey({ status, message, code: e?.code });
   if (key) return tr(key, { url: urlIn(message), status });
-  // No translation for this one: English shows the server's own words, Arabic a general message
-  if (lang === "en" && message) return message;
+  // No translation for this one: English shows the server's own words, Arabic a general message,
+  // unless the text is already Arabic (written by the app or a server answering in Arabic)
+  if (message && (lang === "en" || /[؀-ۿ]/.test(message))) return message;
   return status >= 0 ? tr("errors.generic", { status }) : tr("errors.unknown");
 }

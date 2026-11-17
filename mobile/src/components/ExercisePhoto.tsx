@@ -1,21 +1,26 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, View } from "react-native";
 
 import { api } from "@/lib/api";
-import { cap, shortDate } from "@/lib/format";
+import { idLabel, shortDate } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import { errorTextFor } from "@/lib/i18n/current";
 import { invalidate, qk } from "@/lib/query";
 import { space, type as typeScale, useTheme } from "@/lib/theme";
 import type { SmartRecognition } from "@/lib/types";
 
 import { PhotoMatchStatusCard } from "./GymParts";
-import { Badge, Button, ErrorText, LinkButton, Row, Txt } from "./ui";
+import { Badge, Button, ErrorText, Icon, LinkButton, Row, Txt } from "./ui";
 import { ExerciseSearch, type PickedExercise } from "./WorkoutParts";
 
 const likelihood = (c: number) =>
-  c >= 0.7 ? { label: "Very likely", tone: "good" as const } : c >= 0.4 ? { label: "Likely", tone: "info" as const } : { label: "Maybe", tone: "neutral" as const };
+  c >= 0.7
+    ? { label: "photo.veryLikely" as const, tone: "good" as const }
+    : c >= 0.4
+      ? { label: "photo.likely" as const, tone: "info" as const }
+      : { label: "photo.maybe" as const, tone: "neutral" as const };
 
 /**
  * Choose or take a photo of a machine. Earlier photos the user confirmed are checked first ("Matched from
@@ -33,6 +38,7 @@ export function ExercisePhoto({
   gymId?: number | null;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const [usingCamera, setUsingCamera] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [result, setResult] = useState<SmartRecognition | null>(null);
@@ -58,7 +64,7 @@ export function ExercisePhoto({
       setResult(r);
       if (r.source === "none") setSearching(true); // nothing recognised: pick it by hand
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorTextFor(e));
     }
   };
 
@@ -93,12 +99,12 @@ export function ExercisePhoto({
     return (
       <View style={{ gap: 10 }}>
         <Txt variant="small">
-          Choose or take a photo of the machine. Fit the whole machine in, and its name sticker if it has one.
+          {tr("photo.intro")}
         </Txt>
-        <Button title="Choose a photo" icon="image-outline" onPress={() => pickFile().catch((e) => setError((e as Error).message))} />
-        <Button title="Use the camera" icon="camera-outline" kind="soft" onPress={() => setUsingCamera(true)} />
+        <Button title={tr("photo.choose")} icon="image-outline" onPress={() => pickFile().catch((e) => setError(errorTextFor(e)))} />
+        <Button title={tr("photo.camera")} icon="camera-outline" kind="soft" onPress={() => setUsingCamera(true)} />
         <ErrorText message={error} />
-        <LinkButton title="Search by name instead" onPress={onSearch} />
+        <LinkButton title={tr("photo.searchInstead")} onPress={onSearch} />
         <PhotoMatchStatusCard compact />
       </View>
     );
@@ -108,32 +114,32 @@ export function ExercisePhoto({
   return (
     <View>
       <Row gap={12} style={{ alignItems: "flex-start" }}>
-        <Image source={{ uri: photo }} style={{ width: 88, height: 88, borderRadius: 10, backgroundColor: t.surface2 }} accessibilityLabel="Your photo" />
+        <Image source={{ uri: photo }} style={{ width: 88, height: 88, borderRadius: 10, backgroundColor: t.surface2 }} accessibilityLabel={tr("photo.yourPhoto")} />
         <View style={{ flex: 1 }}>
           {result ? (
             <>
               {fromMemory && result.match ? (
                 <View style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: t.goodSoft, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Ionicons name="sparkles" size={14} color={t.goodInk} />
+                  <Icon name="sparkles" size={14} color={t.goodInk} />
                   <Txt variant="label" style={{ color: t.goodInk }}>
-                    Matched from your earlier photo
+                    {tr("photo.matched")}
                   </Txt>
                 </View>
               ) : (
                 <Txt variant="tiny" style={{ ...typeScale.overline, color: t.muted }}>
-                  {result.source === "model" ? "BEST GUESS" : "NOT RECOGNISED"}
+                  {tr(result.source === "model" ? "photo.bestGuess" : "photo.notRecognised").toLocaleUpperCase()}
                 </Txt>
               )}
               <Txt style={{ fontWeight: "700", marginTop: 4 }}>
-                {fromMemory ? "Is it this one?" : result.guesses.length ? "Which one is it?" : "Pick the machine"}
+                {tr(fromMemory ? "photo.isItThis" : result.guesses.length ? "photo.whichOne" : "photo.pick")}
               </Txt>
               {fromMemory && result.match ? (
                 <Txt variant="tiny" style={{ marginTop: 2 }}>
-                  {Math.round(result.match.similarity * 100)}% like the photo you saved on {shortDate(result.match.taken_at.slice(0, 10))}
+                  {tr("photo.likeEarlier", { percent: Math.round(result.match.similarity * 100), date: shortDate(result.match.taken_at.slice(0, 10)) })}
                 </Txt>
               ) : result.seen ? (
                 <Txt variant="tiny" style={{ marginTop: 2 }}>
-                  The AI saw: {result.seen}
+                  {tr("menu.seen", { seen: result.seen })}
                 </Txt>
               ) : null}
             </>
@@ -141,7 +147,7 @@ export function ExercisePhoto({
             <Row gap={8}>
               <ActivityIndicator size="small" color={t.accent} />
               <Txt variant="small" style={{ flex: 1 }}>
-                Checking your earlier photos, then the AI on your PC (that can take up to a minute)…
+                {tr("photo.checking")}
               </Txt>
             </Row>
           )}
@@ -150,19 +156,21 @@ export function ExercisePhoto({
       <ErrorText message={error} />
       {result?.problem ? (
         <Txt variant="small" style={{ marginTop: space.sm, color: t.warnInk }}>
-          {result.problem} Pick the machine below; the app remembers it for next time.
+          {tr("photo.pickBelow", { problem: result.problem })}
         </Txt>
       ) : null}
 
       {!searching
         ? result?.guesses.map(({ exercise, confidence }) => {
-            const l = fromMemory ? { label: `${Math.round(confidence * 100)}% match`, tone: "good" as const } : likelihood(confidence);
+            const l = fromMemory
+              ? { label: tr("photo.percentMatch", { percent: Math.round(confidence * 100) }), tone: "good" as const }
+              : { label: tr(likelihood(confidence).label), tone: likelihood(confidence).tone };
             return (
               <Pressable
                 key={exercise.id}
                 onPress={() => choose({ id: exercise.id, name: exercise.name })}
                 accessibilityRole="button"
-                accessibilityLabel={`${exercise.name}, ${l.label}`}
+                accessibilityLabel={tr("photo.optionLabel", { name: exercise.name, likelihood: l.label })}
                 style={({ pressed }) => ({
                   marginTop: 10,
                   borderWidth: 1,
@@ -178,7 +186,7 @@ export function ExercisePhoto({
                   <Badge label={l.label} tone={l.tone} />
                 </Row>
                 <Txt variant="tiny">
-                  {cap(exercise.muscle_group)} · {exercise.category}
+                  {idLabel("muscle", exercise.muscle_group)} · {idLabel("category", exercise.category)}
                 </Txt>
               </Pressable>
             );
@@ -193,13 +201,13 @@ export function ExercisePhoto({
 
       {result || error ? (
         <Row style={{ marginTop: 14, justifyContent: "space-between", flexWrap: "wrap" }} gap={space.sm}>
-          <LinkButton title="Try another photo" onPress={reset} />
-          {result && !searching ? <LinkButton title={fromMemory ? "No, it's something else" : "None of these: search"} onPress={() => setSearching(true)} /> : null}
-          {!result ? <LinkButton title="Search by name" onPress={onSearch} /> : null}
+          <LinkButton title={tr("photo.another")} onPress={reset} />
+          {result && !searching ? <LinkButton title={tr(fromMemory ? "photo.somethingElse" : "photo.noneSearch")} onPress={() => setSearching(true)} /> : null}
+          {!result ? <LinkButton title={tr("photo.searchByName")} onPress={onSearch} /> : null}
         </Row>
       ) : null}
       <Txt variant="tiny" style={{ marginTop: 10 }}>
-        Guesses can be wrong: tap the right one. Your pick and the photo are kept on your server (Profile → Gyms) to recognise this machine next time.
+        {tr("photo.guessesNote")}
       </Txt>
     </View>
   );
@@ -208,6 +216,7 @@ export function ExercisePhoto({
 /** Live camera with a shutter button (phones, or a computer with a webcam). */
 function CameraCapture({ onPhoto, onCancel }: { onPhoto: (uri: string) => void; onCancel: () => void }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const [ready, setReady] = useState(false);
@@ -218,7 +227,7 @@ function CameraCapture({ onPhoto, onCancel }: { onPhoto: (uri: string) => void; 
       const picture = await camera.current?.takePictureAsync({ quality: 0.6 });
       if (picture?.uri) onPhoto(picture.uri);
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorTextFor(e));
     }
   };
 
@@ -227,11 +236,11 @@ function CameraCapture({ onPhoto, onCancel }: { onPhoto: (uri: string) => void; 
       <View style={{ padding: 16, borderRadius: 12, backgroundColor: t.surface2, gap: 10 }}>
         <Txt variant="small">
           {permission && !permission.canAskAgain
-            ? "Camera access is turned off for this app. Allow it in your settings, or choose a photo instead."
-            : "Allow the camera to take a photo of the machine."}
+            ? tr("photo.cameraOff")
+            : tr("photo.allowHint")}
         </Txt>
-        {!permission || permission.canAskAgain ? <Button title="Allow camera" icon="camera" onPress={async () => { await requestPermission(); }} /> : null}
-        <LinkButton title="Choose a photo instead" onPress={onCancel} />
+        {!permission || permission.canAskAgain ? <Button title={tr("qr.allow")} icon="camera" onPress={async () => { await requestPermission(); }} /> : null}
+        <LinkButton title={tr("photo.chooseInstead")} onPress={onCancel} />
       </View>
     );
   }
@@ -244,13 +253,13 @@ function CameraCapture({ onPhoto, onCancel }: { onPhoto: (uri: string) => void; 
           style={{ flex: 1 }}
           facing="back"
           onCameraReady={() => setReady(true)}
-          onMountError={() => setError("No camera found. Choose a photo instead.")}
+          onMountError={() => setError(tr("photo.noCamera"))}
         />
       </View>
-      <Button title="Take photo" icon="camera" onPress={shoot} disabled={!ready} style={{ marginTop: 10 }} />
+      <Button title={tr("photo.take")} icon="camera" onPress={shoot} disabled={!ready} style={{ marginTop: 10 }} />
       <ErrorText message={error} />
       <View style={{ marginTop: 8 }}>
-        <LinkButton title="Choose a photo instead" onPress={onCancel} />
+        <LinkButton title={tr("photo.chooseInstead")} onPress={onCancel} />
       </View>
     </View>
   );

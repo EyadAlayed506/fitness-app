@@ -27,6 +27,8 @@ import { useAuth } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
 import { useGyms, useMachinePhotos } from "@/lib/data";
 import { shortDate } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import { trOr } from "@/lib/i18n/current";
 import { errorMessage, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, useTheme } from "@/lib/theme";
 import type { Gym, MachineSetting } from "@/lib/types";
@@ -42,6 +44,7 @@ export default function Gyms() {
 /** The screen itself, once the login has been restored (so its data loads with it). */
 function GymsScreen() {
   const t = useTheme();
+  const { t: tr, tn } = useI18n();
   const toast = useToast();
   const gyms = useGyms();
   useRefreshOnFocus([qk.gyms, qk.machinePhotos]);
@@ -80,48 +83,49 @@ function GymsScreen() {
                 <Txt variant="h2" style={{ flex: 1 }} numberOfLines={1}>
                   {gym.name}
                 </Txt>
-                {gym.is_default ? <Badge label="Default" tone="info" /> : null}
+                {gym.is_default ? <Badge label={tr("gym.default")} tone="info" /> : null}
               </Row>
               <Txt variant="small" style={{ marginTop: 2 }}>
-                {gym.workouts} {gym.workouts === 1 ? "workout" : "workouts"} · {gym.photos} machine {gym.photos === 1 ? "photo" : "photos"} · {gym.settings} machine {gym.settings === 1 ? "setting" : "settings"}
+                {[tn("gym.workoutCount", gym.workouts), tn("gym.photoCount", gym.photos), tn("gym.settingCount", gym.settings)].join(" · ")}
               </Txt>
               {gym.machines.length || gym.equipment.length ? (
                 <Txt variant="tiny" style={{ marginTop: space.xs }}>
-                  From its photo: {gym.machines.length} {gym.machines.length === 1 ? "machine" : "machines"}
-                  {gym.equipment.length ? `, ${gym.equipment.map((e) => e.replace(/_/g, " ")).join(", ")}` : ""}
+                  {tr("gym.fromPhoto", {
+                    machines: [tn("gym.machineCount", gym.machines.length), ...gym.equipment.map((e) => trOr(`equip.${e}`, e.replace(/_/g, " ")))].join(tr("list.separator")),
+                  })}
                 </Txt>
               ) : null}
               {renaming != null ? (
                 <Row style={{ alignItems: "flex-end" }}>
-                  <Field label="Name" value={renaming} onChangeText={setRenaming} maxLength={80} style={{ flex: 1 }} autoFocus />
+                  <Field label={tr("gym.name")} value={renaming} onChangeText={setRenaming} maxLength={80} style={{ flex: 1 }} autoFocus />
                   <Button
-                    title="Save"
+                    title={tr("common.save")}
                     onPress={() => run(async () => {
                       await api(`/gyms/${gym.id}`, { method: "PATCH", body: { name: renaming.trim() } });
                       setRenaming(null);
-                    }, "Gym renamed")}
+                    }, tr("gym.renamed"))}
                   />
                 </Row>
               ) : null}
               <Row style={{ marginTop: space.lg, flexWrap: "wrap" }} gap={space.sm}>
-                <Button title="Photograph it" icon="camera-outline" small onPress={() => setScanning(true)} />
-                <Button title="Rename" kind="soft" small onPress={() => setRenaming(gym.name)} />
+                <Button title={tr("gym.photograph")} icon="camera-outline" small onPress={() => setScanning(true)} />
+                <Button title={tr("gym.rename")} kind="soft" small onPress={() => setRenaming(gym.name)} />
                 {!gym.is_default ? (
-                  <Button title="Make default" kind="soft" small onPress={() => run(() => api(`/gyms/${gym.id}`, { method: "PATCH", body: { is_default: true } }), `${gym.name} is your default gym`)} />
+                  <Button title={tr("gym.makeDefault")} kind="soft" small onPress={() => run(() => api(`/gyms/${gym.id}`, { method: "PATCH", body: { is_default: true } }), tr("gym.isDefault", { name: gym.name }))} />
                 ) : null}
                 {list.length > 1 ? (
                   <Button
-                    title="Delete"
+                    title={tr("settings.deleteConfirm")}
                     kind="danger"
                     small
                     style={{ borderColor: "transparent" }}
                     onPress={async () => {
-                      if (!(await confirm(`Delete ${gym.name}?`, "Its machine photos and settings are deleted. Workouts done there stay.", "Delete"))) return;
+                      if (!(await confirm(tr("gym.deleteTitle", { name: gym.name }), tr("gym.deleteText"), tr("settings.deleteConfirm")))) return;
                       await run(async () => {
                         await api(`/gyms/${gym.id}`, { method: "DELETE" });
                         setSelected(null);
                         invalidate(qk.machinePhotos);
-                      }, "Gym deleted");
+                      }, tr("gym.deleted"));
                     }}
                   />
                 ) : null}
@@ -131,11 +135,11 @@ function GymsScreen() {
           ) : null}
 
           <Card>
-            <Txt variant="label">Add a gym</Txt>
+            <Txt variant="label">{tr("gym.add")}</Txt>
             <Row style={{ alignItems: "flex-end" }}>
-              <Field value={newName} onChangeText={setNewName} placeholder="e.g. Hotel gym" maxLength={80} style={{ flex: 1, marginTop: space.xs }} accessibilityLabel="New gym name" />
+              <Field value={newName} onChangeText={setNewName} placeholder={tr("gym.addPlaceholder")} maxLength={80} style={{ flex: 1, marginTop: space.xs }} accessibilityLabel={tr("gym.newName")} />
               <Button
-                title="Add"
+                title={tr("food.add")}
                 icon="add"
                 kind="soft"
                 disabled={!newName.trim()}
@@ -143,7 +147,7 @@ function GymsScreen() {
                   const created = await api<Gym>("/gyms", { method: "POST", body: { name: newName.trim() } });
                   setSelected(created.id);
                   setNewName("");
-                }, "Gym added")}
+                }, tr("gym.added"))}
               />
             </Row>
           </Card>
@@ -153,13 +157,13 @@ function GymsScreen() {
         </>
       )}
 
-      <Sheet visible={scanning && !!gym} title={gym ? `Photograph ${gym.name}` : ""} onClose={() => setScanning(false)}>
+      <Sheet visible={scanning && !!gym} title={gym ? tr("gym.photographTitle", { name: gym.name }) : ""} onClose={() => setScanning(false)}>
         {scanning && gym ? (
           <GymScanFlow
             gym={gym}
             onStart={() => {
               setScanning(false);
-              toast("Saved. Start the session from Workouts → At another gym");
+              toast(tr("gym.savedStart"));
             }}
           />
         ) : null}
@@ -169,13 +173,14 @@ function GymsScreen() {
 }
 
 function MachineSettingsList({ gym }: { gym: Gym }) {
+  const { t: tr } = useI18n();
   const settings = useQuery({
     queryKey: ["gyms", "machines", gym.id],
     queryFn: () => api<MachineSetting[]>(`/gyms/${gym.id}/machines`),
   });
   return (
     <>
-      <Section title="Machine settings" />
+      <Section title={tr("gym.settings")} />
       <Card style={{ paddingVertical: settings.data?.length ? space.xs : space.lg }}>
         {settings.data?.length ? (
           settings.data.map((s, i) => (
@@ -184,10 +189,10 @@ function MachineSettingsList({ gym }: { gym: Gym }) {
               first={i === 0}
               title={s.exercise_name}
               subtitle={[
-                s.seat && `Seat ${s.seat}`,
-                s.pins && `Pins ${s.pins}`,
-                s.back_pad && `Back pad ${s.back_pad}`,
-                s.handle && `Handle ${s.handle}`,
+                s.seat && tr("setting.value", { label: tr("setting.seat"), value: s.seat }),
+                s.pins && tr("setting.value", { label: tr("setting.pins"), value: s.pins }),
+                s.back_pad && tr("setting.value", { label: tr("setting.back_pad"), value: s.back_pad }),
+                s.handle && tr("setting.value", { label: tr("setting.handle"), value: s.handle }),
                 s.notes,
               ]
                 .filter(Boolean)
@@ -195,7 +200,7 @@ function MachineSettingsList({ gym }: { gym: Gym }) {
             />
           ))
         ) : (
-          <EmptyState icon="options-outline" title="No machine settings yet" text="Save the seat, pins and handle for a machine from its set screen during a workout." />
+          <EmptyState icon="options-outline" title={tr("gym.noSettingsTitle")} text={tr("gym.noSettingsText")} />
         )}
       </Card>
     </>
@@ -204,14 +209,15 @@ function MachineSettingsList({ gym }: { gym: Gym }) {
 
 function SavedPhotos({ gym }: { gym: Gym }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const toast = useToast();
   const photos = useMachinePhotos();
   const mine = (photos.data ?? []).filter((p) => p.gym_id === gym.id);
   return (
     <>
-      <Section title="Machine photos" />
+      <Section title={tr("gym.photos")} />
       <Txt variant="small" style={{ marginTop: -space.xs, marginBottom: space.sm }}>
-        Photos you confirmed. A new photo is compared with these first, so a machine is recognised in a fraction of a second. They stay on your server.
+        {tr("gym.photosIntro")}
       </Txt>
       <PhotoMatchStatusCard />
       <Card>
@@ -219,28 +225,28 @@ function SavedPhotos({ gym }: { gym: Gym }) {
           <View style={styles.grid}>
             {mine.map((p) => (
               <View key={p.id} style={[styles.tile, { backgroundColor: t.surface2 }]}>
-                <Image source={{ uri: p.thumbnail }} style={styles.thumb} accessibilityLabel={`Photo of ${p.exercise_name}`} />
+                <Image source={{ uri: p.thumbnail }} style={styles.thumb} accessibilityLabel={tr("gym.photoOf", { name: p.exercise_name })} />
                 <View style={{ padding: space.sm }}>
                   <Txt variant="label" numberOfLines={2} style={{ color: t.text }}>
                     {p.exercise_name}
                   </Txt>
                   <Txt variant="tiny">
                     {shortDate(p.created_at.slice(0, 10))}
-                    {p.corrected ? " · corrected" : ""}
-                    {p.matchable ? "" : " · waiting for the model"}
+                    {p.corrected ? tr("gym.corrected") : ""}
+                    {p.matchable ? "" : tr("gym.waitingModel")}
                   </Txt>
                 </View>
                 <View style={styles.remove}>
                   <IconButton
                     icon="trash-outline"
-                    label={`Delete the photo of ${p.exercise_name}`}
+                    label={tr("gym.deletePhoto", { name: p.exercise_name })}
                     onPress={async () => {
                       try {
                         await api(`/photo-memory/photos/${p.id}`, { method: "DELETE" });
                         invalidate(qk.machinePhotos, qk.gyms);
-                        toast("Photo deleted");
+                        toast(tr("gym.photoDeleted"));
                       } catch (e) {
-                        toast(errorMessage(e) ?? "Couldn't delete it");
+                        toast(errorMessage(e) ?? tr("gym.couldntDelete"));
                       }
                     }}
                   />
@@ -249,7 +255,7 @@ function SavedPhotos({ gym }: { gym: Gym }) {
             ))}
           </View>
         ) : (
-          <EmptyState icon="images-outline" title="No photos yet" text="When you log an exercise from a photo, the machine you pick is remembered here." />
+          <EmptyState icon="images-outline" title={tr("gym.noPhotosTitle")} text={tr("gym.noPhotosText")} />
         )}
       </Card>
     </>
@@ -261,5 +267,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   tile: { width: "48%", flexGrow: 1, maxWidth: 260, borderRadius: radius.md, overflow: "hidden" },
   thumb: { width: "100%", aspectRatio: 4 / 3 },
-  remove: { position: "absolute", top: space.xs, right: space.xs },
+  remove: { position: "absolute", top: space.xs, end: space.xs },
 });
