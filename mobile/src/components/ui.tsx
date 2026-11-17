@@ -502,7 +502,7 @@ export function Chips<T extends string | number>({
           {label}
         </Txt>
       ) : null}
-      <View style={[styles.row, { flexWrap: "wrap", gap: space.sm }]} accessibilityRole="radiogroup">
+      <View style={[styles.row, { flexWrap: "wrap", gap: space.sm }]} accessibilityRole="radiogroup" accessibilityLabel={label}>
         {options.map((o) => {
           const on = o.value === value;
           return (
@@ -513,6 +513,8 @@ export function Chips<T extends string | number>({
                 onChange(o.value);
               }}
               accessibilityRole="radio"
+              // screen readers read the option (and its hint), not an unnamed "radio button"
+              accessibilityLabel={o.hint ? `${o.label}${tr("list.separator")}${o.hint}` : o.label}
               aria-checked={on}
               style={({ pressed }) => [
                 styles.chip,
@@ -562,6 +564,7 @@ export function Segmented<T extends string>({
                 onChange(o.value);
               }}
               accessibilityRole="tab"
+              accessibilityLabel={o.label}
               aria-selected={on}
               style={({ pressed }) => [
                 {

@@ -58,6 +58,7 @@ export default function TabsLayout() {
               name={tab.name}
               options={{
                 title: tr(tab.title),
+                tabBarAccessibilityLabel: tr(tab.title),
                 tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? tab.active : tab.icon} color={color} size={23} />,
               }}
             />
