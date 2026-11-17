@@ -7,7 +7,33 @@
 | Base | `origin/merged_branch` @ `de689db` |
 | Date | 2026-11-18 |
 | Platform | Web app for the pilot (WEB-01) |
-| Status | **Every app screen is bilingual, and the server answers in the app's language.** Remaining English: exercise names/how-to (needs a data decision) and server error details (on purpose). Hands-free voice removed. Arabic text not yet human-reviewed. |
+| Status | **Every app screen is bilingual, and the server answers in the app's language.** Exercises (names, muscles, how-to) are now Arabic too; only server error details stay English (on purpose). Hands-free voice removed. Arabic text not yet human-reviewed. |
+
+## Update 2026-11-18 (part 7): exercises in Arabic, decisions, cleanups
+
+**Decisions recorded:** Arabic exercise content is stored and served here (decided by us instead of waiting for
+Alzoman). Western digits (0–9) and the Gregorian calendar in Arabic are **confirmed**. Web-only pilot is a group call.
+
+**Exercises in Arabic** — storage: four optional columns on `exercises` (`name_ar`, `aliases_ar`,
+`primary_muscles_ar`, `instructions_ar`), added automatically to existing databases and filled from
+`app/seed/exercises.json` (matched by QR code, so ids and history don't change). The English `name` stays the
+identity (QR codes, workout history, AI prompts, the coach's tools). With `Accept-Language: ar` the server returns
+the Arabic name/muscles/steps (`ExercisePublic`) and uses `exercise_label()` wherever a name is shown: logged sets,
+plan days, Progress lifts, weekly summary, machine settings and photos, coach action cards.
+Search matches Arabic names and aliases, ignoring diacritics and alef/taa-marbuta/yaa spelling variants
+("بنش", "سحب امامي", "السكوات بالبار"). All 48 exercises translated — **wording needs Nawaf/Eyad review**.
+
+**Cleanups:** removed `expo-speech` and `expo-keep-awake` (unused); fixed the 6 date-dependent `test_assistant`
+cases (they used the local date, the server uses UTC); screen readers now hear the option chips' group name and
+each chip's hint, segmented tabs and the tab bar by their translated label.
+
+**Charts in Arabic:** the week strip, cards, legends and tables are right-to-left; the chart drawing area (time axis,
+y-axis numbers) and number lines like the BMI scale stay left-to-right, as written in `mobile/DESIGN.md`.
+**Open for the team:** whether to mirror chart time axes (newest on the left) in Arabic.
+
+**Checks:** backend all pass (incl. 4 new exercise-language tests); app 50/50, typecheck, lint. Browser
+(Arabic, demo account): Workouts shows Arabic exercise names; the how-to sheet shows Arabic muscles, steps and
+alternatives; Progress lifts in Arabic.
 
 ## Update 2026-11-18 (part 6): remaining screens, hands-free removed, server text in Arabic
 
@@ -202,6 +228,6 @@ Still no new dependencies; `package.json`, `app.json`, `eas.json`, `api.ts` unto
 
 ## Contracts / requests
 
-Same as APP-01 (optional error `code` — now also `invalid_email`; Arabic exercise content location; digits
-decision), plus: **how server-generated text gets a language** (suggestions, plan disclaimer, routine names).
+Same as APP-01 (optional error `code` — now also `invalid_email`; Arabic exercise content location and digits
+now decided — see part 7), plus: **how server-generated text gets a language** (suggestions, plan disclaimer, routine names).
 Proposal: the app sends `Accept-Language: ar|en` on every request; the server picks text by it and keeps IDs unchanged.
