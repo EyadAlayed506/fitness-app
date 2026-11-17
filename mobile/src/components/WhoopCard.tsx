@@ -5,6 +5,8 @@ import { View } from "react-native";
 import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
 import { timeAgo } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import { errorTextFor, tr, trCount } from "@/lib/i18n/current";
 import { useTheme } from "@/lib/theme";
 import type { WhoopStatus, WhoopSyncResult } from "@/lib/types";
 
@@ -14,10 +16,10 @@ const POLL_MS = 3000;
 const POLL_TRIES = 60; // wait up to 3 minutes for the user to finish logging in to WHOOP
 
 export function syncSummary(r: WhoopSyncResult): string {
-  if (r.skipped) return "Already up to date";
-  const parts = [`${r.imported} new`, `${r.updated} updated`];
-  if (r.replaced_manual) parts.push(`${r.replaced_manual} typed-in night${r.replaced_manual === 1 ? "" : "s"} replaced`);
-  return `WHOOP synced: ${parts.join(", ")}`;
+  if (r.skipped) return tr("whoop.upToDate");
+  const parts = [tr("sync.new", { n: r.imported }), tr("sync.updated", { n: r.updated })];
+  if (r.replaced_manual) parts.push(trCount("sync.replaced", r.replaced_manual));
+  return tr("whoop.synced", { parts: parts.join(tr("list.separator")) });
 }
 
 /**
@@ -36,6 +38,7 @@ export function WhoopCard({
   toast: (msg: string) => void;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
   const polling = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -60,7 +63,7 @@ export function WhoopCard({
         if (s?.connected || tries >= POLL_TRIES) {
           stopPolling();
           if (s?.connected) {
-            toast("WHOOP connected");
+            toast(tr("whoop.connected"));
             await onChanged();
           }
         }
@@ -68,7 +71,7 @@ export function WhoopCard({
       await WebBrowser.openBrowserAsync(authorize_url);
     } catch (e) {
       stopPolling();
-      setError((e as Error).message);
+      setError(errorTextFor(e));
     }
   };
 
@@ -77,15 +80,15 @@ export function WhoopCard({
     try {
       toast(syncSummary(await api<WhoopSyncResult>("/whoop/sync", { method: "POST" })));
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorTextFor(e));
     }
     await onChanged();
   };
 
   const disconnect = async () => {
-    if (!(await confirm("Disconnect WHOOP?", "New sleep won't be imported any more. Sleep already imported stays in your log.", "Disconnect"))) return;
+    if (!(await confirm(tr("whoop.disconnectTitle"), tr("whoop.disconnectText"), tr("whoop.disconnect")))) return;
     await api("/whoop", { method: "DELETE" });
-    toast("WHOOP disconnected");
+    toast(tr("whoop.disconnected"));
     await onChanged();
   };
 
@@ -96,19 +99,19 @@ export function WhoopCard({
       <Card>
         <Row style={{ justifyContent: "space-between" }}>
           <Txt variant="h3">WHOOP</Txt>
-          <Badge label="Connected" tone="good" />
+          <Badge label={tr("tracker.connected")} tone="good" />
         </Row>
         <Txt variant="small" style={{ marginTop: 4 }}>
-          {status.whoop_name ? `${status.whoop_name} · ` : ""}last synced {timeAgo(status.last_sync_at)}. Sleep, stages and
-          recovery are imported automatically.
+          {status.whoop_name ? `${status.whoop_name} · ` : ""}
+          {tr("whoop.lastSynced", { ago: timeAgo(status.last_sync_at) })}
         </Txt>
         <ErrorText message={error} />
         <Row style={{ marginTop: 12 }}>
-          <Button title="Sync now" icon="sync" onPress={sync} style={{ flex: 1 }} />
-          <Button title="Disconnect" kind="ghost" onPress={disconnect} />
+          <Button title={tr("sync.now")} icon="sync" onPress={sync} style={{ flex: 1 }} />
+          <Button title={tr("whoop.disconnect")} kind="ghost" onPress={disconnect} />
         </Row>
         <Row style={{ marginTop: 12, justifyContent: "center" }}>
-          <LinkButton title="Add a night by hand (if WHOOP missed one)" onPress={onLogManually} />
+          <LinkButton title={tr("whoop.addByHand")} onPress={onLogManually} />
         </Row>
       </Card>
     );
@@ -116,20 +119,20 @@ export function WhoopCard({
 
   return (
     <Card>
-      <Txt variant="h3">How do you want to track sleep?</Txt>
+      <Txt variant="h3">{tr("whoop.howTrack")}</Txt>
       <View style={{ marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: t.surface2, gap: 8 }}>
-        <Txt style={{ fontWeight: "700" }}>Log it myself</Txt>
-        <Txt variant="small">Type in when you went to bed and woke up, and how you slept.</Txt>
-        <Button title="Log sleep" icon="moon" onPress={onLogManually} />
+        <Txt style={{ fontWeight: "700" }}>{tr("whoop.logMyself")}</Txt>
+        <Txt variant="small">{tr("whoop.logMyselfText")}</Txt>
+        <Button title={tr("home.logSleep")} icon="moon" onPress={onLogManually} />
       </View>
       <View style={{ marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: t.surface2, gap: 8 }}>
-        <Txt style={{ fontWeight: "700" }}>Connect WHOOP</Txt>
+        <Txt style={{ fontWeight: "700" }}>{tr("whoop.connectTitle")}</Txt>
         <Txt variant="small">
-          If you wear a WHOOP: sleep, sleep stages and recovery are imported automatically. You log in to WHOOP once.
+          {tr("whoop.connectText")}
         </Txt>
         {status.configured ? (
           <Button
-            title={waiting ? "Waiting for WHOOP login…" : "Connect WHOOP"}
+            title={tr(waiting ? "whoop.waiting" : "whoop.connectTitle")}
             kind="soft"
             icon="link"
             onPress={connect}
@@ -140,7 +143,7 @@ export function WhoopCard({
         )}
         {waiting ? (
           <Row style={{ justifyContent: "center" }}>
-            <LinkButton title="Cancel" onPress={stopPolling} />
+            <LinkButton title={tr("common.cancel")} onPress={stopPolling} />
           </Row>
         ) : null}
       </View>
@@ -155,17 +158,18 @@ export function WhoopCard({
  */
 function WhoopSetupSteps({ redirectUri }: { redirectUri: string }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const steps = [
-    "Log in to WHOOP's developer site with a WHOOP account (it needs a WHOOP membership).",
-    "Create an app. Scopes: read:profile, read:sleep, read:recovery and offline.",
-    `Add this redirect URL, exactly: ${redirectUri}`,
-    "Copy the app's Client ID and Client Secret into the backend's .env file as WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET.",
-    "Stop the backend and start it again. This button then turns into “Connect WHOOP”.",
+    tr("whoop.step1"),
+    tr("whoop.step2"),
+    tr("whoop.step3", { url: redirectUri }),
+    tr("whoop.step4"),
+    tr("whoop.step5"),
   ];
   return (
     <View style={{ gap: 6 }}>
       <Txt variant="small" style={{ color: t.warnInk }}>
-        WHOOP isn&apos;t set up on this server yet. The person running the backend does this once:
+        {tr("whoop.notSetUp")}
       </Txt>
       {steps.map((step, i) => (
         <Row key={step} gap={6} style={{ alignItems: "flex-start" }}>
@@ -178,7 +182,7 @@ function WhoopSetupSteps({ redirectUri }: { redirectUri: string }) {
         </Row>
       ))}
       <Button
-        title="Open WHOOP developer site"
+        title={tr("whoop.openDev")}
         icon="open-outline"
         kind="ghost"
         small
@@ -186,7 +190,7 @@ function WhoopSetupSteps({ redirectUri }: { redirectUri: string }) {
           WebBrowser.openBrowserAsync("https://developer.whoop.com").catch(() => {});
         }}
       />
-      <Txt variant="tiny">Until then you can log sleep by hand above.</Txt>
+      <Txt variant="tiny">{tr("whoop.untilThen")}</Txt>
     </View>
   );
 }

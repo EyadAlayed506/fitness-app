@@ -2,6 +2,7 @@
  * Health Connect sleep records -> what POST /api/sleep/health-connect expects.
  * Pure (no React Native), so it's easy to test; healthConnect.ts does the reading on the phone.
  */
+import { tr, trCount } from "./i18n/current.ts";
 import type { HealthConnectImportResult } from "./types";
 
 export const FIRST_SYNC_DAYS = 30;
@@ -62,7 +63,7 @@ export function addResults(a: HealthConnectImportResult, b: HealthConnectImportR
 }
 
 export function syncSummary(r: HealthConnectImportResult): string {
-  const parts = [`${r.imported} new`, `${r.updated} updated`];
-  if (r.replaced_manual) parts.push(`${r.replaced_manual} typed-in night${r.replaced_manual === 1 ? "" : "s"} replaced`);
-  return `Health Connect synced: ${parts.join(", ")}`;
+  const parts = [tr("sync.new", { n: r.imported }), tr("sync.updated", { n: r.updated })];
+  if (r.replaced_manual) parts.push(trCount("sync.replaced", r.replaced_manual));
+  return tr("hc.synced", { parts: parts.join(tr("list.separator")) });
 }

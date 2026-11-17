@@ -2,19 +2,22 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { api } from "@/lib/api";
-import { WEEKDAYS_SHORT, clockOf, hoursMinutes, longDate, parseISO, todayISO, trackerName } from "@/lib/format";
+import { WEEKDAYS_MIN, clockOf, hoursMinutes, longDate, parseISO, todayISO, trackerName } from "@/lib/format";
+import { useI18n, useLanguageEnd } from "@/lib/i18n";
+import { errorTextFor, tr } from "@/lib/i18n/current";
 import { useTheme } from "@/lib/theme";
 import type { SleepAnalytics, SleepNight } from "@/lib/types";
 
 import { Badge, Button, Card, CardHead, Chips, ErrorText, LinkButton, Meter, Row, Stat, Txt } from "./ui";
 
 const sourceBadge = (n: SleepNight) =>
-  n.source !== "manual" ? <Badge label={trackerName(n.source) ?? ""} tone="info" /> : <Badge label="Logged by you" />;
+  n.source !== "manual" ? <Badge label={trackerName(n.source) ?? ""} tone="info" /> : <Badge label={tr("sleep.byYou")} />;
 
 /** "8 h" for whole hours, otherwise "7 h 30 min" */
-export const goalHours = (m: number) => (m % 60 ? hoursMinutes(m) : `${m / 60} h`);
+export const goalHours = (m: number) => (m % 60 ? hoursMinutes(m) : tr("sleep.hours", { h: m / 60 }));
 
-const weekdayOf = (iso: string) => WEEKDAYS_SHORT[(parseISO(iso).getDay() + 6) % 7];
+// narrowest day names: seven columns side by side ("Mon" / "ن")
+const weekdayOf = (iso: string) => WEEKDAYS_MIN[(parseISO(iso).getDay() + 6) % 7];
 
 /** The last `n` nights with their dates. */
 function lastNights(data: SleepAnalytics, n = 7) {
@@ -25,47 +28,46 @@ function lastNights(data: SleepAnalytics, n = 7) {
 
 export function LastNightCard({ data, onEditGoal }: { data: SleepAnalytics; onEditGoal: () => void }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const today = todayISO();
   const night = data.labels.at(-1) === today ? data.nights.at(-1) ?? null : null;
   const goal = data.goal_minutes;
-  const goalText = `${goalHours(goal)} goal${data.goal_custom ? "" : " (recommended for your age)"}`;
+  const goalText = tr(data.goal_custom ? "sleep.goalText" : "sleep.goalRecommended", { goal: goalHours(goal) });
   return (
     <Card>
-      <CardHead title="Last night" right={night ? sourceBadge(night) : undefined} />
+      <CardHead title={tr("sleep.lastNightTitle")} right={night ? sourceBadge(night) : undefined} />
       {night ? (
         <>
           <Row style={{ justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap" }}>
             <View style={{ flexShrink: 1 }}>
               <Txt variant="big">{hoursMinutes(night.minutes)}</Txt>
-              <Txt variant="small">of your {goalHours(goal)} goal</Txt>
+              <Txt variant="small">{tr("sleep.ofGoal", { goal: goalHours(goal) })}</Txt>
             </View>
-            {night.points ? <Badge label="Points earned" tone="good" /> : null}
+            {night.points ? <Badge label={tr("sleep.pointsEarned")} tone="good" /> : null}
           </Row>
           <View style={{ marginTop: 8 }}>
             <Meter value={night.minutes} max={goal} color={night.minutes >= goal ? t.good : t.accent} />
           </View>
           <Txt variant="small" style={{ marginTop: 8 }}>
-            {night.minutes >= goal
-              ? "Goal reached."
-              : `${hoursMinutes(goal - night.minutes)} under your goal.`}{" "}
-            Bed {clockOf(night.bedtime)} · up {clockOf(night.wake_time)}
-            {night.minutes !== night.main_minutes ? ` · includes ${hoursMinutes(night.minutes - night.main_minutes)} of naps` : ""}
+            {night.minutes >= goal ? tr("sleep.goalReached") : tr("sleep.under", { d: hoursMinutes(goal - night.minutes) })}{" "}
+            {tr("sleep.bedUp", { bed: clockOf(night.bedtime), up: clockOf(night.wake_time) })}
+            {night.minutes !== night.main_minutes ? tr("sleep.naps", { d: hoursMinutes(night.minutes - night.main_minutes) }) : ""}
           </Txt>
           {night.stages ? <Stages stages={night.stages} from={trackerName(night.source)} /> : null}
           {night.source === "manual" ? (
             <Txt variant="tiny" style={{ marginTop: 6 }}>
-              Sleep stages are only shown for nights measured by a tracker.
+              {tr("sleep.stagesOnlyTracker")}
             </Txt>
           ) : null}
         </>
       ) : (
-        <Txt variant="small">Not logged yet. Log last night, or connect a tracker to bring it in automatically.</Txt>
+        <Txt variant="small">{tr("sleep.notLoggedYet")}</Txt>
       )}
       <Row style={{ marginTop: 10, justifyContent: "space-between" }}>
         <Txt variant="tiny" style={{ flex: 1 }}>
           {goalText}
         </Txt>
-        <LinkButton title="Change goal" onPress={onEditGoal} />
+        <LinkButton title={tr("sleep.changeGoal")} onPress={onEditGoal} />
       </Row>
     </Card>
   );
@@ -74,16 +76,16 @@ export function LastNightCard({ data, onEditGoal }: { data: SleepAnalytics; onEd
 function Stages({ stages, from }: { stages: NonNullable<SleepNight["stages"]>; from: string | null }) {
   const t = useTheme();
   const parts = [
-    { label: "Light", value: stages.light, color: t.series[0] },
-    { label: "Deep", value: stages.deep, color: t.series[2] },
-    { label: "REM", value: stages.rem, color: t.series[4] },
-    { label: "Awake", value: stages.awake, color: t.series[3] },
+    { label: tr("sleep.light"), value: stages.light, color: t.series[0] },
+    { label: tr("sleep.deep"), value: stages.deep, color: t.series[2] },
+    { label: tr("sleep.rem"), value: stages.rem, color: t.series[4] },
+    { label: tr("sleep.awake"), value: stages.awake, color: t.series[3] },
   ];
   const total = parts.reduce((s, p) => s + (p.value ?? 0), 0);
   if (!total) return null;
   return (
-    <View style={{ marginTop: 12 }} accessibilityLabel={`Sleep stages: ${parts.map((p) => `${p.label} ${p.value ?? "unknown"} minutes`).join(", ")}`}>
-      <Txt variant="label">Stages{from ? ` (from ${from})` : ""}</Txt>
+    <View style={{ marginTop: 12 }} accessibilityLabel={tr("sleep.stagesLabel", { list: parts.map((p) => tr("sleep.stageMinutes", { label: p.label, n: p.value ?? tr("sleep.unknown") })).join(tr("list.separator")) })}>
+      <Txt variant="label">{from ? tr("sleep.stagesFrom", { tracker: from }) : tr("sleep.stages")}</Txt>
       <View style={{ flexDirection: "row", height: 12, borderRadius: 99, overflow: "hidden", marginTop: 6, gap: 2 }}>
         {parts.map((p) => (p.value ? <View key={p.label} style={{ flex: p.value, backgroundColor: p.color }} /> : null))}
       </View>
@@ -105,6 +107,7 @@ function Stages({ stages, from }: { stages: NonNullable<SleepNight["stages"]>; f
 
 export function SleepWeekCard({ data }: { data: SleepAnalytics }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const nights = lastNights(data);
   const goal = data.goal_minutes;
   const scaleMax = Math.max(goal + 120, ...nights.map((n) => n.night?.minutes ?? 0));
@@ -116,31 +119,35 @@ export function SleepWeekCard({ data }: { data: SleepAnalytics }) {
 
   return (
     <Card>
-      <CardHead title="Last 7 nights" />
+      <CardHead title={tr("sleep.last7")} />
       <Row>
-        <Stat label="Average" value={avg != null ? hoursMinutes(avg * 60) : "–"} />
-        <Stat label="At goal" value={`${data.nights_at_goal_7d} of ${data.nights_logged_7d}`} />
-        <Stat label="Week before" value={prev != null ? hoursMinutes(prev * 60) : "–"} />
+        <Stat label={tr("sleep.average")} value={avg != null ? hoursMinutes(avg * 60) : "–"} />
+        <Stat label={tr("sleep.atGoal")} value={tr("sleep.atGoalValue", { n: data.nights_at_goal_7d, total: data.nights_logged_7d })} />
+        <Stat label={tr("sleep.weekBefore")} value={prev != null ? hoursMinutes(prev * 60) : "–"} />
       </Row>
       <Txt variant="tiny" style={{ marginTop: 4 }}>
         {prev != null && avg != null
-          ? `${avg >= prev ? "Up" : "Down"} ${hoursMinutes(Math.abs(avg - prev) * 60)} on average compared with the 7 nights before.`
-          : `Comparing weeks needs at least 3 logged nights in each (the week before has ${data.nights_logged_prev_7d}).`}
+          ? tr(avg >= prev ? "sleep.upBy" : "sleep.downBy", { d: hoursMinutes(Math.abs(avg - prev) * 60) })
+          : tr("sleep.needs3", { n: data.nights_logged_prev_7d })}
       </Txt>
 
-      <View style={{ height: H + 20, marginTop: 14 }} accessibilityLabel={`Hours slept, last 7 nights, goal ${goalHours(goal)}`}>
-        <View style={{ position: "absolute", left: 0, right: 0, bottom: 20 + goalY, borderTopWidth: 1.5, borderStyle: "dashed", borderColor: t.text2 }} />
+      <View style={{ height: H + 20, marginTop: 14 }} accessibilityLabel={tr("sleep.chartLabel", { goal: goalHours(goal) })}>
+        <View style={{ position: "absolute", start: 0, end: 0, bottom: 20 + goalY, borderTopWidth: 1.5, borderStyle: "dashed", borderColor: t.text2 }} />
         <View style={{ flexDirection: "row", alignItems: "flex-end", height: H, gap: 6 }}>
           {nights.map(({ date, night }) => (
             <View key={date} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", height: H }}>
               {night ? (
                 <View
-                  accessibilityLabel={`${longDate(date)}: ${hoursMinutes(night.minutes)}, ${night.source !== "manual" ? `from ${trackerName(night.source)}` : "logged by you"}`}
+                  accessibilityLabel={tr("sleep.barLabel", {
+                    date: longDate(date),
+                    duration: hoursMinutes(night.minutes),
+                    source: night.source !== "manual" ? tr("sleep.fromTracker", { tracker: trackerName(night.source) ?? "" }) : tr("sleep.byYouLower"),
+                  })}
                   style={{ width: "70%", maxWidth: 28, height: Math.max(4, (night.minutes / scaleMax) * H), backgroundColor: color(night), borderTopLeftRadius: 5, borderTopRightRadius: 5 }}
                 />
               ) : (
                 <View
-                  accessibilityLabel={`${longDate(date)}: not logged`}
+                  accessibilityLabel={tr("sleep.notLoggedOn", { date: longDate(date) })}
                   style={{ width: "70%", maxWidth: 28, height: 26, borderWidth: 1, borderStyle: "dashed", borderColor: t.muted, borderRadius: 5, alignItems: "center", justifyContent: "center" }}
                 >
                   <Txt variant="tiny">–</Txt>
@@ -158,12 +165,12 @@ export function SleepWeekCard({ data }: { data: SleepAnalytics }) {
         </View>
       </View>
       <Row style={{ marginTop: 8, flexWrap: "wrap" }} gap={12}>
-        <Legend color={t.series[0]} label="From a tracker" />
-        <Legend color={t.series[2]} label="Logged by you" />
-        <Legend color="transparent" dashed label="Not logged" />
+        <Legend color={t.series[0]} label={tr("sleep.legendTracker")} />
+        <Legend color={t.series[2]} label={tr("sleep.byYou")} />
+        <Legend color="transparent" dashed label={tr("sleep.legendNotLogged")} />
         <Row gap={4}>
           <View style={{ width: 14, borderTopWidth: 1.5, borderStyle: "dashed", borderColor: t.text2 }} />
-          <Txt variant="tiny">Goal {goalHours(goal)}</Txt>
+          <Txt variant="tiny">{tr("sleep.goalShort", { goal: goalHours(goal) })}</Txt>
         </Row>
       </Row>
     </Card>
@@ -195,17 +202,20 @@ function timelinePos(iso: string, nightDate: string) {
 
 export function SleepConsistencyCard({ data }: { data: SleepAnalytics }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
+  const end = useLanguageEnd();
   const nights = lastNights(data);
-  const spread = (m: number | null) => (m == null ? null : m < 15 ? "under 15 min" : `about ${hoursMinutes(Math.round(m / 5) * 5)}`);
+  const spread = (m: number | null) =>
+    m == null ? null : m < 15 ? tr("sleep.spreadUnder") : tr("sleep.spreadAbout", { d: hoursMinutes(Math.round(m / 5) * 5) });
   const bed = spread(data.bedtime_spread_minutes);
   const wake = spread(data.wake_spread_minutes);
   return (
     <Card>
-      <CardHead title="Bedtime and wake-up" />
+      <CardHead title={tr("sleep.consistencyTitle")} />
       <Txt variant="small">
         {bed && wake
-          ? `Over the last 7 nights your bedtime varied by ${bed} and your wake-up time by ${wake}.`
-          : "Log at least 3 nights to see how much your bedtime and wake-up time vary."}
+          ? tr("sleep.varied", { bed, wake })
+          : tr("sleep.need3")}
       </Txt>
       <View style={{ marginTop: 12, gap: 6 }}>
         {nights.map(({ date, night }) => (
@@ -213,10 +223,10 @@ export function SleepConsistencyCard({ data }: { data: SleepAnalytics }) {
             <Txt variant="tiny" style={{ width: 30 }}>
               {weekdayOf(date)}
             </Txt>
-            <View style={{ flex: 1, height: 14, borderRadius: 7, backgroundColor: t.surface2, overflow: "hidden" }}>
+            <View style={{ flex: 1, height: 14, borderRadius: 7, backgroundColor: t.surface2, overflow: "hidden", direction: "ltr" }}>
               {night ? (
                 <View
-                  accessibilityLabel={`${longDate(date)}: bed ${clockOf(night.bedtime)}, up ${clockOf(night.wake_time)}`}
+                  accessibilityLabel={tr("sleep.bedUpLabel", { date: longDate(date), bed: clockOf(night.bedtime), up: clockOf(night.wake_time) })}
                   style={{
                     position: "absolute",
                     top: 0,
@@ -229,14 +239,14 @@ export function SleepConsistencyCard({ data }: { data: SleepAnalytics }) {
                 />
               ) : null}
             </View>
-            <Txt variant="tiny" style={{ width: 82, textAlign: "right" }}>
-              {night ? `${clockOf(night.bedtime)}–${clockOf(night.wake_time)}` : "not logged"}
+            <Txt variant="tiny" style={{ width: 82, textAlign: end }}>
+              {night ? `${clockOf(night.bedtime)}–${clockOf(night.wake_time)}` : tr("sleep.notLogged")}
             </Txt>
           </Row>
         ))}
         <Row gap={8}>
           <View style={{ width: 30 }} />
-          <Row style={{ flex: 1, justifyContent: "space-between" }}>
+          <Row style={{ flex: 1, justifyContent: "space-between", direction: "ltr" }}>
             {["18:00", "00:00", "06:00", "12:00"].map((l) => (
               <Txt key={l} variant="tiny">
                 {l}
@@ -247,7 +257,7 @@ export function SleepConsistencyCard({ data }: { data: SleepAnalytics }) {
         </Row>
       </View>
       <Txt variant="tiny" style={{ marginTop: 8 }}>
-        Main sleep of each night. Naps aren&apos;t shown here.
+        {tr("sleep.mainOnly")}
       </Txt>
     </Card>
   );
@@ -258,34 +268,34 @@ export function SleepConsistencyCard({ data }: { data: SleepAnalytics }) {
 const GOAL_CHOICES = [360, 390, 420, 450, 480, 510, 540, 600];
 
 export function SleepGoalForm({ data, onSaved }: { data: SleepAnalytics; onSaved: (message: string) => void }) {
+  const { t: tr } = useI18n();
   const [low] = data.recommended_hours;
   const [value, setValue] = useState<number | "recommended">(data.goal_custom ? data.goal_minutes : "recommended");
   const [error, setError] = useState<string | null>(null);
   const save = async () => {
     try {
       await api("/me/sleep-goal", { method: "PUT", body: { minutes: value === "recommended" ? null : value } });
-      onSaved("Sleep goal saved");
+      onSaved(tr("sleep.goalSaved"));
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorTextFor(e));
     }
   };
   return (
     <View>
       <Txt variant="small">
-        Recommended for your age: {data.recommended_hours[0]}–{data.recommended_hours[1]} h a night. Your goal is used for the
-        sleep chart, your points and workout suggestions.
+        {tr("sleep.goalIntro", { low: data.recommended_hours[0], high: data.recommended_hours[1] })}
       </Txt>
       <Chips
-        label="Goal"
+        label={tr("profile.goal")}
         value={value}
         onChange={setValue}
         options={[
-          { value: "recommended" as const, label: `Recommended (${low} h)` },
+          { value: "recommended" as const, label: tr("sleep.recommendedChoice", { h: low }) },
           ...GOAL_CHOICES.map((m) => ({ value: m, label: goalHours(m) })),
         ]}
       />
       <ErrorText message={error} />
-      <Button title="Save goal" onPress={save} style={{ marginTop: 14 }} />
+      <Button title={tr("sleep.saveGoal")} onPress={save} style={{ marginTop: 14 }} />
     </View>
   );
 }

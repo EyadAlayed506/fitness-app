@@ -4,77 +4,76 @@ import { View } from "react-native";
 import { api } from "@/lib/api";
 import { confirm } from "@/lib/confirm";
 import { addDays, clockOf, clockText, hoursMinutes, longDate, parseClock, shortDate, todayISO, trackerName } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import { errorTextFor, tr } from "@/lib/i18n/current";
 import { useTheme } from "@/lib/theme";
 import type { SleepAnalytics, SleepEntry } from "@/lib/types";
 
 import { Chart, ChartCard, type ChartSeries } from "./charts";
 import { Badge, Button, Chips, ErrorText, Field, IconButton, Row, Stat, Txt } from "./ui";
 
-export const QUALITY = [
-  { value: 1, label: "Very poor" },
-  { value: 2, label: "Poor" },
-  { value: 3, label: "OK" },
-  { value: 4, label: "Good" },
-  { value: 5, label: "Great" },
-];
+const QUALITY_VALUES = [1, 2, 3, 4, 5] as const;
 
-export const qualityLabel = (q: number | null | undefined) => QUALITY.find((x) => x.value === Math.round(q ?? 0))?.label;
+/** Quality 1–5 with its name in the current language ("Good" / "جيدة"). */
+export const qualityChoices = () => QUALITY_VALUES.map((value) => ({ value, label: tr(`quality.${value}`) }));
+
+export const qualityLabel = (q: number | null | undefined) => qualityChoices().find((x) => x.value === Math.round(q ?? 0))?.label;
 
 /** Compare a night's hours with the recommended range. */
 export function rangeBadge(hours: number | null, [low, high]: [number, number]) {
   if (hours == null) return null;
-  if (hours < low) return <Badge label={`Below ${low} h`} tone="warn" />;
-  if (hours > high) return <Badge label={`Over ${high} h`} tone="info" />;
-  return <Badge label="In range" tone="good" />;
+  if (hours < low) return <Badge label={tr("sleep.below", { h: low })} tone="warn" />;
+  if (hours > high) return <Badge label={tr("sleep.over", { h: high })} tone="info" />;
+  return <Badge label={tr("sleep.inRange")} tone="good" />;
 }
 
 /** "Deep 1 h 45 min · REM 2 h 00 min · Recovery 78 %" for tracker nights */
 export function trackerSummary(e: SleepEntry): string {
   const parts: string[] = [];
-  if (e.deep_minutes != null) parts.push(`Deep ${hoursMinutes(e.deep_minutes)}`);
-  if (e.rem_minutes != null) parts.push(`REM ${hoursMinutes(e.rem_minutes)}`);
-  if (e.recovery_score != null) parts.push(`Recovery ${Math.round(e.recovery_score)} %`);
+  if (e.deep_minutes != null) parts.push(tr("sleep.part", { label: tr("sleep.deep"), value: hoursMinutes(e.deep_minutes) }));
+  if (e.rem_minutes != null) parts.push(tr("sleep.part", { label: tr("sleep.rem"), value: hoursMinutes(e.rem_minutes) }));
+  if (e.recovery_score != null) parts.push(tr("sleep.part", { label: tr("sleep.recovery"), value: `${Math.round(e.recovery_score)} %` }));
   return parts.join(" · ");
 }
 
 function TrackerDetails({ entry }: { entry: SleepEntry }) {
   const stages: [string, number | null | undefined][] = [
-    ["Light", entry.light_minutes],
-    ["Deep", entry.deep_minutes],
-    ["REM", entry.rem_minutes],
-    ["Awake", entry.awake_minutes],
+    [tr("sleep.light"), entry.light_minutes],
+    [tr("sleep.deep"), entry.deep_minutes],
+    [tr("sleep.rem"), entry.rem_minutes],
+    [tr("sleep.awake"), entry.awake_minutes],
   ];
   const whoop = entry.source === "whoop";
   return (
     <View>
       <Row style={{ justifyContent: "space-between" }}>
         <Txt style={{ fontWeight: "700" }}>{longDate(entry.date)}</Txt>
-        <Badge label={`From ${trackerName(entry.source)}`} tone="info" />
+        <Badge label={tr("sleep.from", { tracker: trackerName(entry.source) ?? "" })} tone="info" />
       </Row>
       <Txt variant="small" style={{ marginTop: 4 }}>
-        {clockOf(entry.bedtime)} → {clockOf(entry.wake_time)} · {hoursMinutes(entry.duration_minutes)} asleep
+        {clockOf(entry.bedtime)} → {clockOf(entry.wake_time)} · {tr("sleep.asleep", { duration: hoursMinutes(entry.duration_minutes) })}
       </Txt>
       {entry.light_minutes != null ? (
         <Row style={{ marginTop: 10 }} gap={6}>
           {stages.map(([label, m]) => (
-            <Stat key={label} label={label} value={m == null ? "–" : m < 60 ? `${m} min` : hoursMinutes(m).replace(" min", "")} />
+            <Stat key={label} label={label} value={m == null ? "–" : hoursMinutes(m)} />
           ))}
         </Row>
       ) : (
         <Txt variant="tiny" style={{ marginTop: 8 }}>
           {whoop
-            ? "WHOOP hasn't scored this sleep yet. Stages appear after the next sync."
-            : "The app that recorded this sleep didn't save sleep stages."}
+            ? tr("sleep.whoopNotScored")
+            : tr("sleep.noStages")}
         </Txt>
       )}
       {whoop ? (
         <Row style={{ marginTop: 8 }} gap={6}>
-          <Stat label="Sleep performance" value={entry.performance_pct != null ? `${Math.round(entry.performance_pct)} %` : "–"} />
-          <Stat label="Recovery" value={entry.recovery_score != null ? `${Math.round(entry.recovery_score)} %` : "–"} />
+          <Stat label={tr("sleep.performance")} value={entry.performance_pct != null ? `${Math.round(entry.performance_pct)} %` : "–"} />
+          <Stat label={tr("sleep.recovery")} value={entry.recovery_score != null ? `${Math.round(entry.recovery_score)} %` : "–"} />
         </Row>
       ) : null}
       <Txt variant="tiny" style={{ marginTop: 8 }}>
-        Times come from {trackerName(entry.source)} and update on every sync. You can still change the quality and add notes.
+        {tr("sleep.timesFrom", { tracker: trackerName(entry.source) ?? "" })}
       </Txt>
     </View>
   );
@@ -83,6 +82,7 @@ function TrackerDetails({ entry }: { entry: SleepEntry }) {
 // ---------- log or edit a sleep ----------
 
 export function SleepForm({ entry, onSaved }: { entry?: SleepEntry; onSaved: (message: string) => void }) {
+  const { t: tr } = useI18n();
   const [wakeDay, setWakeDay] = useState(entry?.date ?? todayISO());
   const [bed, setBed] = useState(entry ? clockOf(entry.bedtime) : "23:00");
   const [wake, setWake] = useState(entry ? clockOf(entry.wake_time) : "07:00");
@@ -103,14 +103,14 @@ export function SleepForm({ entry, onSaved }: { entry?: SleepEntry; onSaved: (me
     if (fromTracker) {
       try {
         await api(`/sleep/${entry.id}`, { method: "PATCH", body: { quality: quality || null, notes } });
-        onSaved("Sleep updated");
+        onSaved(tr("sleep.updated"));
       } catch (e) {
-        setError((e as Error).message);
+        setError(errorTextFor(e));
       }
       return;
     }
     if (bedMin == null || wakeMin == null) {
-      setError("Enter times like 23:30 or 7:00.");
+      setError(tr("sleep.badTimes"));
       return;
     }
     const body = {
@@ -122,9 +122,9 @@ export function SleepForm({ entry, onSaved }: { entry?: SleepEntry; onSaved: (me
     try {
       if (entry) await api(`/sleep/${entry.id}`, { method: "PATCH", body });
       else await api("/sleep", { method: "POST", body });
-      onSaved(entry ? "Sleep updated" : `Sleep saved: ${hoursMinutes(minutes ?? 0)}`);
+      onSaved(entry ? tr("sleep.updated") : tr("sleep.saved", { duration: hoursMinutes(minutes ?? 0) }));
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorTextFor(e));
     }
   };
 
@@ -135,39 +135,39 @@ export function SleepForm({ entry, onSaved }: { entry?: SleepEntry; onSaved: (me
       ) : (
         <>
           <Txt variant="label" style={{ marginTop: 4 }}>
-            Woke up on
+            {tr("sleep.wokeOn")}
           </Txt>
           <Row style={{ justifyContent: "space-between", marginTop: 6 }}>
-            <IconButton icon="chevron-back" label="Day before" onPress={() => setWakeDay(addDays(wakeDay, -1))} />
-            <Txt style={{ fontWeight: "700" }}>{isToday ? "Today" : longDate(wakeDay)}</Txt>
-            {isToday ? <View style={{ width: 30 }} /> : <IconButton icon="chevron-forward" label="Next day" onPress={() => setWakeDay(addDays(wakeDay, 1))} />}
+            <IconButton icon="chevron-back" label={tr("food.previousDay")} onPress={() => setWakeDay(addDays(wakeDay, -1))} />
+            <Txt style={{ fontWeight: "700" }}>{isToday ? tr("today.today") : longDate(wakeDay)}</Txt>
+            {isToday ? <View style={{ width: 30 }} /> : <IconButton icon="chevron-forward" label={tr("food.nextDay")} onPress={() => setWakeDay(addDays(wakeDay, 1))} />}
           </Row>
           <Row>
-            <Field label="Went to bed" value={bed} onChangeText={setBed} placeholder="23:30" keyboardType="numbers-and-punctuation" style={{ flex: 1 }} />
-            <Field label="Woke up" value={wake} onChangeText={setWake} placeholder="07:00" keyboardType="numbers-and-punctuation" style={{ flex: 1 }} />
+            <Field label={tr("sleep.wentToBed")} value={bed} onChangeText={setBed} placeholder="23:30" keyboardType="numbers-and-punctuation" style={{ flex: 1 }} />
+            <Field label={tr("sleep.wokeUp")} value={wake} onChangeText={setWake} placeholder="07:00" keyboardType="numbers-and-punctuation" style={{ flex: 1 }} />
           </Row>
           <Txt variant="small" style={{ marginTop: 8 }}>
             {minutes != null
-              ? `${hoursMinutes(minutes)} of sleep${bedBefore ? ` (bed on ${shortDate(addDays(wakeDay, -1))})` : ""}`
-              : "Use 24-hour times like 23:30, or 11:30 pm."}
+              ? tr("sleep.ofSleep", { duration: hoursMinutes(minutes) }) + (bedBefore ? tr("sleep.bedOn", { date: shortDate(addDays(wakeDay, -1)) }) : "")
+              : tr("sleep.timeHint")}
           </Txt>
         </>
       )}
-      <Chips label="How did you sleep? (optional)" value={quality} onChange={setQuality} options={QUALITY} />
-      <Field label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="e.g. coffee late, woke up twice" />
+      <Chips label={tr("sleep.howDid")} value={quality} onChange={setQuality} options={qualityChoices()} />
+      <Field label={tr("sleep.notes")} value={notes} onChangeText={setNotes} placeholder={tr("sleep.notesPlaceholder")} />
       <ErrorText message={error} />
-      <Button title={entry ? "Save changes" : "Save sleep"} onPress={save} style={{ marginTop: 14 }} />
+      <Button title={tr(entry ? "profile.saveChanges" : "sleep.save")} onPress={save} style={{ marginTop: 14 }} />
       {entry ? (
         <Button
-          title="Delete"
+          title={tr("settings.deleteConfirm")}
           kind="danger"
           style={{ marginTop: 10 }}
           onPress={async () => {
             const from = trackerName(entry.source);
-            const note = fromTracker ? ` It may come back on the next ${from} sync if ${from} still has it.` : "";
-            if (!(await confirm("Delete this sleep?", `${longDate(entry.date)} · ${hoursMinutes(entry.duration_minutes)}.${note}`, "Delete"))) return;
+            const note = fromTracker ? tr("sleep.mayComeBack", { tracker: from ?? "" }) : "";
+            if (!(await confirm(tr("sleep.deleteTitle"), `${longDate(entry.date)} · ${hoursMinutes(entry.duration_minutes)}.${note}`, tr("settings.deleteConfirm")))) return;
             await api(`/sleep/${entry.id}`, { method: "DELETE" });
-            onSaved("Sleep deleted");
+            onSaved(tr("sleep.deleted"));
           }}
         />
       ) : null}
@@ -179,23 +179,24 @@ export function SleepForm({ entry, onSaved }: { entry?: SleepEntry; onSaved: (me
 
 export function SleepChart({ data }: { data: SleepAnalytics }) {
   const t = useTheme();
+  const { t: tr, tn } = useI18n();
   const [low, high] = data.recommended_hours;
   const labels = data.labels.map(shortDate);
   const goal = Math.round((data.goal_minutes / 60) * 100) / 100;
   const series: ChartSeries[] = [
-    { name: "Hours slept", data: data.series[0].data, color: t.series[0], type: "bar" },
-    { name: `Goal ${data.goal_minutes % 60 ? hoursMinutes(data.goal_minutes) : `${data.goal_minutes / 60} h`}`, data: [goal], color: t.text2, type: "ref" },
+    { name: tr("sleep.hoursSlept"), data: data.series[0].data, color: t.series[0], type: "bar" },
+    { name: tr("sleep.goalShort", { goal: data.goal_minutes % 60 ? hoursMinutes(data.goal_minutes) : tr("sleep.hours", { h: data.goal_minutes / 60 }) }), data: [goal], color: t.text2, type: "ref" },
   ];
   const tableSeries: ChartSeries[] = [
     series[0],
-    { name: "Quality (1–5)", data: data.quality, color: t.series[1], type: "line" },
+    { name: tr("sleep.quality15"), data: data.quality, color: t.series[1], type: "line" },
   ];
   return (
     <ChartCard
-      title={`Sleep, last ${data.labels.length} nights`}
-      subtitle={`Hours per night against your goal. Recommended for your age: ${low}–${high} h. Gaps are nights not logged.`}
+      title={tr("sleep.chartTitle", { nights: tn("weekly.nights", data.labels.length) })}
+      subtitle={tr("sleep.chartHint", { low, high })}
       empty={!data.series[0].data.some((v) => v != null)}
-      emptyText="Log your sleep to see it here."
+      emptyText={tr("sleep.chartEmpty")}
       table={{ labels, series: tableSeries }}
     >
       <Chart labels={labels} series={series} />

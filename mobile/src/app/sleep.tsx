@@ -4,13 +4,14 @@ import { useState } from "react";
 import { ScrollView } from "react-native";
 
 import { LastNightCard, SleepConsistencyCard, SleepGoalForm, SleepWeekCard } from "@/components/SleepDashboard";
-import { QUALITY, SleepChart, SleepForm, qualityLabel, trackerSummary } from "@/components/SleepParts";
+import { SleepChart, SleepForm, qualityChoices, qualityLabel, trackerSummary } from "@/components/SleepParts";
 import { HealthConnectCard } from "@/components/HealthConnectCard";
 import { Badge, Card, EmptyState, ListRow, Loading, Section, Sheet, SkeletonCards, Txt, useToast } from "@/components/ui";
 import { WhoopCard, syncSummary } from "@/components/WhoopCard";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { clockOf, hoursMinutes, longDate, trackerName, tzOffset } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import { useWhoopAutoSync, useWhoopStatus } from "@/lib/data";
 import { useHealthConnectAutoSync, useHealthConnectStatus } from "@/lib/healthConnect";
 import { syncSummary as healthConnectSummary } from "@/lib/healthConnectSessions";
@@ -30,6 +31,7 @@ export default function Sleep() {
 /** The screen itself, once the login has been restored (so its data loads with it). */
 function SleepScreen() {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const toast = useToast();
   const [sheet, setSheet] = useState<SheetState>(null);
   const screen = useQuery({
@@ -88,7 +90,7 @@ function SleepScreen() {
 
       {stats ? <SleepChart data={stats} /> : null}
 
-      <Section title="History" action="Log sleep" onAction={() => setSheet({ kind: "new" })} />
+      <Section title={tr("workouts.history")} action={tr("home.logSleep")} onAction={() => setSheet({ kind: "new" })} />
       <Card style={entries.length ? { paddingVertical: space.xs } : undefined}>
         {entries.length ? (
           entries.map((e, i) => (
@@ -111,24 +113,24 @@ function SleepScreen() {
         ) : (
           <EmptyState
             icon="moon-outline"
-            title="No sleep logged yet"
-            text="Log last night by hand, or connect Health Connect or WHOOP to import it."
-            action="Log sleep"
+            title={tr("sleep.noSleepTitle")}
+            text={tr("sleep.noSleepText")}
+            action={tr("home.logSleep")}
             onAction={() => setSheet({ kind: "new" })}
           />
         )}
       </Card>
       <Txt variant="tiny" style={{ textAlign: "center", marginTop: space.xs, paddingHorizontal: space.sm }}>
-        Quality: {QUALITY.map((q) => `${q.value} = ${q.label}`).join(", ")}. Recommended hours follow CDC / National Sleep Foundation guidance for your age.
+        {tr("sleep.qualityNote", { scale: qualityChoices().map((q) => `${q.value} = ${q.label}`).join(tr("list.separator")) })}
       </Txt>
 
-      <Sheet visible={sheet?.kind === "new"} title="Log sleep" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "new"} title={tr("home.logSleep")} onClose={() => setSheet(null)}>
         {sheet?.kind === "new" ? <SleepForm onSaved={saved} /> : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "goal"} title="Sleep goal" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "goal"} title={tr("sleep.goalTitle")} onClose={() => setSheet(null)}>
         {sheet?.kind === "goal" && stats ? <SleepGoalForm data={stats} onSaved={saved} /> : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "edit"} title="Edit sleep" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "edit"} title={tr("sleep.edit")} onClose={() => setSheet(null)}>
         {sheet?.kind === "edit" ? <SleepForm entry={sheet.entry} onSaved={saved} /> : null}
       </Sheet>
     </ScrollView>

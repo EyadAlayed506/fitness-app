@@ -3,6 +3,8 @@ import { Linking, View } from "react-native";
 
 import { confirm } from "@/lib/confirm";
 import { timeAgo } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
+import { errorTextFor } from "@/lib/i18n/current";
 import {
   connectHealthConnect,
   disconnectHealthConnect,
@@ -31,6 +33,7 @@ export function HealthConnectCard({
   toast: (msg: string) => void;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +43,7 @@ export function HealthConnectCard({
     try {
       await action();
     } catch (e) {
-      setError((e as Error).message);
+      setError(errorTextFor(e));
     } finally {
       setBusy(false);
     }
@@ -56,26 +59,22 @@ export function HealthConnectCard({
   const connect = () =>
     run(async () => {
       if (!(await connectHealthConnect())) {
-        setError("The app wasn't allowed to read sleep. Tap Connect again and turn on Sleep.");
+        setError(tr("hc.notAllowed"));
         return;
       }
-      toast("Health Connect connected");
+      toast(tr("hc.connected"));
       const r = await syncHealthConnect();
       if (r) toast(syncSummary(r));
     });
 
   const disconnect = async () => {
     if (
-      !(await confirm(
-        "Stop importing from Health Connect?",
-        "New sleep won't be imported on this phone any more. Sleep already imported stays in your log. To take the permission away too, use Manage in Health Connect.",
-        "Stop",
-      ))
+      !(await confirm(tr("hc.stopTitle"), tr("hc.stopText"), tr("hc.stop")))
     )
       return;
     await run(async () => {
       await disconnectHealthConnect();
-      toast("Health Connect disconnected");
+      toast(tr("hc.disconnected"));
     });
   };
 
@@ -86,19 +85,18 @@ export function HealthConnectCard({
       <Card>
         <Row style={{ justifyContent: "space-between" }}>
           <Txt variant="h3">Health Connect</Txt>
-          <Badge label="Connected" tone="good" />
+          <Badge label={tr("tracker.connected")} tone="good" />
         </Row>
         <Txt variant="small" style={{ marginTop: 4 }}>
-          Last synced {timeAgo(status.lastSyncAt)}. Sleep (and stages, when your watch or ring records them) is imported
-          when you open the app.
+          {tr("hc.lastSynced", { ago: timeAgo(status.lastSyncAt) })}
         </Txt>
         <ErrorText message={error} />
         <Row style={{ marginTop: 12 }}>
-          <Button title="Sync now" icon="sync" onPress={sync} loading={busy} style={{ flex: 1 }} />
-          <Button title="Disconnect" kind="ghost" onPress={disconnect} />
+          <Button title={tr("sync.now")} icon="sync" onPress={sync} loading={busy} style={{ flex: 1 }} />
+          <Button title={tr("whoop.disconnect")} kind="ghost" onPress={disconnect} />
         </Row>
         <Row style={{ marginTop: 12, justifyContent: "center" }}>
-          <LinkButton title="Manage in Health Connect" onPress={openHealthConnectSettings} />
+          <LinkButton title={tr("hc.manage")} onPress={openHealthConnectSettings} />
         </Row>
       </Card>
     );
@@ -107,27 +105,25 @@ export function HealthConnectCard({
   return (
     <Card>
       <View style={{ padding: 12, borderRadius: 12, backgroundColor: t.surface2, gap: 8 }}>
-        <Txt style={{ fontWeight: "700" }}>Connect Health Connect</Txt>
+        <Txt style={{ fontWeight: "700" }}>{tr("hc.connectTitle")}</Txt>
         <Txt variant="small">
-          Imports sleep that your watch, ring or sleep app saves on this phone (Samsung Health, Fitbit, Garmin, Oura,
-          Sleep as Android, bedtime mode…). No account needed.
+          {tr("hc.connectText")}
         </Txt>
         {status.state === "available" ? (
-          <Button title="Connect Health Connect" kind="soft" icon="fitness" onPress={connect} loading={busy} />
+          <Button title={tr("hc.connectTitle")} kind="soft" icon="fitness" onPress={connect} loading={busy} />
         ) : status.state === "needs_build" ? (
           <Txt variant="tiny" style={{ color: t.warnInk }}>
-            This version of the app can&apos;t use Health Connect (Expo Go doesn&apos;t include it). Install the app&apos;s own
-            build on your phone; the README explains how.
+            {tr("hc.needsBuild")}
           </Txt>
         ) : (
           <>
             <Txt variant="tiny" style={{ color: t.warnInk }}>
               {status.state === "update_required"
-                ? "Health Connect needs an update first."
-                : "Health Connect isn't on this phone yet. It's built into Android 14 and newer; on older phones install it from Google Play."}
+                ? tr("hc.updateRequired")
+                : tr("hc.notInstalled")}
             </Txt>
             <Button
-              title={status.state === "update_required" ? "Update Health Connect" : "Get Health Connect"}
+              title={tr(status.state === "update_required" ? "hc.update" : "hc.get")}
               kind="ghost"
               icon="open-outline"
               small
