@@ -18,7 +18,7 @@ from app.routers.assistant import chosen_provider, get_assistant_backend
 from app.services import assistant
 from tests.conftest import PROFILE, add_sleep, signup_and_login
 
-TODAY = dt.date.today()
+TODAY = dt.datetime.now(dt.UTC).date()  # the requests send tz_offset=0, so "today" is the UTC date
 
 
 def text(t: str):
