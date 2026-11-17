@@ -3,8 +3,10 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { api } from "@/lib/api";
 import { addFood, deleteFood, updateFood, useRecentFoods } from "@/lib/data";
-import { MASS_TO_G, VOLUME_TO_ML, cap, fmt, unitLabel } from "@/lib/format";
+import { MASS_TO_G, VOLUME_TO_ML, fmt, unitLabel } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useI18n, type MessageKey } from "@/lib/i18n";
+import { tr } from "@/lib/i18n/current";
 import { errorMessage } from "@/lib/query";
 import { space, useTheme } from "@/lib/theme";
 import type { Food, FoodCandidate, FoodLogEntry, FoodSearch as SearchResult, Meal, RecentFood } from "@/lib/types";
@@ -13,17 +15,20 @@ import { Badge, Button, Checkbox, Chips, ErrorText, Field, IconButton, ListRow, 
 
 export const MEALS: Meal[] = ["breakfast", "lunch", "dinner", "snack"];
 
-const SOURCE_LABEL: Record<string, string> = { usda: "USDA", off: "Open Food Facts", manual: "Mine", builtin: "" };
+// Database names stay as they are; "manual" is the user's own food
+const sourceLabel = (source: string): string =>
+  ({ usda: "USDA", off: "Open Food Facts", manual: tr("food.sourceMine"), builtin: "" })[source] ?? "";
 
-const SUB_NUTRIENTS: [keyof Food, string, string][] = [
-  ["fiber_g", "Fiber", "g"],
-  ["sugar_g", "Sugars", "g"],
-  ["added_sugar_g", "Added sugars", "g"],
-  ["saturated_fat_g", "Saturated fat", "g"],
-  ["trans_fat_g", "Trans fat", "g"],
-  ["cholesterol_mg", "Cholesterol", "mg"],
-  ["sodium_mg", "Sodium", "mg"],
-  ["potassium_mg", "Potassium", "mg"],
+// [field, its label key, its unit key]
+const SUB_NUTRIENTS: [keyof Food, MessageKey, MessageKey][] = [
+  ["fiber_g", "nutrient.fiber_g", "unit.g"],
+  ["sugar_g", "nutrient.sugar_g", "unit.g"],
+  ["added_sugar_g", "nutrient.added_sugar_g", "unit.g"],
+  ["saturated_fat_g", "nutrient.saturated_fat_g", "unit.g"],
+  ["trans_fat_g", "nutrient.trans_fat_g", "unit.g"],
+  ["cholesterol_mg", "nutrient.cholesterol_mg", "unit.mg"],
+  ["sodium_mg", "nutrient.sodium_mg", "unit.mg"],
+  ["potassium_mg", "nutrient.potassium_mg", "unit.mg"],
 ];
 
 export function baseAmount(food: Food, quantity: number, unit: string): number | null {
@@ -54,6 +59,7 @@ export function FoodSearch({
   /** log a recent food again with last time's amount, in one tap */
   onQuickAdd?: (item: RecentFood) => void;
 }) {
+  const { t: tr, errorText } = useI18n();
   const recentFoods = useRecentFoods();
   const [query, setQuery] = useState("");
   const [local, setLocal] = useState<Food[]>([]);
@@ -87,13 +93,13 @@ export function FoodSearch({
     return () => clearTimeout(id);
   }, [query]);
 
-  const [importError, setImportError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<unknown>(null);
   const pickOnline = async (c: FoodCandidate) => {
     setImportError(null);
     try {
       onPick(await api<Food>("/foods/import", { method: "POST", body: c }));
     } catch (e) {
-      setImportError(e instanceof Error ? e.message : "Couldn't add that food. Try another result.");
+      setImportError(e);
     }
   };
 
@@ -101,7 +107,7 @@ export function FoodSearch({
   const searching = query.trim() !== "";
 
   const subtitle = (f: Food | FoodCandidate) =>
-    `${f.brand ? `${f.brand} · ` : ""}${fmt(f.calories)} kcal per ${f.is_liquid ? "100 ml" : "100 g"}`;
+    `${f.brand ? `${f.brand} · ` : ""}${tr("food.per100", { kcal: fmt(f.calories), base: tr(f.is_liquid ? "food.100ml" : "food.100g") })}`;
 
   // With an empty box: what the user logs most, so a repeat is one or two taps
   const recent = recentFoods.data?.recent.slice(0, 6) ?? [];
@@ -114,11 +120,11 @@ export function FoodSearch({
         key={`${r.food.id}`}
         first={i === 0}
         title={r.food.name}
-        subtitle={`${fmt(r.quantity, 2)} ${unitLabel(r.unit)}${kcal != null ? ` · ${fmt(kcal)} kcal` : ""}${r.times > 1 ? ` · ${r.times}×` : ""}`}
+        subtitle={`${fmt(r.quantity, 2)} ${unitLabel(r.unit)}${kcal != null ? ` · ${tr("food.kcal", { n: fmt(kcal) })}` : ""}${r.times > 1 ? ` · ${r.times}×` : ""}`}
         onPress={() => onPick(r.food, { quantity: r.quantity, unit: r.unit })}
         right={
           onQuickAdd ? (
-            <IconButton icon="add" label={`Add ${r.food.name}, ${fmt(r.quantity, 2)} ${unitLabel(r.unit)}`} onPress={() => onQuickAdd(r)} />
+            <IconButton icon="add" label={tr("food.addLabel", { name: r.food.name, amount: `${fmt(r.quantity, 2)} ${unitLabel(r.unit)}` })} onPress={() => onQuickAdd(r)} />
           ) : undefined
         }
       />
@@ -127,7 +133,7 @@ export function FoodSearch({
 
   return (
     <View>
-      <Field label="Search food" value={query} onChangeText={setQuery} placeholder="e.g. banana, chicken breast, nutella" autoFocus autoCorrect={false} />
+      <Field label={tr("food.searchLabel")} value={query} onChangeText={setQuery} placeholder={tr("food.searchPlaceholder")} autoFocus autoCorrect={false} />
       {!searching && recentFoods.isPending ? (
         <View style={{ gap: space.sm, marginTop: space.md }}>
           <Skeleton height={44} />
@@ -136,26 +142,26 @@ export function FoodSearch({
       ) : null}
       {!searching && recent.length ? (
         <View style={{ marginTop: space.md }}>
-          <Txt variant="label">Recent</Txt>
+          <Txt variant="label">{tr("food.recent")}</Txt>
           {recent.map(recentRow)}
         </View>
       ) : null}
       {!searching && frequent.length ? (
         <View style={{ marginTop: space.md }}>
-          <Txt variant="label">Frequent</Txt>
+          <Txt variant="label">{tr("food.frequent")}</Txt>
           {frequent.map(recentRow)}
         </View>
       ) : null}
       {searching && local.length ? (
         <View style={{ marginTop: 10 }}>
-          <Txt variant="label">In the app</Txt>
+          <Txt variant="label">{tr("food.inApp")}</Txt>
           {local.map((f, i) => (
             <ListRow
               key={`l${f.id}`}
               first={i === 0}
               title={f.name}
               subtitle={subtitle(f)}
-              right={SOURCE_LABEL[f.source] ? <Badge label={SOURCE_LABEL[f.source]} /> : undefined}
+              right={sourceLabel(f.source) ? <Badge label={sourceLabel(f.source)} /> : undefined}
               onPress={() => onPick(f)}
             />
           ))}
@@ -163,25 +169,25 @@ export function FoodSearch({
       ) : null}
       {searching && searchingOnline ? (
         <Txt variant="muted" style={{ marginTop: 10 }}>
-          Searching USDA and Open Food Facts…
+          {tr("food.searchingOnline")}
         </Txt>
       ) : null}
       {searching && online?.length ? (
         <View style={{ marginTop: 10 }}>
-          <Txt variant="label">Online databases</Txt>
+          <Txt variant="label">{tr("food.online")}</Txt>
           {online.map((f, i) => (
             <ListRow
               key={`o${f.source}${f.external_id}`}
               first={i === 0}
               title={f.name}
               subtitle={subtitle(f)}
-              right={<Badge label={SOURCE_LABEL[f.source]} />}
+              right={<Badge label={sourceLabel(f.source)} />}
               onPress={() => pickOnline(f)}
             />
           ))}
         </View>
       ) : null}
-      <ErrorText message={importError} />
+      <ErrorText message={importError == null ? null : errorText(importError)} />
       {(searching ? warnings : []).map((w) => (
         <Txt key={w} variant="muted" style={{ marginTop: 6, fontSize: 13 }}>
           {w}
@@ -189,10 +195,10 @@ export function FoodSearch({
       ))}
       {searching && online && !online.length && !local.length && !warnings.length ? (
         <Txt variant="muted" style={{ marginTop: 10 }}>
-          Nothing found.
+          {tr("food.nothingFound")}
         </Txt>
       ) : null}
-      <Button title="Not found? Create a custom food" kind="ghost" onPress={onCustom} style={{ marginTop: 16 }} />
+      <Button title={tr("food.notFound")} kind="ghost" onPress={onCustom} style={{ marginTop: 16 }} />
     </View>
   );
 }
@@ -231,6 +237,7 @@ export function FoodDetail({
   onDeleted?: (entry: FoodLogEntry) => void;
 }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const start = entry ? { quantity: entry.quantity, unit: entry.unit } : portion;
   const [units, setUnits] = useState<string[]>([]);
   const [unit, setUnit] = useState(start?.unit ?? "g");
@@ -305,7 +312,7 @@ export function FoodDetail({
 
   const row = (label: string, value: string, indent = false) => (
     <Row key={label} style={{ justifyContent: "space-between", paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }}>
-      <Text style={{ color: indent ? t.text2 : t.text, paddingLeft: indent ? 12 : 0, fontSize: 14 }}>{label}</Text>
+      <Text style={{ color: indent ? t.text2 : t.text, paddingStart: indent ? 12 : 0, fontSize: 14 }}>{label}</Text>
       <Text style={{ color: t.text, fontSize: 14, fontVariant: ["tabular-nums"] }}>{value}</Text>
     </Row>
   );
@@ -314,36 +321,36 @@ export function FoodDetail({
     <View>
       <Txt variant="small">
         {food.brand ? `${food.brand} · ` : ""}
-        {food.is_liquid ? "Drink / liquid" : "Solid"}
-        {food.serving_size && food.serving_unit ? ` · 1 serving = ${fmt(food.serving_size, 1)} ${unitLabel(food.serving_unit)}` : ""}
+        {tr(food.is_liquid ? "food.liquid" : "food.solid")}
+        {food.serving_size && food.serving_unit ? ` · ${tr("food.serving", { amount: `${fmt(food.serving_size, 1)} ${unitLabel(food.serving_unit)}` })}` : ""}
       </Txt>
-      <Stepper label="Amount" value={qty} onChange={setQty} step={STEP[unit] ?? 1} min={0} max={100000} decimals={2} suffix={unitLabel(unit)} />
-      {units.length ? <Chips label="Unit" value={unit} onChange={setUnit} options={units.map((u) => ({ value: u, label: unitLabel(u) }))} /> : null}
-      <Chips label="Meal" value={meal} onChange={setMeal} options={MEALS.map((m) => ({ value: m, label: cap(m) }))} />
+      <Stepper label={tr("food.amount")} value={qty} onChange={setQty} step={STEP[unit] ?? 1} min={0} max={100000} decimals={2} suffix={unitLabel(unit)} />
+      {units.length ? <Chips label={tr("food.unit")} value={unit} onChange={setUnit} options={units.map((u) => ({ value: u, label: unitLabel(u) }))} /> : null}
+      <Chips label={tr("food.meal")} value={meal} onChange={setMeal} options={MEALS.map((m) => ({ value: m, label: tr(`meal.${m}`) }))} />
       <Row style={{ marginTop: 12 }} gap={6}>
-        <Stat label="kcal" value={fmt(food.calories * f)} />
-        <Stat label="Protein g" value={fmt(food.protein_g * f, 1)} />
-        <Stat label="Carbs g" value={fmt(food.carbs_g * f, 1)} />
-        <Stat label="Fat g" value={fmt(food.fat_g * f, 1)} />
+        <Stat label={tr("food.kcalLabel")} value={fmt(food.calories * f)} />
+        <Stat label={tr("food.proteinG")} value={fmt(food.protein_g * f, 1)} />
+        <Stat label={tr("food.carbsG")} value={fmt(food.carbs_g * f, 1)} />
+        <Stat label={tr("food.fatG")} value={fmt(food.fat_g * f, 1)} />
       </Row>
       <ErrorText message={error} />
       {entry ? (
         <>
-          <Button title="Save changes" icon="checkmark" onPress={save} disabled={quantity <= 0} style={{ marginTop: 14 }} />
-          <Button title="Remove from log" icon="trash-outline" kind="danger" onPress={remove} style={{ marginTop: space.sm, borderColor: "transparent" }} />
+          <Button title={tr("profile.saveChanges")} icon="checkmark" onPress={save} disabled={quantity <= 0} style={{ marginTop: 14 }} />
+          <Button title={tr("food.removeFromLog")} icon="trash-outline" kind="danger" onPress={remove} style={{ marginTop: space.sm, borderColor: "transparent" }} />
         </>
       ) : (
-        <Button title="Add to log" icon="add" onPress={add} disabled={quantity <= 0} style={{ marginTop: 14 }} />
+        <Button title={tr("food.addToLog")} icon="add" onPress={add} disabled={quantity <= 0} style={{ marginTop: 14 }} />
       )}
 
       <Txt variant="h3" style={{ marginTop: 18, marginBottom: 4 }}>
-        Per {food.is_liquid ? "100 ml" : "100 g"}
+        {tr("food.per", { base: tr(food.is_liquid ? "food.100ml" : "food.100g") })}
       </Txt>
-      {row("Calories", `${fmt(food.calories)} kcal`)}
-      {row("Protein", `${fmt(food.protein_g, 1)} g`)}
-      {row("Carbohydrates", `${fmt(food.carbs_g, 1)} g`)}
-      {row("Fat", `${fmt(food.fat_g, 1)} g`)}
-      {subs.map(([k, label, u]) => row(label, `${fmt(food[k] as number, 1)} ${u}`, true))}
+      {row(tr("food.calories"), tr("food.kcal", { n: fmt(food.calories) }))}
+      {row(tr("macro.protein"), `${fmt(food.protein_g, 1)} ${tr("unit.g")}`)}
+      {row(tr("food.carbohydrates"), `${fmt(food.carbs_g, 1)} ${tr("unit.g")}`)}
+      {row(tr("macro.fat"), `${fmt(food.fat_g, 1)} ${tr("unit.g")}`)}
+      {subs.map(([k, label, u]) => row(tr(label), `${fmt(food[k] as number, 1)} ${tr(u)}`, true))}
     </View>
   );
 }
@@ -351,6 +358,7 @@ export function FoodDetail({
 // ---------- manual custom food ----------
 
 export function CustomFoodForm({ onCreated }: { onCreated: (food: Food) => void }) {
+  const { t: tr, errorText } = useI18n();
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [liquid, setLiquid] = useState(false);
@@ -359,7 +367,8 @@ export function CustomFoodForm({ onCreated }: { onCreated: (food: Food) => void 
   const [per, setPer] = useState<"serving" | "100">("serving");
   const [values, setValues] = useState<Record<string, string>>({});
   const [showSubs, setShowSubs] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // a form problem (key) or the API error, translated when shown
+  const [error, setError] = useState<{ key: MessageKey } | { error: unknown } | null>(null);
 
   const unitOptions = Object.keys(liquid ? VOLUME_TO_ML : MASS_TO_G).map((u) => ({ value: u, label: unitLabel(u) }));
   const set = (k: string) => (v: string) => setValues((old) => ({ ...old, [k]: v }));
@@ -377,57 +386,57 @@ export function CustomFoodForm({ onCreated }: { onCreated: (food: Food) => void 
     };
     for (const k of ["calories", "protein_g", "carbs_g", "fat_g", ...SUB_NUTRIENTS.map(([k]) => k as string)]) body[k] = num(values[k]);
     if (!name.trim() || [body.calories, body.protein_g, body.carbs_g, body.fat_g].some((v) => v == null)) {
-      setError("Enter a name, calories, protein, carbs and fat.");
+      setError({ key: "custom.missing" });
       return;
     }
     try {
       onCreated(await api<Food>("/foods", { method: "POST", body }));
     } catch (e) {
-      setError((e as Error).message);
+      setError({ error: e });
     }
   };
 
   return (
     <View>
-      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Mom's lentil soup" />
-      <Field label="Brand (optional)" value={brand} onChangeText={setBrand} />
+      <Field label={tr("custom.name")} value={name} onChangeText={setName} placeholder={tr("custom.namePlaceholder")} />
+      <Field label={tr("custom.brand")} value={brand} onChangeText={setBrand} />
       <Checkbox
         checked={liquid}
         onChange={(v) => {
           setLiquid(v);
           setServingUnit(v ? "ml" : "g");
         }}
-        label="It's a drink / liquid (measured in ml)"
+        label={tr("custom.liquid")}
       />
-      <Field label="Serving size" value={servingSize} onChangeText={setServingSize} keyboardType="decimal-pad" />
+      <Field label={tr("custom.servingSize")} value={servingSize} onChangeText={setServingSize} keyboardType="decimal-pad" />
       <Chips value={servingUnit} onChange={setServingUnit} options={unitOptions} />
       <Chips
-        label="The values below are for"
+        label={tr("custom.valuesFor")}
         value={per}
         onChange={setPer}
         options={[
-          { value: "serving", label: "1 serving" },
-          { value: "100", label: "100 g / ml" },
+          { value: "serving", label: tr("custom.oneServing") },
+          { value: "100", label: tr("custom.per100") },
         ]}
       />
       <Row>
-        <Field label="Calories (kcal)" value={values.calories ?? ""} onChangeText={set("calories")} keyboardType="decimal-pad" style={{ flex: 1 }} />
-        <Field label="Protein (g)" value={values.protein_g ?? ""} onChangeText={set("protein_g")} keyboardType="decimal-pad" style={{ flex: 1 }} />
+        <Field label={tr("custom.calories")} value={values.calories ?? ""} onChangeText={set("calories")} keyboardType="decimal-pad" style={{ flex: 1 }} />
+        <Field label={tr("custom.protein")} value={values.protein_g ?? ""} onChangeText={set("protein_g")} keyboardType="decimal-pad" style={{ flex: 1 }} />
       </Row>
       <Row>
-        <Field label="Carbs (g)" value={values.carbs_g ?? ""} onChangeText={set("carbs_g")} keyboardType="decimal-pad" style={{ flex: 1 }} />
-        <Field label="Fat (g)" value={values.fat_g ?? ""} onChangeText={set("fat_g")} keyboardType="decimal-pad" style={{ flex: 1 }} />
+        <Field label={tr("custom.carbs")} value={values.carbs_g ?? ""} onChangeText={set("carbs_g")} keyboardType="decimal-pad" style={{ flex: 1 }} />
+        <Field label={tr("custom.fat")} value={values.fat_g ?? ""} onChangeText={set("fat_g")} keyboardType="decimal-pad" style={{ flex: 1 }} />
       </Row>
-      <Button title={showSubs ? "Hide sub-macros" : "Add sub-macros (optional)"} kind="ghost" small onPress={() => setShowSubs(!showSubs)} style={{ marginTop: 12, alignSelf: "flex-start" }} />
+      <Button title={tr(showSubs ? "custom.hideSubs" : "custom.showSubs")} kind="ghost" small onPress={() => setShowSubs(!showSubs)} style={{ marginTop: 12, alignSelf: "flex-start" }} />
       {showSubs ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: 8 }}>
           {SUB_NUTRIENTS.map(([k, label, u]) => (
-            <Field key={k} label={`${label} (${u})`} value={values[k] ?? ""} onChangeText={set(k)} keyboardType="decimal-pad" style={{ width: "48%" }} />
+            <Field key={k} label={tr("custom.withUnit", { label: tr(label), unit: tr(u) })} value={values[k] ?? ""} onChangeText={set(k)} keyboardType="decimal-pad" style={{ width: "48%" }} />
           ))}
         </View>
       ) : null}
-      <ErrorText message={error} />
-      <Button title="Save and log it" onPress={save} style={{ marginTop: 16 }} />
+      <ErrorText message={error == null ? null : "key" in error ? tr(error.key) : errorText(error.error)} />
+      <Button title={tr("custom.save")} onPress={save} style={{ marginTop: 16 }} />
     </View>
   );
 }

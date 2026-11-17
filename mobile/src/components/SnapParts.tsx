@@ -1,10 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from "react-native";
 
 import { logMenuDish } from "@/lib/data";
-import { cap, fmt, shortDate, todayISO, tzOffset } from "@/lib/format";
+import { fmt, shortDate, todayISO, tzOffset } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useI18n } from "@/lib/i18n";
 import { choosePhoto, sendPhoto, type Photo } from "@/lib/photo";
 import { errorMessage } from "@/lib/query";
 import { radius, space, useTheme } from "@/lib/theme";
@@ -12,7 +12,7 @@ import type { FoodLogEntry, Meal, MenuDish, MenuScan } from "@/lib/types";
 
 import { MEALS } from "./FoodParts";
 import { MacroText } from "./MacroBars";
-import { Badge, Button, Chips, ErrorText, LinkButton, Row, Txt } from "./ui";
+import { Badge, Button, Chips, ErrorText, Icon, LinkButton, Row, Txt } from "./ui";
 
 /** Snap and say: the menu scanner. */
 
@@ -23,7 +23,11 @@ function mealNow(): Meal {
 }
 
 const fitLabel = (fit: number) =>
-  fit >= 0.7 ? { label: "Good fit", tone: "good" as const } : fit >= 0.45 ? { label: "OK", tone: "neutral" as const } : { label: "Poor fit", tone: "warn" as const };
+  fit >= 0.7
+    ? { label: "menu.goodFit" as const, tone: "good" as const }
+    : fit >= 0.45
+      ? { label: "menu.ok" as const, tone: "neutral" as const }
+      : { label: "menu.poorFit" as const, tone: "warn" as const };
 
 /**
  * Photograph a restaurant menu: each dish gets estimated calories and macros, ranked by how well it fits
@@ -38,8 +42,9 @@ const PORTIONS = [
 
 export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry: FoodLogEntry) => void }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const isToday = date === todayISO();
-  const dayText = isToday ? "today" : `on ${shortDate(date)}`;
+  const day = shortDate(date);
   const [servings, setServings] = useState(1);
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [scan, setScan] = useState<MenuScan | null>(null);
@@ -86,11 +91,11 @@ export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry
     return (
       <View>
         <Txt variant="small">
-          At a restaurant? Photograph the menu. The AI on your PC estimates each dish and ranks them by how well they fit what&apos;s left {dayText}.
+          {isToday ? tr("menu.introToday") : tr("menu.introDate", { date: day })}
         </Txt>
         <Row gap={space.sm} style={{ marginTop: space.lg, flexWrap: "wrap" }}>
-          <Button title="Take a photo" icon="camera-outline" onPress={() => take("camera")} />
-          <Button title="Choose one" icon="image-outline" kind="ghost" onPress={() => take("library")} />
+          <Button title={tr("menu.takePhoto")} icon="camera-outline" onPress={() => take("camera")} />
+          <Button title={tr("menu.chooseOne")} icon="image-outline" kind="ghost" onPress={() => take("library")} />
         </Row>
         <ErrorText message={error} />
       </View>
@@ -100,18 +105,18 @@ export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry
     return (
       <View>
         <Row gap={space.md}>
-          <Image source={{ uri: photo.uri }} style={styles.thumb} accessibilityLabel="Your photo of the menu" />
+          <Image source={{ uri: photo.uri }} style={styles.thumb} accessibilityLabel={tr("menu.photoLabel")} />
           {error ? null : (
             <Row gap={space.sm} style={{ flex: 1 }}>
               <ActivityIndicator size="small" color={t.muted} />
               <Txt variant="small" style={{ flex: 1 }}>
-                Reading the menu… (up to a minute or two for a long menu)
+                {tr("menu.reading")}
               </Txt>
             </Row>
           )}
         </Row>
         <ErrorText message={error} />
-        {error ? <Button title="Try another photo" kind="soft" icon="image-outline" onPress={() => take("library")} style={{ marginTop: space.md }} /> : null}
+        {error ? <Button title={tr("menu.tryAnother")} kind="soft" icon="image-outline" onPress={() => take("library")} style={{ marginTop: space.md }} /> : null}
       </View>
     );
 
@@ -119,20 +124,20 @@ export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry
   return (
     <View>
       <View style={[styles.estimate, { backgroundColor: t.warnSoft }]}>
-        <Ionicons name="information-circle" size={18} color={t.warnInk} />
+        <Icon name="information-circle" size={18} color={t.warnInk} />
         <Txt variant="small" style={{ color: t.warnInk, flex: 1 }}>
           {scan.note}
         </Txt>
       </View>
       <Txt style={{ marginTop: space.md, fontWeight: "600" }}>
         {left > 0
-          ? `Left ${dayText}: about ${fmt(left)} kcal and ${fmt(scan.remaining_protein_g)} g protein`
-          : `You're at the target ${dayText} (${fmt(-left)} kcal over)`}
+          ? tr(isToday ? "menu.leftToday" : "menu.leftDate", { date: day, kcal: fmt(left), protein: fmt(scan.remaining_protein_g) })
+          : tr(isToday ? "menu.overToday" : "menu.overDate", { date: day, kcal: fmt(-left) })}
       </Txt>
-      {scan.seen ? <Txt variant="tiny">The AI saw: {scan.seen}</Txt> : null}
+      {scan.seen ? <Txt variant="tiny">{tr("menu.seen", { seen: scan.seen })}</Txt> : null}
       {!scan.dishes.length ? (
         <Txt variant="small" style={{ marginTop: space.md }}>
-          No dishes found. Try a closer, sharper photo of one page.
+          {tr("menu.noDishes")}
         </Txt>
       ) : null}
       <View style={{ marginTop: space.md }}>
@@ -148,7 +153,7 @@ export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry
                 }}
                 accessibilityRole="button"
                 aria-expanded={open}
-                accessibilityLabel={`${d.name}, about ${fmt(d.calories)} calories, ${f.label}`}
+                accessibilityLabel={tr("menu.dishLabel", { name: d.name, kcal: fmt(d.calories), fit: tr(f.label) })}
                 style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
               >
                 <Row gap={space.sm} style={{ alignItems: "flex-start" }}>
@@ -161,22 +166,22 @@ export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry
                     ) : null}
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 4 }}>
-                    {i === 0 && d.fit >= 0.45 ? <Badge label="Best fit" tone="info" /> : null}
-                    <Badge label={f.label} tone={f.tone} />
+                    {i === 0 && d.fit >= 0.45 ? <Badge label={tr("menu.bestFit")} tone="info" /> : null}
+                    <Badge label={tr(f.label)} tone={f.tone} />
                   </View>
                 </Row>
                 <Txt variant="small" style={{ marginTop: space.xs, fontVariant: ["tabular-nums"] }}>
-                  ≈ {fmt(d.calories)} kcal (estimate{d.portion_g ? `, about ${fmt(d.portion_g)} g` : ""})
+                  {d.portion_g ? tr("menu.estimatePortion", { kcal: fmt(d.calories), grams: fmt(d.portion_g) }) : tr("menu.estimate", { kcal: fmt(d.calories) })}
                   <MacroText protein={d.protein_g} carbs={d.carbs_g} fat={d.fat_g} />
                 </Txt>
                 <Txt variant="tiny">{d.verdict}</Txt>
               </Pressable>
               {open ? (
                 <View style={{ marginTop: space.sm }}>
-                  <Chips<number> label="How much did you eat? (portions)" value={servings} onChange={setServings} options={PORTIONS} />
-                  <Chips<Meal> label="Log to" value={meal} onChange={setMeal} options={MEALS.map((m) => ({ value: m, label: cap(m) }))} />
+                  <Chips<number> label={tr("menu.howMuch")} value={servings} onChange={setServings} options={PORTIONS} />
+                  <Chips<Meal> label={tr("menu.logTo")} value={meal} onChange={setMeal} options={MEALS.map((m) => ({ value: m, label: tr(`meal.${m}`) }))} />
                   <Button
-                    title={`Log ≈ ${fmt(d.calories * servings)} kcal (estimate)`}
+                    title={tr("menu.log", { kcal: fmt(d.calories * servings) })}
                     icon="add"
                     small
                     onPress={() => log(d)}
@@ -190,7 +195,7 @@ export function MenuScanner({ date, onLogged }: { date: string; onLogged: (entry
       </View>
       <ErrorText message={error} />
       <View style={{ marginTop: space.md }}>
-        <LinkButton title="Scan another menu" onPress={() => take("camera")} />
+        <LinkButton title={tr("menu.another")} onPress={() => take("camera")} />
       </View>
     </View>
   );

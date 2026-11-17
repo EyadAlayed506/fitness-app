@@ -210,16 +210,21 @@ export function Txt({
     big: { fontSize: 28, fontWeight: "700", letterSpacing: -0.6, lineHeight: 32, color: t.text, fontVariant: ["tabular-nums"] },
     hero: { ...typeScale.display, fontSize: 44, lineHeight: 48, color: t.text, fontVariant: ["tabular-nums"] },
   };
-  // Arabic letters join up; any letter spacing pulls them apart, so it is turned off in Arabic
-  const joined = useLanguage() === "ar" ? noLetterSpacing : null;
+  const rtl = useLanguage() === "ar";
+  // Arabic letters join up; any letter spacing pulls them apart, so it is turned off in Arabic.
+  const joined = rtl ? noLetterSpacing : null;
+  // Align with the page, not with the text: an Arabic food name in the English app (or an English
+  // exercise name in the Arabic app) would otherwise sit on the opposite side. A style can still override it.
   return (
-    <Text style={[v[variant], style, joined]} numberOfLines={numberOfLines} selectable={selectable}>
+    <Text style={[rtl ? alignRight : alignLeft, v[variant], style, joined]} numberOfLines={numberOfLines} selectable={selectable}>
       {children}
     </Text>
   );
 }
 
 const noLetterSpacing: TextStyle = { letterSpacing: 0 };
+const alignLeft: TextStyle = { textAlign: "left" };
+const alignRight: TextStyle = { textAlign: "right" };
 
 export function ErrorText({ message }: { message: string | null }) {
   const t = useTheme();

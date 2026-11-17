@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { View } from "react-native";
@@ -11,6 +10,7 @@ import {
   Card,
   ErrorText,
   FadeIn,
+  Icon,
   IconButton,
   ListRow,
   ProgressRing,
@@ -25,8 +25,9 @@ import {
 import { api } from "@/lib/api";
 import { useProfile } from "@/lib/auth";
 import { addFood, copyMeal, deleteFood, deleteFoods, restoreFood, useFoodDay } from "@/lib/data";
-import { addDays, cap, fmt, longDate, shortDate, todayISO, unitLabel } from "@/lib/format";
+import { addDays, fmt, longDate, shortDate, todayISO, unitLabel } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
+import { useI18n } from "@/lib/i18n";
 import { errorMessage, qk, useRefreshOnFocus } from "@/lib/query";
 import { space, type as typeScale, useTheme } from "@/lib/theme";
 import type { Food, FoodLogEntry, Meal, RecentFood } from "@/lib/types";
@@ -41,6 +42,7 @@ type SheetState =
 
 export default function FoodLog() {
   const t = useTheme();
+  const { t: tr, tn } = useI18n();
   const toast = useToast();
   const { plan } = useProfile();
   const [date, setDate] = useState(todayISO());
@@ -58,23 +60,23 @@ export default function FoodLog() {
   const left = target - eaten;
 
   const undoable = (message: string, undo: () => Promise<unknown>) =>
-    toast(message, { action: { label: "Undo", onPress: () => void undo().catch(() => {}) } });
+    toast(message, { action: { label: tr("common.undo"), onPress: () => void undo().catch(() => {}) } });
 
   const remove = async (e: FoodLogEntry) => {
     try {
       await deleteFood(e);
-      undoable(`${e.food_name} removed`, () => restoreFood(e));
+      undoable(tr("food.removed", { name: e.food_name }), () => restoreFood(e));
     } catch (err) {
-      toast(errorMessage(err) ?? "Couldn't remove it");
+      toast(errorMessage(err) ?? tr("food.couldntRemove"));
     }
   };
   const copy = async (meal: Meal) => {
     try {
       const created = await copyMeal(previous, date, meal);
       haptics.success();
-      undoable(`Copied ${created.length} ${created.length === 1 ? "food" : "foods"} to ${meal}`, () => deleteFoods(created));
+      undoable(tr("food.copied", { count: tn("food.foodCount", created.length), meal: tr(`mealLower.${meal}`) }), () => deleteFoods(created));
     } catch (err) {
-      toast(errorMessage(err) ?? "Couldn't copy the meal");
+      toast(errorMessage(err) ?? tr("food.couldntCopy"));
     }
   };
   const quickAdd = async (item: RecentFood, meal: Meal) => {
@@ -82,16 +84,16 @@ export default function FoodLog() {
       const saved = await addFood({ food_id: item.food.id, quantity: item.quantity, unit: item.unit, meal, date });
       haptics.success();
       setSheet(null);
-      undoable(`${item.food.name} added to ${meal}`, () => deleteFood(saved));
+      undoable(tr("food.addedTo", { name: item.food.name, meal: tr(`mealLower.${meal}`) }), () => deleteFood(saved));
     } catch (err) {
-      toast(errorMessage(err) ?? "Couldn't add it");
+      toast(errorMessage(err) ?? tr("food.couldntAdd"));
     }
   };
 
   return (
     <Screen
-      title="Food"
-      subtitle={isToday ? "TODAY" : longDate(date).toUpperCase()}
+      title={tr("nav.food")}
+      subtitle={(isToday ? tr("today.today") : longDate(date)).toLocaleUpperCase()}
       refreshing={refreshing}
       onRefresh={async () => {
         setRefreshing(true);
@@ -100,8 +102,8 @@ export default function FoodLog() {
       }}
       right={
         <Row gap={space.sm}>
-          <IconButton icon="chevron-back" label="Previous day" onPress={() => setDate(previous)} />
-          {isToday ? null : <IconButton icon="chevron-forward" label="Next day" onPress={() => setDate(addDays(date, 1))} />}
+          <IconButton icon="chevron-back" label={tr("food.previousDay")} onPress={() => setDate(previous)} />
+          {isToday ? null : <IconButton icon="chevron-forward" label={tr("food.nextDay")} onPress={() => setDate(addDays(date, 1))} />}
         </Row>
       }
     >
@@ -109,7 +111,7 @@ export default function FoodLog() {
         <Card>
           <ErrorText message={errorMessage(dayQuery.error)} />
           <Button
-            title="Try again"
+            title={tr("common.tryAgain")}
             kind="soft"
             small
             onPress={async () => {
@@ -131,15 +133,15 @@ export default function FoodLog() {
                 diameter={112}
                 stroke={9}
                 color={left < 0 ? t.warn : t.accent}
-                label={`${fmt(eaten)} of ${fmt(target)} calories eaten`}
+                label={tr("home.ringLabel", { eaten: fmt(eaten), target: fmt(target) })}
               >
                 <Txt style={{ ...typeScale.heading, fontSize: 22, lineHeight: 26, fontVariant: ["tabular-nums"] }}>{fmt(Math.abs(left))}</Txt>
-                <Txt variant="tiny">{left >= 0 ? "kcal left" : "kcal over"}</Txt>
+                <Txt variant="tiny">{tr(left >= 0 ? "home.kcalLeft" : "home.kcalOver")}</Txt>
               </ProgressRing>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <MacroBars totals={day.totals} targetKcal={target} stacked />
                 <Txt variant="tiny" style={{ marginTop: space.md }}>
-                  {fmt(eaten)} eaten · {fmt(target)} target
+                  {tr("home.eatenTarget", { eaten: fmt(eaten), target: fmt(target) })}
                 </Txt>
               </View>
             </Row>
@@ -153,14 +155,18 @@ export default function FoodLog() {
               <Card key={meal} style={{ paddingBottom: items.length ? space.xs : space.lg }}>
                 <Row style={{ justifyContent: "space-between" }}>
                   <View style={{ flex: 1 }}>
-                    <Txt variant="h3">{cap(meal)}</Txt>
-                    <Txt variant="tiny">{items.length ? `${fmt(kcal)} kcal` : "Nothing logged"}</Txt>
+                    <Txt variant="h3">{tr(`meal.${meal}`)}</Txt>
+                    <Txt variant="tiny">{items.length ? tr("food.kcal", { n: fmt(kcal) }) : tr("food.nothingLogged")}</Txt>
                   </View>
-                  <Button title="Add" icon="add" kind="soft" small onPress={() => setSheet({ kind: "search", meal })} accessibilityLabel={`Add food to ${meal}`} />
+                  <Button title={tr("food.add")} icon="add" kind="soft" small onPress={() => setSheet({ kind: "search", meal })} accessibilityLabel={tr("food.addFoodTo", { meal: tr(`mealLower.${meal}`) })} />
                 </Row>
                 {!items.length && before.length ? (
                   <Button
-                    title={`${isToday ? `Copy yesterday's ${meal}` : `Copy ${meal} from ${shortDate(previous)}`} · ${fmt(before.reduce((a, e) => a + e.calories, 0))} kcal`}
+                    title={tr(isToday ? "food.copyYesterday" : "food.copyFrom", {
+                      meal: tr(`mealLower.${meal}`),
+                      date: shortDate(previous),
+                      kcal: fmt(before.reduce((a, e) => a + e.calories, 0)),
+                    })}
                     icon="copy-outline"
                     kind="ghost"
                     small
@@ -184,7 +190,7 @@ export default function FoodLog() {
                     right={
                       <Row gap={space.sm}>
                         <Txt style={{ fontWeight: "600", fontVariant: ["tabular-nums"], opacity: e.id > 0 ? 1 : 0.5 }}>{fmt(e.calories)}</Txt>
-                        {e.id > 0 ? <IconButton icon="close" label={`Remove ${e.food_name}`} onPress={() => remove(e)} /> : null}
+                        {e.id > 0 ? <IconButton icon="close" label={tr("food.removeLabel", { name: e.food_name })} onPress={() => remove(e)} /> : null}
                       </Row>
                     }
                   />
@@ -194,28 +200,28 @@ export default function FoodLog() {
           })}
           <Card onPress={() => setSheet({ kind: "menu" })}>
             <Row gap={space.md}>
-              <Ionicons name="restaurant-outline" size={20} color={t.text2} />
+              <Icon name="restaurant-outline" size={20} color={t.text2} />
               <View style={{ flex: 1 }}>
-                <Txt>Eating out? Scan the menu</Txt>
-                <Txt variant="tiny">See which dishes fit what&apos;s left {isToday ? "today" : `on ${shortDate(date)}`} (estimates)</Txt>
+                <Txt>{tr("food.menuTitle")}</Txt>
+                <Txt variant="tiny">{isToday ? tr("food.menuHintToday") : tr("food.menuHintDate", { date: shortDate(date) })}</Txt>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              <Icon name="chevron-forward" size={18} color={t.muted} />
             </Row>
           </Card>
           <Card onPress={() => setSheet({ kind: "custom", meal: "snack" })}>
             <Row gap={space.md}>
-              <Ionicons name="create-outline" size={20} color={t.text2} />
+              <Icon name="create-outline" size={20} color={t.text2} />
               <View style={{ flex: 1 }}>
-                <Txt>Create a custom food</Txt>
-                <Txt variant="tiny">For recipes or labels the search doesn’t know</Txt>
+                <Txt>{tr("food.customTitle")}</Txt>
+                <Txt variant="tiny">{tr("food.customHint")}</Txt>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={t.muted} />
+              <Icon name="chevron-forward" size={18} color={t.muted} />
             </Row>
           </Card>
         </FadeIn>
       ) : null}
 
-      <Sheet visible={sheet?.kind === "search"} title={sheet?.kind === "search" ? `Add to ${sheet.meal}` : ""} onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "search"} title={sheet?.kind === "search" ? tr("food.addToMeal", { meal: tr(`mealLower.${sheet.meal}`) }) : ""} onClose={() => setSheet(null)}>
         {sheet?.kind === "search" ? (
           <FoodSearch
             onPick={(food, portion) => setSheet({ kind: "detail", food, meal: sheet.meal, portion })}
@@ -233,23 +239,23 @@ export default function FoodLog() {
             portion={sheet.portion}
             onAdded={(saved) => {
               setSheet(null);
-              undoable(`${sheet.food.name} added`, () => deleteFood(saved));
+              undoable(tr("food.added", { name: sheet.food.name }), () => deleteFood(saved));
             }}
           />
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "menu"} title="Scan a menu" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "menu"} title={tr("food.scanMenu")} onClose={() => setSheet(null)}>
         {sheet?.kind === "menu" ? (
           <MenuScanner
             date={date}
             onLogged={(entry) => {
               setSheet(null);
-              undoable(`${entry.food_name} logged to ${entry.meal} (estimate)`, () => deleteFood(entry));
+              undoable(tr("food.loggedEstimate", { name: entry.food_name, meal: tr(`mealLower.${entry.meal}`) }), () => deleteFood(entry));
             }}
           />
         ) : null}
       </Sheet>
-      <Sheet visible={sheet?.kind === "custom"} title="Custom food" onClose={() => setSheet(null)}>
+      <Sheet visible={sheet?.kind === "custom"} title={tr("food.custom")} onClose={() => setSheet(null)}>
         {sheet?.kind === "custom" ? <CustomFoodForm onCreated={(food) => setSheet({ kind: "detail", food, meal: sheet.meal })} /> : null}
       </Sheet>
       <Sheet visible={sheet?.kind === "edit"} title={sheet?.kind === "edit" ? sheet.entry.food_name : ""} onClose={() => setSheet(null)}>
@@ -258,11 +264,11 @@ export default function FoodLog() {
             entry={sheet.entry}
             onSaved={() => {
               setSheet(null);
-              toast("Food updated");
+              toast(tr("food.updated"));
             }}
             onDeleted={(e) => {
               setSheet(null);
-              undoable(`${e.food_name} removed`, () => restoreFood(e));
+              undoable(tr("food.removed", { name: e.food_name }), () => restoreFood(e));
             }}
           />
         ) : null}
@@ -281,11 +287,12 @@ function EditEntry({
   onSaved: () => void;
   onDeleted: (e: FoodLogEntry) => void;
 }) {
+  const { t: tr } = useI18n();
   const food = useQuery({ queryKey: ["food", entry.food_id], queryFn: () => api<Food>(`/foods/${entry.food_id}`) });
   if (food.error) return <ErrorText message={errorMessage(food.error)} />;
   if (!food.data)
     return (
-      <View style={{ gap: space.md }} accessibilityLabel="Loading">
+      <View style={{ gap: space.md }} accessibilityLabel={tr("common.loading")}>
         <Skeleton height={56} />
         <Skeleton height={36} width="70%" />
       </View>

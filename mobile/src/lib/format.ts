@@ -24,7 +24,11 @@ export const VOLUME_TO_ML: Record<string, number> = {
   gallon: 3785.411784,
 };
 
-export const unitLabel = (u: string) => (u === "fl_oz" ? "fl oz" : u);
+/** A food unit ID ("g", "tbsp", "fl_oz") as shown in the current language; an unknown unit as it is. */
+export const unitLabel = (u: string): string => {
+  const key = `foodUnit.${u}` as MessageKey;
+  return key in en ? tr(key) : u;
+};
 
 export function round(n: number | null | undefined, digits = 0): number | null {
   if (n == null || Number.isNaN(n)) return null;

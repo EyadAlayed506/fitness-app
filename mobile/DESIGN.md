@@ -54,6 +54,9 @@ Status: **draft for review** (APP-01, 2026-11-18). Reviewers: Nawaf (language/co
   automatically. `Button`, `IconButton`, `ListRow` already use it.
 - **No letter spacing in Arabic:** it breaks joined letters. `Txt` removes it automatically; other `Text` uses must not set it in Arabic.
 - Emails, passwords, URLs and numbers typed by the user stay left-to-right inside an Arabic layout (browser default `dir=auto`).
+- **Text aligns with the page, not with its own script:** `Txt` sets `textAlign` left (English) or right (Arabic),
+  so an Arabic product name in the English app, or an English exercise name in the Arabic app, lines up with the
+  rest of the row. Pass `textAlign` in `style` to centre. Plain `Text` elsewhere should do the same.
 - Arabic text is often longer/taller: no fixed widths on text, allow two lines on buttons and labels where space is tight.
 
 ## States

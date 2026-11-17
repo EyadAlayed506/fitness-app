@@ -7,7 +7,7 @@
 | Base | `origin/merged_branch` @ `de689db` |
 | Date | 2026-11-18 |
 | Platform | Web app for the pilot (WEB-01) |
-| Status | **Partly done.** Sign-up → onboarding → Today → Profile → **Workouts** work in Arabic and English against the real local backend. Food, progress, coach, sleep screens still English. Arabic text not yet human-reviewed. |
+| Status | **Partly done.** Sign-up → onboarding → Today → Profile → Workouts → **Food** work in Arabic and English against the real local backend. Progress, coach, sleep screens still English. Arabic text not yet human-reviewed. |
 
 ## Update 2026-11-18 (part 2): Workouts
 
@@ -26,7 +26,30 @@
   Eyad), and server text (exercise names and instructions, plan explanation and notes, focus labels).
 - Arabic users can't search exercises in Arabic yet (names are English in the library); the empty-search hint says so.
 
-Screenshots: [workouts](APP-02/workouts-ar.jpg) · [log a set](APP-02/log-set-ar.jpg) ·
+## Update 2026-11-18 (part 3): Food
+
+- Translated: Food tab (day summary, meals, copy yesterday's meal, previous/next day), food search (recent,
+  frequent, in-app and online results), food detail (amount, unit, meal, per-100 table and sub-nutrients),
+  editing/removing entries, custom food form, and the restaurant-menu scanner. Undo toasts too.
+- Food units (`g`, `tbsp`, `fl_oz`, …) are shown translated via `unitLabel`; the unit IDs sent to the API are unchanged.
+- **Arabic food search works**: "موز" finds Saudi products in Open Food Facts, so the Arabic search hint uses
+  Arabic examples. Product names stay as the database has them.
+- **Mixed-script fix (both languages):** `Txt` now aligns with the page direction. Before, an Arabic product name
+  in the English app sat on the right while its details sat on the left (and the reverse for English exercise
+  names in Arabic).
+- Browser check (Arabic, 375×812, local backend): empty day → search "موز" → product detail → add to breakfast
+  (toast with undo, ring, meal total, entry row). English re-checked.
+- Checks: **96/96** unit tests, typecheck, lint, web export.
+- **Still English in Food:** server/AI text — online-database warnings ("USDA … not reachable"), the menu
+  scanner's estimate note, dish descriptions and verdicts.
+- Minor, existing in both languages: in bottom sheets, the scroll indicator overlaps the first few pixels of
+  text on the outer edge (right in English, left in Arabic). Not fixed.
+
+Screenshots: [food](APP-02/food-ar.jpg) · [Arabic search](APP-02/food-search-arabic-ar.jpg) ·
+[detail](APP-02/food-detail-ar.jpg) · [logged](APP-02/food-logged-ar.jpg) ·
+[English with an Arabic product](APP-02/food-en-mixed-script.jpg)
+
+Workouts screenshots: [workouts](APP-02/workouts-ar.jpg) · [log a set](APP-02/log-set-ar.jpg) ·
 [active workout](APP-02/active-workout-ar.jpg) · [discard dialog](APP-02/discard-dialog-ar.jpg) ·
 [English](APP-02/workouts-en.jpg)
 
@@ -80,7 +103,7 @@ Still no new dependencies; `package.json`, `app.json`, `eas.json`, `api.ts` unto
 |---|---|---|
 | Server-generated text | today's suggestion titles/messages/reasons, plan disclaimer, routine split and day titles ("Full body"), exercise names | **Alzoman / Nawaf** — needs a decision: server returns text per `lang`, or stable IDs the app translates |
 | Workouts (rest of) | `HandsFree`, `SetHelpers` (voice + weight from photo) — **done otherwise** | Samer; Nawaf for voice language |
-| Food | `food.tsx`, `FoodParts`, `MacroText` | Samer |
+| Food | **done** (server/AI text excepted) | Samer |
 | Progress | `progress.tsx`, `WeeklySummary`, `Insights`, `charts` | Samer |
 | Sleep / points | `SleepParts` (quality, "In range", goal "7 h"), `SleepDashboard`, `WhoopCard`, `HealthConnectCard`, `PointsParts` | Badr (meanings) |
 | Coach | `coach.tsx` + reply language | Nawaf |

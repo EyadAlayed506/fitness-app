@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { WEEKDAYS, WEEKDAYS_MIN, WEEKDAYS_SHORT, dayList, duration, fmt, hoursMinutes, idLabel, shortDate, timeAgo, units } from "./format.ts";
+import { WEEKDAYS, WEEKDAYS_MIN, WEEKDAYS_SHORT, dayList, duration, fmt, hoursMinutes, idLabel, shortDate, timeAgo, unitLabel, units } from "./format.ts";
 import { setCurrentLanguage } from "./i18n/current.ts";
 
 // strip the invisible direction marks Arabic placeholders are wrapped in
@@ -60,6 +60,15 @@ test("server IDs (muscle group, category) are shown translated, unknown ones as 
   assert.equal(idLabel("muscle", "chest"), "الصدر");
   assert.equal(idLabel("category", "free weight"), "أوزان حرة");
   assert.equal(idLabel("muscle", "forearms"), "Forearms", "a new ID from the server still shows something");
+});
+
+test("food units are shown in the current language; unknown units as they are", () => {
+  assert.equal(unitLabel("fl_oz"), "fl oz");
+  assert.equal(unitLabel("g"), "g");
+  setCurrentLanguage("ar");
+  assert.equal(unitLabel("g"), "غ");
+  assert.equal(unitLabel("tbsp"), "ملعقة كبيرة");
+  assert.equal(unitLabel("bowl"), "bowl");
 });
 
 test("'days ago' uses Arabic plural forms", () => {

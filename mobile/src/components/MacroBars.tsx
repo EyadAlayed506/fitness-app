@@ -48,10 +48,11 @@ const NBSP = String.fromCharCode(160);
  */
 export function MacroText({ protein, carbs, fat }: { protein: number; carbs: number; fat: number }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
   const parts = [
-    { label: "protein", grams: protein, color: t.series[0] },
-    { label: "carbs", grams: carbs, color: t.series[1] },
-    { label: "fat", grams: fat, color: t.series[2] },
+    { label: tr("macroLower.protein"), grams: protein, color: t.series[0] },
+    { label: tr("macroLower.carbs"), grams: carbs, color: t.series[1] },
+    { label: tr("macroLower.fat"), grams: fat, color: t.series[2] },
   ];
   return (
     <>
@@ -62,7 +63,7 @@ export function MacroText({ protein, carbs, fat }: { protein: number; carbs: num
             ●
           </Txt>
           {/* no-break spaces: a line only wraps between nutrients, never inside "5 g fat" */}
-          {["", fmt(p.grams), "g", p.label].join(NBSP)}
+          {["", fmt(p.grams), tr("unit.g"), p.label].join(NBSP)}
         </Txt>
       ))}
     </>
