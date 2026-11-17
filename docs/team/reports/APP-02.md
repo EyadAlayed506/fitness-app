@@ -29,7 +29,7 @@ each chip's hint, segmented tabs and the tab bar by their translated label.
 
 **Charts in Arabic:** the week strip, cards, legends and tables are right-to-left; the chart drawing area (time axis,
 y-axis numbers) and number lines like the BMI scale stay left-to-right, as written in `mobile/DESIGN.md`.
-**Open for the team:** whether to mirror chart time axes (newest on the left) in Arabic.
+**Decided:** chart time axes stay left-to-right in Arabic (not mirrored).
 
 **Checks:** backend all pass (incl. 4 new exercise-language tests); app 50/50, typecheck, lint. Browser
 (Arabic, demo account): Workouts shows Arabic exercise names; the how-to sheet shows Arabic muscles, steps and

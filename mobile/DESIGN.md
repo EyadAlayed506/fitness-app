@@ -62,7 +62,7 @@ Status: **draft for review** (APP-01, 2026-11-18). Reviewers: Nawaf (language/co
   rest of the row. Pass `textAlign` in `style` to centre. Plain `Text` elsewhere should do the same.
 - **Charts and number lines stay left-to-right** in Arabic (time runs left → right, like the BMI scale 15 → 40).
   Their containers set `direction: "ltr"`; legends, titles and tables around them follow the page.
-  Whether to mirror chart time axes in Arabic is still open for the team.
+  Decided (2026-11-18): chart time axes are not mirrored in Arabic (newest on the right, numbers on the left).
 - **Exercise names and how-to** come from the server in the request's language (`name_ar` etc., see APP-02 part 7);
   the English name stays the ID used by QR codes and history.
   *Decision to confirm with an Arabic-speaking reviewer.*
