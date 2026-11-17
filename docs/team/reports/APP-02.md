@@ -7,7 +7,49 @@
 | Base | `origin/merged_branch` @ `de689db` |
 | Date | 2026-11-18 |
 | Platform | Web app for the pilot (WEB-01) |
-| Status | **All five tabs done.** Sign-up → onboarding → Today → Profile → Workouts → Food → Progress → **Coach** in Arabic and English. Sleep, points, gyms, QR screens and hands-free voice still English. Arabic text not yet human-reviewed. |
+| Status | **Every app screen is bilingual, and the server answers in the app's language.** Remaining English: exercise names/how-to (needs a data decision) and server error details (on purpose). Hands-free voice removed. Arabic text not yet human-reviewed. |
+
+## Update 2026-11-18 (part 6): remaining screens, hands-free removed, server text in Arabic
+
+**Hands-free voice removed** (team decision): wake word, spoken commands, "hold to say your set" and spoken rest
+announcements in the app; `POST /voice/interpret` and its service/tests on the server; README rows and
+`docs/HANDS_FREE.md`. The coach's voice message (`/assistant/transcribe`) stays. **Open:** `expo-speech` and
+`expo-keep-awake` are now unused but still in `package.json` (lockfile change to coordinate).
+
+**Remaining screens translated:** Sleep (incl. WHOOP / Health Connect cards and setup steps), wellness points,
+gyms, QR stickers, machine photo recognition, weight from a photo, rest-timer phone notification.
+Sleep wording → Badr; machine/gym wording → Eyad.
+
+**Server text in the app's language** — mechanism: the app sends `Accept-Language: ar|en` with every request
+(and refetches when the language changes); `app/i18n.py` keeps it per request and gives `tr()`/`tr_count()`
+with Arabic plurals. English is the default, so other clients see no change. Translated:
+
+| Area | What |
+|---|---|
+| Coach | reply-language rule in the system prompt + app note; action cards; disclaimer; fallback replies; setup/connection problems |
+| Today | suggestion titles, messages, reasons, sources, disclaimer |
+| Plan | day titles / focus labels ("الجسم كامل"), split names and reasons, warnings, notes, plan disclaimer, capped-diet warning, projection note |
+| Progress | insight titles, texts, cautions, "needs more data", group labels; weekly note |
+| Points | rule names/descriptions, achievements; stored award reasons translated on read by rule |
+| Other | alternative-exercise reasons, menu verdicts and note, gym session title/note; AI photo prompts ask for Arabic free text |
+
+Kept English on purpose: error `detail` texts (the app recognises them and shows its own translation), IDs and
+enum values, names stored in the database, tool errors/descriptions (only the model reads them).
+
+**Still English (needs a decision): exercise names and how-to steps** (48 exercises in `app/seed/exercises.json`).
+Names are stored in workout history and used by QR codes and search, so Arabic names need to be agreed
+(Nawaf/Eyad) and a storage choice made (Alzoman: e.g. optional `name_ar`/`instructions_ar` columns served by
+`Accept-Language`).
+
+**Checks:** app 50/50 tests, typecheck, lint. Backend 288 passed; 6 fail, and the same 6 fail on the unchanged
+code (date-dependent `test_assistant` cases: just after midnight the local day differs from UTC). New tests:
+`tests/test_i18n.py` (language reaches threaded endpoints, plurals, Arabic menu/alternatives/AI prompt),
+Arabic tests in test_assistant, test_recommendations, test_points. Browser (Arabic, demo account): Today
+suggestion and its reasons, Workouts plan names, Progress patterns — all from the server in Arabic.
+Not tested with a real AI model (no Ollama/Claude key here).
+
+Screenshots: [Today](APP-02/server-today-ar.jpg) · [Why?](APP-02/server-why-ar.png) ·
+[Workouts plan](APP-02/server-workouts-plan-ar.jpg) · [Patterns](APP-02/server-insights-ar.jpg)
 
 ## Update 2026-11-18 (part 5): Coach
 

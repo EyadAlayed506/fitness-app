@@ -30,6 +30,9 @@ Status: **draft for review** (APP-01, 2026-11-18). Reviewers: Nawaf (language/co
 - **Errors:** show `errorText(err)` from `useI18n()` for API errors. It maps known server answers to translated
   text; unknown ones show the server's words in English and a general message in Arabic. Keep the error object in
   state (not the text) so it re-translates when the language changes.
+- **Server text:** the app sends `Accept-Language` with every request; text the server writes comes back in that
+  language (`app/i18n.py` on the server). Server error `detail` texts stay English on purpose: `errorText()`
+  recognises them. A message that is already Arabic is shown as it is.
 - **User and external text** (notes, food product names, coach replies' quoted data) is shown as written.
 - **Choice and memory:** the switch shows `English | العربية`, each in its own script. The choice is saved on the
   device (`localStorage` on the web, secure storage on phones). First visit: Arabic if the browser's first language
