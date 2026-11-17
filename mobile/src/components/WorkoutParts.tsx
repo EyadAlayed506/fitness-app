@@ -13,14 +13,12 @@ import { useI18n } from "@/lib/i18n";
 import { tr } from "@/lib/i18n/current";
 import { betterBest, bestOf, isNewBest, parseRepRange, suggestNext, type Best } from "@/lib/progression";
 import { errorMessage, qk } from "@/lib/query";
-import { spokenWeight } from "@/lib/speech";
 import { radius, space, useTheme } from "@/lib/theme";
 import type { Exercise, ExerciseHistory, Gym, Workout, WorkoutSet } from "@/lib/types";
-import type { SpokenSet } from "@/lib/voiceSet";
 
 import { MachineSettingsCard } from "./GymParts";
 import { RestTimerPanel } from "./RestTimer";
-import { HandsFreeMic, WeightFromPhoto } from "./SetHelpers";
+import { WeightFromPhoto } from "./SetHelpers";
 import { useWorkoutSession } from "./WorkoutSession";
 import {
   Badge,
@@ -285,7 +283,7 @@ function SetFormBody({
   const { t: tr } = useI18n();
   const toast = useToast();
   const { profile } = useProfile();
-  const { timer, announceAfterRest } = useWorkoutSession();
+  const { timer } = useWorkoutSession();
   const imperial = units(profile.unit_system).imperial;
   const mine = workout.sets.filter((s) => s.exercise_id === exercise.id);
   const lastHere = mine.at(-1) ?? null;
@@ -319,7 +317,6 @@ function SetFormBody({
     // the best so far: from earlier workouts, and from this one
     const before: Best | null = mine.reduce<Best | null>((b, s) => betterBest(b, bestOf(s.weight_kg, s.reps)), history?.best ?? null);
     timer.dispatch({ type: "start", now: Date.now() }); // the rest starts as soon as the set is logged
-    announceAfterRest(null); // only a spoken set is answered out loud (saveSpoken sets the next one)
     haptics.success();
     try {
       const saved = await addSet(workout.id, { exercise_id: exercise.id, exercise_name: exercise.name, added_via: addedVia, ...values });
@@ -353,37 +350,6 @@ function SetFormBody({
     return save({ reps: lastHere.reps, weight: inUnit(lastHere.weight_kg, unit), unit, rpe: lastHere.rpe, notes: "" });
   };
   const targetDone = target ? mine.length >= target.sets : false;
-
-  /** Hands-free: a spoken set is saved like a tapped one; the reply and the next set are said out loud. */
-  const saveSpoken = async (spoken: SpokenSet): Promise<{ said: string } | { error: string }> => {
-    let values: { reps: number; weight: number; unit: string } | null;
-    if (spoken.kind === "same") {
-      if (!lastHere) return { error: "There's no set to repeat yet. Say one like “8 reps at 60”." };
-      values = { reps: lastHere.reps, weight: inUnit(lastHere.weight_kg, unit), unit };
-    } else {
-      const spokenUnit = spoken.unit ?? unit;
-      const formWeight = Number(weight.replace(",", ".")) || 0;
-      // no weight said: keep the one in the form ("12 reps")
-      const w = spoken.weight ?? (spokenUnit === unit ? formWeight : inUnit(unit === "lb" ? formWeight * KG_PER_LB : formWeight, spokenUnit));
-      values = { reps: spoken.reps, weight: w, unit: spokenUnit };
-    }
-    if (values.reps <= 0 || values.reps > 200) return { error: "That doesn't sound like a number of reps. Try again." };
-    setReps(String(values.reps));
-    setUnit(values.unit);
-    setWeight(String(values.weight));
-    const saved = await save({ ...values, rpe, notes: "" });
-    if (!saved) return { error: "Couldn't save the set. Check the connection to your PC." };
-    const done = mine.length + 1;
-    const said = `Saved: ${values.reps} reps at ${spokenWeight(values.weight, values.unit)}.`;
-    announceAfterRest(
-      target && done >= target.sets
-        ? next
-          ? `Next: ${next.name}.`
-          : `That's all ${target.sets} sets of ${exercise.name}.`
-        : `Next: set ${done + 1}${target ? ` of ${target.sets}` : ""}, ${values.reps} reps at ${spokenWeight(values.weight, values.unit)}.`,
-    );
-    return { said };
-  };
 
   return (
     <View>
@@ -526,7 +492,6 @@ function SetFormBody({
           ) : null}
         </Row>
       ) : null}
-      <HandsFreeMic onSet={saveSpoken} />
 
       {mine.length ? (
         <View style={{ marginTop: space.xl }}>

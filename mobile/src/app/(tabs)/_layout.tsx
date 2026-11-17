@@ -3,7 +3,6 @@ import { Redirect } from "expo-router";
 import { BottomTabBar, Tabs } from "expo-router/js-tabs";
 import { StyleSheet, View } from "react-native";
 
-import { HandsFreeBadge, HandsFreeProvider } from "@/components/HandsFree";
 import { Loading, type IconName } from "@/components/ui";
 import { WorkoutMiniBar, WorkoutSessionProvider } from "@/components/WorkoutSession";
 import { useAuth } from "@/lib/auth";
@@ -29,12 +28,11 @@ export default function TabsLayout() {
   if (!profile) return <Redirect href="/onboarding" />;
   return (
     <WorkoutSessionProvider>
-      <HandsFreeProvider>
         <Tabs
           // the "workout in progress" bar sits on top of the tab bar, so screens never hide behind it
           tabBar={(props) => (
             <View>
-              <WorkoutMiniBar extra={<HandsFreeBadge />} />
+              <WorkoutMiniBar />
               <BottomTabBar {...props} />
             </View>
           )}
@@ -66,7 +64,6 @@ export default function TabsLayout() {
           ))}
           <Tabs.Screen name="profile" options={{ title: tr("nav.profile"), href: null }} />
         </Tabs>
-      </HandsFreeProvider>
     </WorkoutSessionProvider>
   );
 }

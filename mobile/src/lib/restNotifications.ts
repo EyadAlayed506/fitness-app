@@ -40,7 +40,7 @@ function load(): Promise<Notifications | null> {
 }
 
 /**
- * Schedule "Rest is over" in `seconds`. `next` is the next set when it's known (hands-free sets), e.g.
+ * Schedule "Rest is over" in `seconds`. `next` is an optional extra line, e.g.
  * "Next: set 3 of 4, 8 reps at 60 kilos." Returns its id, or null (no permission, or not supported).
  */
 export async function scheduleRestEnd(seconds: number, exerciseName: string, next: string | null = null): Promise<string | null> {

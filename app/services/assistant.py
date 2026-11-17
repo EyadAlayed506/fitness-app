@@ -708,25 +708,6 @@ class ClaudeBackend:
             return Answer(text or NO_ANSWER, used)
         return Answer(TOO_MANY_STEPS, used)
 
-    def interpret(self, prompt: str, schema: dict) -> dict:
-        """One structured answer (hands-free commands): Claude must fill in the schema."""
-        import anthropic
-
-        try:
-            response = self.client.beta.messages.create(
-                model=self.model,
-                max_tokens=400,
-                tools=[{"name": "command", "description": "The workout command", "input_schema": schema}],
-                tool_choice={"type": "tool", "name": "command"},
-                messages=[{"role": "user", "content": prompt}],
-            )
-        except anthropic.APIError as e:
-            raise AssistantError(502, f"The assistant couldn't read that ({type(e).__name__}).")
-        for block in response.content:
-            if block.type == "tool_use":
-                return dict(block.input)
-        return {}
-
 
 # Small local models have less room: shorter history and tool results
 OLLAMA_HISTORY_MESSAGES = 10
@@ -796,16 +777,6 @@ class OllamaBackend:
                 text += CUT_OFF
             return Answer(text or NO_ANSWER, used)
         return Answer(TOO_MANY_STEPS, used)
-
-    def interpret(self, prompt: str, schema: dict) -> dict:
-        """One structured answer (hands-free commands), with Ollama's JSON-schema output."""
-        reply = self._chat([{"role": "user", "content": prompt}], tools=False, answer_format=schema, timeout=60)
-        content = _THINK.sub("", (reply.get("message") or {}).get("content") or "").strip()
-        try:
-            data = json.loads(content)
-        except ValueError:
-            return {}
-        return data if isinstance(data, dict) else {}
 
     def _chat(self, messages: list[dict], tools: bool = True, answer_format: dict | None = None, timeout: float = 300) -> dict:
         body: dict[str, Any] = {

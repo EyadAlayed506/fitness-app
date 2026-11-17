@@ -1,106 +1,18 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, View } from "react-native";
 
 import { haptics } from "@/lib/haptics";
 import { choosePhoto, sendPhoto, type Photo } from "@/lib/photo";
 import { errorMessage } from "@/lib/query";
-import { speak } from "@/lib/speech";
-import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
+import { radius, space, useTheme } from "@/lib/theme";
 import type { WeightReading } from "@/lib/types";
-import { useHoldToTalk } from "@/lib/voice";
-import { parseSpokenSet, type SpokenSet } from "@/lib/voiceSet";
 
-import { useHandsFree } from "./HandsFree";
 import { Badge, Button, ErrorText, LinkButton, Row, Txt } from "./ui";
 
-/** Helpers in the set form: say the set out loud (hands-free), or read the weight from a photo. */
+/** Helper in the set form: read the weight from a photo. */
 
 const confidenceLabel = (c: number) =>
   c >= 0.7 ? { label: "Likely", tone: "good" as const } : c >= 0.4 ? { label: "Not sure", tone: "warn" as const } : { label: "Guess", tone: "neutral" as const };
-
-// ---------- hands-free sets ----------
-
-/**
- * Hold the mic and say "8 reps at 60" or "same again"; let go and the set is saved. The app answers out
- * loud (through headphones if they're connected), and says the next set when the rest is over.
- */
-export function HandsFreeMic({
-  onSet,
-  disabled = false,
-}: {
-  /** a set was heard; returns what to say back ("Saved: …"), or an error to show and say */
-  onSet: (set: SpokenSet, heard: string) => Promise<{ said: string } | { error: string }>;
-  disabled?: boolean;
-}) {
-  const t = useTheme();
-  const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
-  const fail = (text: string) => {
-    setNote({ text, error: true });
-    void speak(text);
-  };
-  const talk = useHoldToTalk(
-    async (text) => {
-      const heard = text.trim();
-      const set = parseSpokenSet(heard);
-      if (!set) {
-        fail(heard ? `Heard “${heard}”. Say a set like “8 reps at 60” or “same again”.` : "Didn't catch that. Try again.");
-        return;
-      }
-      const result = await onSet(set, heard);
-      if ("error" in result) fail(result.error);
-      else {
-        setNote({ text: `Heard “${heard}”`, error: false });
-        void speak(result.said);
-      }
-    },
-    (message) => setNote({ text: message, error: true }),
-  );
-  const listening = talk.state === "recording";
-  const busy = talk.state === "transcribing";
-  const handsFree = useHandsFree();
-  if (handsFree?.on)
-    return (
-      <Txt variant="tiny" style={{ marginTop: space.sm }}>
-        Hands-free is listening: say “{handsFree.wakeWord}, 12 reps at 25 kilos”.
-      </Txt>
-    );
-  return (
-    <View style={{ marginTop: space.sm }}>
-      <Pressable
-        {...talk.pressProps}
-        disabled={disabled || busy}
-        accessibilityRole="button"
-        accessibilityLabel={listening ? "Listening. Tap to save the set" : "Say your set"}
-        accessibilityHint="Hold and say a set, like 8 reps at 60, or same again. Let go to save it."
-        aria-busy={busy}
-        style={({ pressed }) => [
-          styles.mic,
-          noSelect,
-          {
-            backgroundColor: listening ? t.critical : t.surface2,
-            borderColor: listening ? t.critical : t.border,
-            opacity: disabled ? 0.4 : pressed && !listening ? 0.8 : 1,
-          },
-        ]}
-      >
-        {busy ? (
-          <ActivityIndicator size="small" color={t.text} />
-        ) : (
-          <Ionicons name={listening ? "radio-button-on" : "mic-outline"} size={20} color={listening ? t.criticalText : t.text} />
-        )}
-        <Txt style={{ ...typeScale.bodyStrong, color: listening ? t.criticalText : t.text }} numberOfLines={1} selectable={false}>
-          {listening ? `Listening… ${talk.seconds}s` : busy ? "Writing it down…" : "Hold to say your set"}
-        </Txt>
-      </Pressable>
-      <View accessibilityLiveRegion="polite" aria-live="polite">
-        <Txt variant="tiny" style={{ marginTop: space.xs, color: note?.error ? t.critical : t.muted }}>
-          {listening ? "Say “8 reps at 60” or “same again”, then let go (or tap again)." : note ? note.text : ""}
-        </Txt>
-      </View>
-    </View>
-  );
-}
 
 // ---------- snap the weight ----------
 
@@ -204,20 +116,7 @@ export function WeightFromPhoto({ onUse, onClose }: { onUse: (weight: number, un
   );
 }
 
-// holding the mic mustn't select text in the browser (that cancels the press)
-const noSelect = (Platform.OS === "web" ? { userSelect: "none" } : {}) as ViewStyle;
-
 const styles = StyleSheet.create({
-  mic: {
-    minHeight: 44,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-    paddingHorizontal: space.lg,
-  },
   panel: { borderRadius: radius.md, padding: space.md, marginTop: space.md },
   thumb: { width: 72, height: 72, borderRadius: radius.md },
 });

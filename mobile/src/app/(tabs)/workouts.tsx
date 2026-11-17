@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ExerciseInfo } from "@/components/ExerciseInfo";
 import { GymPicker, MachineTaken } from "@/components/GymParts";
 import { ExercisePhoto } from "@/components/ExercisePhoto";
-import { HandsFreePanel, useHandsFree } from "@/components/HandsFree";
 import { RestTimerPanel } from "@/components/RestTimer";
 import { ScheduleEditor } from "@/components/ScheduleEditor";
 import {
@@ -80,9 +79,8 @@ export default function Workouts() {
   useRefreshOnFocus([qk.workouts, qk.routine]);
   const { timer, planDay, plan, setPlanDay, swap, clearPlanDay } = useWorkoutSession();
   const gym = useCurrentGym();
-  const handsFree = useHandsFree();
   const params = useLocalSearchParams<{ start?: string }>();
-  // typed notes; `base` is what the saved notes were when typing started (hands-free can add to them meanwhile)
+  // typed notes; `base` is what the saved notes were when typing started (the server copy can change meanwhile, e.g. from another device)
   const [notesDraft, setNotesDraft] = useState<{ workoutId: number; text: string; base: string } | null>(null);
   const [openDay, setOpenDay] = useState<number | null>(null); // weekday index; null = today or the next training day
   const [sheet, setSheet] = useState<SheetState>(null);
@@ -164,7 +162,6 @@ export default function Workouts() {
       return;
     }
     timer.loadExercise(exercise.id, exercise.name).catch(() => {});
-    handsFree?.setCurrent(exercise); // short voice commands are for the exercise on screen
     setSheet({ kind: "set", exercise, via });
   };
   useEffect(() => {
@@ -233,7 +230,6 @@ export default function Workouts() {
                 <Stat label={tr("workouts.volume")} value={u.weight(active.volume_kg, 0)} />
                 <Stat label={tr("workouts.exercises")} value={String(new Set(active.sets.map((x) => x.exercise_id)).size)} />
               </Row>
-              <HandsFreePanel />
               {gym ? (
                 <Row gap={space.sm} style={{ marginTop: space.md }}>
                   <Icon name="location-outline" size={16} color={t.text2} />
