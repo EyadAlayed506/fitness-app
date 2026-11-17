@@ -25,7 +25,9 @@ Search matches Arabic names and aliases, ignoring diacritics and alef/taa-marbut
 
 **Cleanups:** removed `expo-speech` and `expo-keep-awake` (unused); fixed the 6 date-dependent `test_assistant`
 cases (they used the local date, the server uses UTC); screen readers now hear the option chips' group name and
-each chip's hint, segmented tabs and the tab bar by their translated label.
+each chip's hint, segmented tabs and the tab bar by their translated label. The food search's "… is not reachable
+right now" note (USDA / Open Food Facts down) now comes in Arabic too. Bottom sheets: the scroll bar sits at the
+sheet's edge instead of over the first pixels of text.
 
 **Charts in Arabic:** the week strip, cards, legends and tables are right-to-left; the chart drawing area (time axis,
 y-axis numbers) and number lines like the BMI scale stay left-to-right, as written in `mobile/DESIGN.md`.
@@ -208,26 +210,29 @@ Still no new dependencies; `package.json`, `app.json`, `eas.json`, `api.ts` unto
 | Browser 375×812, **real local backend** (`uv run fastapi dev`, demo account from `app.demo`) | Arabic: wrong password (live 401) → Arabic message; login → Today; Profile; switch to English and back. New account: sign-up (invalid email → Arabic message), 4 onboarding steps incl. validation, Today with first-week checklist. English Today/Profile checked for regressions. Screenshots in [APP-02/](APP-02/). |
 | Real phones, Safari, Firefox | **Not run** |
 
-## Still English (next)
+## What's left
 
-| Area | Where | Owner of meaning |
-|---|---|---|
-| Server-generated text | today's suggestion titles/messages/reasons, plan disclaimer, routine split and day titles ("Full body"), exercise names | **Alzoman / Nawaf** — needs a decision: server returns text per `lang`, or stable IDs the app translates |
-| Workouts (rest of) | `HandsFree`, `SetHelpers` (voice + weight from photo) — **done otherwise** | Samer; Nawaf for voice language |
-| Food | **done** (server/AI text excepted) | Samer |
-| Progress | **done** (Sleep view and server text excepted) | Samer |
-| Sleep / points | `SleepParts` (quality, "In range", goal "7 h"), `SleepDashboard`, `WhoopCard`, `HealthConnectCard`, `PointsParts` | Badr (meanings) |
-| Coach | **done** in the app; reply language needs a server rule (Nawaf) | Nawaf |
-| Machine photos / gyms | `ExercisePhoto`, `SnapParts`, `GymParts`, `gyms.tsx` | Eyad (names) |
+Every screen and all server text a user sees is bilingual. Left:
+
+| What | Who |
+|---|---|
+| Review the Arabic wording | Nawaf (overall, coach), Eyad (exercises, machines, gyms), Badr (sleep, points) |
+| Try the coach and photo features with a real AI model (Arabic replies and notes not seen live) | whoever has Ollama or a Claude key |
+| Real phones, Safari, Firefox | Samer + testers |
+| Web-only pilot | group call |
+| Push the branch and open the PR (mention the `package.json`/lockfile change) | Samer |
+
+Kept English on purpose: server error `detail` texts. The app shows its own translation for the ones it knows;
+an unknown error would show in English.
 
 ## Found along the way
 
-- Choice chips (`Chips`) expose `role=radio` with **no accessible name** in the web build (screen readers can't
-  read the options). Existing issue, not fixed here.
+- Choice chips (`Chips`) exposed `role=radio` with **no accessible name** in the web build — fixed in part 7.
 - Tab labels were clipped on the web in both languages — fixed (`flexShrink: 0`, `lineHeight`).
+- Bottom sheets: the scroll bar covered a few pixels of text at the edge (both languages) — fixed in part 7.
 
 ## Contracts / requests
 
 Same as APP-01 (optional error `code` — now also `invalid_email`; Arabic exercise content location and digits
-now decided — see part 7), plus: **how server-generated text gets a language** (suggestions, plan disclaimer, routine names).
-Proposal: the app sends `Accept-Language: ar|en` on every request; the server picks text by it and keeps IDs unchanged.
+now decided — see part 7), plus: **how server-generated text gets a language** — done: the app sends
+`Accept-Language: ar|en` on every request; the server picks text by it and keeps IDs unchanged (part 6).

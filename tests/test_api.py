@@ -165,6 +165,10 @@ def test_food_search_when_apis_are_down(client, auth):
     app.dependency_overrides[get_http_client] = failing
     r = client.get("/api/foods/search", params={"q": "rice"}, headers=auth).json()
     assert r["local"] and r["online"] == [] and len(r["warnings"]) == 2
+    assert r["warnings"][0] == "USDA FoodData Central is not reachable right now"
+    # the app in Arabic gets the warning in Arabic (the source name stays as it is)
+    r = client.get("/api/foods/search", params={"q": "rice"}, headers={**auth, "Accept-Language": "ar"}).json()
+    assert r["warnings"][0].startswith("تعذّر الوصول إلى") and "USDA FoodData Central" in r["warnings"][0]
 
 
 def test_manual_food_and_log(client, auth):

@@ -9,6 +9,7 @@ from sqlmodel import Session, or_, select
 
 from app.database import SessionDep
 from app.deps import CurrentUser
+from app.i18n import Table, tr
 from app.models.food import (
     NUTRIENT_FIELDS,
     CopyMealIn,
@@ -34,6 +35,12 @@ from app.services.plan import build_plan
 from app.services.units import UnitError, to_base_amount, units_for
 
 router = APIRouter(tags=["food"])
+
+# Shown in the app above the search results, in the language of the request (app.i18n)
+SEARCH_TEXTS: Table = {
+    "en": {"unreachable": "{source} is not reachable right now"},
+    "ar": {"unreachable": "تعذّر الوصول إلى {source} الآن"},
+}
 
 
 async def get_http_client() -> AsyncIterator[httpx.AsyncClient]:
@@ -77,7 +84,7 @@ async def search_foods(
     responses = await asyncio.gather(*(fn(client, q) for _, fn in sources), return_exceptions=True)
     for (label, _), res in zip(sources, responses):
         if isinstance(res, Exception):
-            result.warnings.append(f"{label} is not reachable right now")
+            result.warnings.append(tr(SEARCH_TEXTS, "unreachable", source=label))
             continue
         result.online.extend(c for c in res if (c.source, c.external_id) not in known)
     return result

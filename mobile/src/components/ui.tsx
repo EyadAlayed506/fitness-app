@@ -925,7 +925,12 @@ export function Sheet({
                 <IconButton icon="close" label={tr("common.close")} onPress={onClose} />
               </View>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: space.xl + insets.bottom }}>
+            {/* full sheet width, with the side padding inside: the scroll bar sits at the sheet's edge, not over the text */}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              style={{ marginHorizontal: -space.lg }}
+              contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.xl + insets.bottom }}
+            >
               {children}
             </ScrollView>
           </Animated.View>
