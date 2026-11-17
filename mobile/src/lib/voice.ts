@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import { api } from "./api";
+import { errorTextFor, tr } from "./i18n/current";
 
 export const MAX_SECONDS = 120; // voice messages are short; recording stops (and is sent to Whisper) after two minutes
 
@@ -48,7 +49,7 @@ export function useVoiceMessage(
   const failed = (e: unknown) => {
     recording.current = false;
     setState("idle");
-    handlers.current.onError((e as Error).message || "The microphone isn't available.");
+    handlers.current.onError((e as Error).message || tr("voice.noMic"));
   };
 
   const stop = async () => {
@@ -60,14 +61,14 @@ export function useVoiceMessage(
     const uri = recorder.uri;
     if (!uri) {
       setState("idle");
-      handlers.current.onError("Nothing was recorded. Try again.");
+      handlers.current.onError(tr("voice.nothing"));
       return;
     }
     setState("transcribing");
     try {
       handlers.current.onText(await transcribe(uri));
     } catch (e) {
-      handlers.current.onError((e as Error).message);
+      handlers.current.onError(errorTextFor(e));
     } finally {
       setState("idle");
     }
@@ -76,7 +77,7 @@ export function useVoiceMessage(
   const start = async () => {
     const permission = await requestRecordingPermissionsAsync();
     if (!permission.granted) {
-      handlers.current.onError("Allow the microphone to use your voice (in your phone's settings).");
+      handlers.current.onError(tr("voice.allowMic"));
       return false;
     }
     // a headset's microphone (wired or Bluetooth) is used when one is connected

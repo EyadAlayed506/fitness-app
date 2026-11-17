@@ -7,7 +7,28 @@
 | Base | `origin/merged_branch` @ `de689db` |
 | Date | 2026-11-18 |
 | Platform | Web app for the pilot (WEB-01) |
-| Status | **Partly done.** Sign-up → onboarding → Today → Profile → Workouts → Food → **Progress** work in Arabic and English against the real local backend. Coach and sleep screens still English. Arabic text not yet human-reviewed. |
+| Status | **All five tabs done.** Sign-up → onboarding → Today → Profile → Workouts → Food → Progress → **Coach** in Arabic and English. Sleep, points, gyms, QR screens and hands-free voice still English. Arabic text not yet human-reviewed. |
+
+## Update 2026-11-18 (part 5): Coach
+
+- Translated the Coach tab: header (provider line), empty state with Arabic starter questions, "not ready" card,
+  composer (placeholder, voice recording/transcribing states, send/record labels), questions-left line with Arabic
+  plurals, clear-conversation dialog, action cards (Added/Removed/Undone, Open, Undo), the "looked at" sources line
+  (tool IDs → translated labels), send/undo/voice errors.
+- Chat bubbles mirror in Arabic: the user's bubble sits on the end side and its "tail" corner follows it
+  (`borderBottomStart/EndRadius`); replies and bullets align right.
+- **Reply language:** the server has no language setting, and its system prompt doesn't name one. Starter questions are
+  sent in the app's language, and models usually answer in the language they are asked in, but this is **not
+  guaranteed**. **Request to Nawaf:** add a rule to the prompt ("answer in the language of the user's message") or an
+  optional `language` field on `POST /assistant/messages`. Action summaries ("Added Banana (118 g) to breakfast"),
+  the disclaimer and the "not ready" explanation are server text, still English.
+- **Not tested with a real model:** no Ollama running and no Claude key on this machine. The "not ready" card was
+  checked live. The chat layout was checked with a **clearly labelled sample conversation** injected in the browser
+  only (a patched `fetch` for one request, removed afterwards; no code or data changed), in Arabic and English.
+- Checks: **96/96** unit tests, typecheck, lint, web export.
+
+Screenshots: [not ready (live)](APP-02/coach-not-ready-ar.jpg) · [chat layout, sample data](APP-02/coach-sample-ar.png) ·
+[English, sample data](APP-02/coach-sample-en.jpg)
 
 ## Update 2026-11-18 (part 4): Progress
 
@@ -128,7 +149,7 @@ Still no new dependencies; `package.json`, `app.json`, `eas.json`, `api.ts` unto
 | Food | **done** (server/AI text excepted) | Samer |
 | Progress | **done** (Sleep view and server text excepted) | Samer |
 | Sleep / points | `SleepParts` (quality, "In range", goal "7 h"), `SleepDashboard`, `WhoopCard`, `HealthConnectCard`, `PointsParts` | Badr (meanings) |
-| Coach | `coach.tsx` + reply language | Nawaf |
+| Coach | **done** in the app; reply language needs a server rule (Nawaf) | Nawaf |
 | Machine photos / gyms | `ExercisePhoto`, `SnapParts`, `GymParts`, `gyms.tsx` | Eyad (names) |
 
 ## Found along the way

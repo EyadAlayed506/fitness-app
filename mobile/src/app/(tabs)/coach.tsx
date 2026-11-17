@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -15,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Button, Card, ErrorText, FadeIn, IconButton, Row, Skeleton, Txt, type IconName } from "@/components/ui";
+import { Button, Card, ErrorText, FadeIn, Icon, IconButton, Row, Skeleton, Txt, type IconName } from "@/components/ui";
 import { useHandsFree } from "@/components/HandsFree";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -23,49 +22,34 @@ import { confirm } from "@/lib/confirm";
 import { afterCoachActions, useAssistant } from "@/lib/data";
 import { parseCoachText, type Span } from "@/lib/coachText";
 import { tzOffset } from "@/lib/format";
+import { useI18n, useLanguage, type MessageKey } from "@/lib/i18n";
+import { trOr } from "@/lib/i18n/current";
 import { errorMessage, qk, queryClient, useRefreshOnFocus } from "@/lib/query";
 import { useVoiceMessage } from "@/lib/voice";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
 import type { AssistantAction, AssistantStatus, ChatMessage, ChatReply } from "@/lib/types";
 
-const STARTERS: { text: string; icon: IconName }[] = [
-  { text: "What should I train today?", icon: "barbell-outline" },
-  { text: "Add a banana to breakfast", icon: "restaurant-outline" },
-  { text: "How did I sleep this week?", icon: "moon-outline" },
-  { text: "Am I eating to my plan?", icon: "pie-chart-outline" },
+// Sent as typed, in the app's language: the coach answers in the language it's asked in
+const STARTERS: { text: MessageKey; icon: IconName }[] = [
+  { text: "coach.starter1", icon: "barbell-outline" },
+  { text: "coach.starter2", icon: "restaurant-outline" },
+  { text: "coach.starter3", icon: "moon-outline" },
+  { text: "coach.starter4", icon: "pie-chart-outline" },
 ];
-
-// What each tool looked at, shown under an answer so the user knows where it came from
-const TOOL_LABELS: Record<string, string> = {
-  get_profile_and_plan: "profile and plan",
-  get_training_plan: "training plan",
-  get_today_suggestions: "today's suggestions",
-  get_recent_workouts: "workouts",
-  get_exercise_history: "lift history",
-  get_exercise_info: "exercise library",
-  get_sleep: "sleep",
-  get_food_day: "food log",
-  get_calorie_trend: "calories",
-  get_weekly_summary: "weekly summary",
-  get_points: "points",
-  log_food: "food log",
-  remove_food_entry: "food log",
-  log_workout_sets: "workout",
-  log_weight: "weigh-ins",
-  log_sleep: "sleep",
-};
 
 /** Chat with the assistant about your training, sleep and food. It reads your data and can log things you ask it to. */
 export default function Coach() {
   const t = useTheme();
+  const { t: tr, tn, errorText } = useI18n();
   const { refresh } = useAuth();
   const assistant = useAssistant();
   useRefreshOnFocus([qk.assistant]);
   const status = assistant.data ?? null;
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null); // the question being answered
-  const [sendError, setError] = useState<string | null>(null);
-  const error = sendError ?? (status ? null : errorMessage(assistant.error));
+  // a send error is kept as-is so it re-translates; voice errors arrive as text
+  const [sendError, setError] = useState<unknown>(null);
+  const error = sendError != null ? (typeof sendError === "string" ? sendError : errorText(sendError)) : status ? null : errorMessage(assistant.error);
   const handsFree = useHandsFree(); // its microphone is in use while hands-free listens
   const voice = useVoiceMessage(
     (text) => setDraft((d) => (d.trim() ? `${d.trim()} ${text}` : text)),
@@ -91,7 +75,7 @@ export default function Coach() {
       afterCoachActions(kinds);
       if (kinds.includes("weight")) refresh().catch(() => {}); // the current weight is part of the profile
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
       setDraft(question); // keep what they typed so they can try again
     } finally {
       setPending(null);
@@ -99,11 +83,12 @@ export default function Coach() {
   };
 
   const clear = async () => {
-    if (!(await confirm("Clear the conversation?", "This deletes the messages for good."))) return;
+    if (!(await confirm(tr("coach.clearTitle"), tr("coach.clearText"), tr("coach.clearConfirm")))) return;
     await api("/assistant/messages", { method: "DELETE" });
     queryClient.setQueryData<AssistantStatus>(qk.assistant, (s) => (s ? { ...s, messages: [] } : s));
   };
 
+  const rtlText = useLanguage() === "ar" ? ({ letterSpacing: 0, textAlign: "right" } as const) : null;
   const messages = status?.messages ?? [];
   const canSend = !!draft.trim() && !pending;
   const recording = voice.state === "recording";
@@ -113,14 +98,14 @@ export default function Coach() {
         <View style={{ width: "100%", maxWidth: 600, alignSelf: "center", flex: 1 }}>
           <Row style={{ paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm, justifyContent: "space-between" }} gap={space.md}>
             <View style={{ flex: 1 }}>
-              <Text style={[typeScale.overline, { color: t.muted, marginBottom: 2 }]} numberOfLines={1}>
-                {status ? (status.provider === "ollama" ? `ON YOUR PC · ${status.model.toUpperCase()}` : "RUNS ON CLAUDE") : " "}
+              <Text style={[typeScale.overline, { color: t.muted, marginBottom: 2 }, rtlText]} numberOfLines={1}>
+                {status ? (status.provider === "ollama" ? tr("coach.onPc", { model: status.model }) : tr("coach.onClaude")).toLocaleUpperCase() : " "}
               </Text>
-              <Text style={[typeScale.title, { color: t.text }]} accessibilityRole="header">
-                Coach
+              <Text style={[typeScale.title, { color: t.text }, rtlText]} accessibilityRole="header">
+                {tr("nav.coach")}
               </Text>
             </View>
-            {messages.length ? <IconButton icon="trash-outline" label="Clear conversation" onPress={clear} /> : null}
+            {messages.length ? <IconButton icon="trash-outline" label={tr("coach.clear")} onPress={clear} /> : null}
           </Row>
 
           {messages.length || pending ? (
@@ -148,7 +133,8 @@ export default function Coach() {
                       >
                         <ActivityIndicator size="small" color={t.muted} />
                         <Txt variant="small">
-                          Looking at your data…{status?.provider === "ollama" ? " (a model on your PC can take up to a minute)" : ""}
+                          {tr("coach.thinking")}
+                          {status?.provider === "ollama" ? tr("coach.slowPc") : ""}
                         </Txt>
                       </Row>
                     </>
@@ -164,7 +150,7 @@ export default function Coach() {
               keyboardShouldPersistTaps="handled"
             >
               {!status && !error ? (
-                <View style={{ gap: space.md }} accessibilityLabel="Loading the conversation">
+                <View style={{ gap: space.md }} accessibilityLabel={tr("coach.loading")}>
                   <Skeleton height={44} width="70%" style={{ borderRadius: radius.lg }} />
                   <Skeleton height={44} width="55%" style={{ borderRadius: radius.lg, alignSelf: "flex-end" }} />
                   <Skeleton height={64} width="80%" style={{ borderRadius: radius.lg }} />
@@ -173,33 +159,33 @@ export default function Coach() {
               {status && !status.configured ? (
                 <Card>
                   <Row gap={space.sm}>
-                    <Ionicons name="alert-circle" size={18} color={t.warnInk} />
-                    <Txt variant="h3">The coach isn&apos;t ready yet</Txt>
+                    <Icon name="alert-circle" size={18} color={t.warnInk} />
+                    <Txt variant="h3">{tr("coach.notReady")}</Txt>
                   </Row>
                   <Txt variant="small" style={{ marginTop: space.sm }} selectable>
                     {status.problem}
                   </Txt>
-                  <Button title="Check again" kind="soft" small onPress={load} style={{ marginTop: space.md, alignSelf: "flex-start" }} />
+                  <Button title={tr("coach.checkAgain")} kind="soft" small onPress={load} style={{ marginTop: space.md, alignSelf: "flex-start" }} />
                 </Card>
               ) : null}
               {status?.configured ? (
                 <FadeIn style={{ flex: 1, justifyContent: "center", paddingVertical: space.xl }}>
                   <View style={{ alignItems: "center", marginBottom: space.xl }}>
                     <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: t.accentSoft, alignItems: "center", justifyContent: "center" }}>
-                      <Ionicons name="chatbubble-ellipses" size={24} color={t.accent} />
+                      <Icon name="chatbubble-ellipses" size={24} color={t.accent} />
                     </View>
                     <Txt variant="h2" style={{ marginTop: space.md, textAlign: "center" }}>
-                      How can I help today?
+                      {tr("coach.hello")}
                     </Txt>
                     <Txt variant="small" style={{ marginTop: space.xs, textAlign: "center", maxWidth: 320 }}>
-                      Ask about your training, sleep and food, or tell me what to log. I&apos;ll add it right away.
+                      {tr("coach.intro")}
                     </Txt>
                   </View>
                   <View style={{ gap: space.sm }}>
                     {STARTERS.map((q) => (
                       <Pressable
                         key={q.text}
-                        onPress={() => send(q.text)}
+                        onPress={() => send(tr(q.text))}
                         accessibilityRole="button"
                         style={({ pressed }) => ({
                           flexDirection: "row",
@@ -214,9 +200,9 @@ export default function Coach() {
                           opacity: pressed ? 0.7 : 1,
                         })}
                       >
-                        <Ionicons name={q.icon} size={18} color={t.text2} />
-                        <Txt style={{ flex: 1 }}>{q.text}</Txt>
-                        <Ionicons name="arrow-up" size={16} color={t.muted} style={{ transform: [{ rotate: "45deg" }] }} />
+                        <Icon name={q.icon} size={18} color={t.text2} />
+                        <Txt style={{ flex: 1 }}>{tr(q.text)}</Txt>
+                        <Icon name="arrow-up" size={16} color={t.muted} style={{ transform: [{ rotate: rtlText ? "-45deg" : "45deg" }] }} />
                       </Pressable>
                     ))}
                   </View>
@@ -232,12 +218,12 @@ export default function Coach() {
                 <TextInput
                   value={draft}
                   onChangeText={setDraft}
-                  placeholder={recording ? "Listening…" : "Message your coach"}
+                  placeholder={tr(recording ? "coach.listening" : "coach.placeholder")}
                   placeholderTextColor={t.muted}
                   multiline
                   numberOfLines={1}
                   maxLength={2000}
-                  accessibilityLabel="Message"
+                  accessibilityLabel={tr("coach.message")}
                   onSubmitEditing={() => send(draft)}
                   onKeyPress={(e) => {
                     // keyboard on a computer: Enter sends, Shift+Enter starts a new line
@@ -271,7 +257,7 @@ export default function Coach() {
                   }}
                   disabled={!!pending || voice.state === "transcribing" || !!handsFree?.on}
                   accessibilityRole="button"
-                  accessibilityLabel={recording ? "Stop recording" : "Record a voice message"}
+                  accessibilityLabel={tr(recording ? "coach.stopRecording" : "coach.record")}
                   style={({ pressed }) => ({
                     width: 44,
                     height: 44,
@@ -285,14 +271,14 @@ export default function Coach() {
                   {voice.state === "transcribing" ? (
                     <ActivityIndicator size="small" color={t.text2} />
                   ) : (
-                    <Ionicons name={recording ? "stop" : "mic-outline"} size={20} color={recording ? "#fff" : t.text2} />
+                    <Icon name={recording ? "stop" : "mic-outline"} size={20} color={recording ? "#fff" : t.text2} />
                   )}
                 </Pressable>
                 <Pressable
                   onPress={() => send(draft)}
                   disabled={!canSend}
                   accessibilityRole="button"
-                  accessibilityLabel="Send"
+                  accessibilityLabel={tr("coach.send")}
                   aria-disabled={!canSend}
                   style={({ pressed }) => ({
                     width: 44,
@@ -304,7 +290,7 @@ export default function Coach() {
                     opacity: pressed ? 0.8 : 1,
                   })}
                 >
-                  <Ionicons name="arrow-up" size={20} color={canSend ? t.inkText : t.muted} />
+                  <Icon name="arrow-up" size={20} color={canSend ? t.inkText : t.muted} />
                 </Pressable>
               </Row>
               {voice.state !== "idle" ? (
@@ -312,14 +298,14 @@ export default function Coach() {
                   {recording ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.critical }} /> : null}
                   <Txt variant="small" style={{ color: recording ? t.critical : t.text2 }}>
                     {recording
-                      ? `Recording ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")} · tap stop when you're done`
-                      : "Turning your voice into text…"}
+                      ? tr("coach.recording", { time: `${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")}` })
+                      : tr("coach.transcribing")}
                   </Txt>
                 </Row>
               ) : null}
               <Txt variant="tiny" style={{ marginTop: space.sm, paddingHorizontal: space.xs, fontSize: 11, lineHeight: 15 }}>
                 {status.disclaimer}
-                {status.messages_left_today != null ? ` ${status.messages_left_today} questions left in the last 24 hours.` : ""}
+                {status.messages_left_today != null ? ` ${tn("coach.questionsLeft", status.messages_left_today)}` : ""}
               </Txt>
             </View>
           ) : null}
@@ -331,8 +317,10 @@ export default function Coach() {
 
 function Bubble({ message: m }: { message: ChatMessage }) {
   const t = useTheme();
+  const { t: tr } = useI18n();
+  const align = useTextAlign();
   const mine = m.role === "user";
-  const sources = [...new Set(m.tools_used.map((x) => TOOL_LABELS[x] ?? x))];
+  const sources = [...new Set(m.tools_used.map((x) => trOr(`tool.${x}`, x)))];
   return (
     <View style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: mine ? "85%" : "92%" }}>
       <View
@@ -341,14 +329,14 @@ function Bubble({ message: m }: { message: ChatMessage }) {
           borderColor: t.border,
           borderWidth: !mine && t.dark ? 1 : 0,
           borderRadius: 20,
-          borderBottomRightRadius: mine ? 6 : 20,
-          borderBottomLeftRadius: mine ? 20 : 6,
+          borderBottomEndRadius: mine ? 6 : 20,
+          borderBottomStartRadius: mine ? 20 : 6,
           paddingHorizontal: space.md + 2,
           paddingVertical: space.sm + 2,
         }}
       >
         {mine ? (
-          <Text style={[typeScale.body, { color: t.inkText }]} selectable>
+          <Text style={[typeScale.body, { color: t.inkText }, align]} selectable>
             {m.text}
           </Text>
         ) : (
@@ -359,8 +347,8 @@ function Bubble({ message: m }: { message: ChatMessage }) {
         <ActionCard key={`${m.id}-${i}`} action={a} />
       ))}
       {sources.length ? (
-        <Txt variant="tiny" style={{ marginTop: space.xs, marginLeft: space.xs }}>
-          Looked at: {sources.join(", ")}
+        <Txt variant="tiny" style={{ marginTop: space.xs, marginStart: space.xs }}>
+          {tr("coach.lookedAt", { sources: sources.join(tr("list.separator")) })}
         </Txt>
       ) : null}
     </View>
@@ -378,9 +366,10 @@ const ACTION_ICON: Record<AssistantAction["kind"], IconName> = {
 /** Something the coach added: where to see it, and an Undo. */
 function ActionCard({ action }: { action: AssistantAction }) {
   const t = useTheme();
+  const { t: tr, errorText } = useI18n();
   const [undone, setUndone] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const undo = async () => {
     setBusy(true);
     setError(null);
@@ -393,7 +382,7 @@ function ActionCard({ action }: { action: AssistantAction }) {
       setUndone(true);
       afterCoachActions([action.kind === "removed" ? "removed" : action.kind]);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e);
     } finally {
       setBusy(false);
     }
@@ -420,11 +409,11 @@ function ActionCard({ action }: { action: AssistantAction }) {
             backgroundColor: undone ? t.surface2 : t.goodSoft,
           }}
         >
-          <Ionicons name={undone ? "arrow-undo" : ACTION_ICON[action.kind]} size={16} color={undone ? t.muted : t.goodInk} />
+          <Icon name={undone ? "arrow-undo" : ACTION_ICON[action.kind]} size={16} color={undone ? t.muted : t.goodInk} />
         </View>
         <View style={{ flex: 1 }}>
           <Txt variant="tiny" style={{ ...typeScale.overline, color: undone ? t.muted : t.goodInk }}>
-            {undone ? "UNDONE" : action.kind === "removed" ? "REMOVED" : "ADDED"}
+            {tr(undone ? "coach.undone" : action.kind === "removed" ? "coach.removed" : "coach.added").toLocaleUpperCase()}
           </Txt>
           <Txt variant="small" style={{ color: undone ? t.muted : t.text, textDecorationLine: undone ? "line-through" : "none" }}>
             {action.summary}
@@ -433,13 +422,13 @@ function ActionCard({ action }: { action: AssistantAction }) {
       </Row>
       {undone ? null : (
         <Row gap={space.sm} style={{ marginTop: space.md }}>
-          <Button title="Open" kind="soft" small icon="open-outline" onPress={() => router.push(action.screen as never)} style={{ flex: 1 }} />
+          <Button title={tr("coach.open")} kind="soft" small icon="open-outline" onPress={() => router.push(action.screen as never)} style={{ flex: 1 }} />
           {action.undo.length ? (
-            <Button title="Undo" kind="ghost" small icon="arrow-undo-outline" loading={busy} onPress={undo} style={{ flex: 1 }} />
+            <Button title={tr("common.undo")} kind="ghost" small icon="arrow-undo-outline" loading={busy} onPress={undo} style={{ flex: 1 }} />
           ) : null}
         </Row>
       )}
-      <ErrorText message={error} />
+      <ErrorText message={error == null ? null : errorText(error)} />
     </View>
   );
 }
@@ -447,6 +436,7 @@ function ActionCard({ action }: { action: AssistantAction }) {
 /** A coach reply: block titles, list items with a hanging indent, bold key numbers. */
 function CoachText({ text }: { text: string }) {
   const t = useTheme();
+  const align = useTextAlign();
   const draw = (parts: Span[]) =>
     parts.map((s, i) => (
       <Text key={i} style={s.bold ? { fontWeight: "700", color: t.text } : undefined}>
@@ -461,16 +451,21 @@ function CoachText({ text }: { text: string }) {
         ) : line.kind === "bullet" ? (
           <View key={i} style={{ flexDirection: "row", gap: space.sm, marginTop: 3 }}>
             <Text style={[typeScale.body, { color: t.accent }]}>•</Text>
-            <Text style={[typeScale.body, { color: t.text, flex: 1 }]} selectable>
+            <Text style={[typeScale.body, { color: t.text, flex: 1 }, align]} selectable>
               {draw(line.spans)}
             </Text>
           </View>
         ) : (
-          <Text key={i} style={[line.kind === "title" ? typeScale.bodyStrong : typeScale.body, { color: t.text }]} selectable>
+          <Text key={i} style={[line.kind === "title" ? typeScale.bodyStrong : typeScale.body, { color: t.text }, align]} selectable>
             {draw(line.spans)}
           </Text>
         ),
       )}
     </View>
   );
+}
+
+/** Text that lines up with the page: right in Arabic, left in English, whatever script the text is in. */
+function useTextAlign() {
+  return { textAlign: useLanguage() === "ar" ? "right" : "left" } as const;
 }
