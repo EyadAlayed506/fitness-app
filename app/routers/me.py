@@ -33,10 +33,10 @@ from app.services.activity import (
 )
 from app.services.plan import PlanOut, build_plan
 from app.services.recommendations import (
-    DISCLAIMER,
     PROGRESSION_LOOKBACK_DAYS,
     Context,
     Recommendation,
+    disclaimer,
     recommend,
 )
 from app.services.routine import Routine
@@ -407,4 +407,4 @@ def read_recommendations(user: CurrentUser, profile: CurrentProfile, session: Se
         imperial=profile.unit_system == "imperial",
         since=local_date(user.created_at, tz_offset),
     )
-    return RecommendationsOut(date=today, items=recommend(ctx), disclaimer=DISCLAIMER)
+    return RecommendationsOut(date=today, items=recommend(ctx), disclaimer=disclaimer())

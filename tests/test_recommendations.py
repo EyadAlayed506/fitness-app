@@ -151,3 +151,27 @@ def test_days_before_sign_up_are_not_missed(catalogue):
     c.since = MONDAY + dt.timedelta(days=2)  # Wednesday: only Wednesday counts
     missed = next(r for r in recommend(c) if r.id == "missed_sessions")
     assert missed.title == "0 of 1 planned session so far this week"
+
+
+def plain(text: str) -> str:
+    return text.replace("⁨", "").replace("⁩", "")
+
+
+def test_suggestions_in_arabic(catalogue):
+    from app.i18n import reset_language, set_language
+    from app.services.recommendations import disclaimer
+
+    token = set_language("ar")
+    try:
+        rest = recommend(ctx(catalogue, MONDAY + dt.timedelta(days=1)))  # Tuesday: a rest day
+        assert rest[0].title == "يوم راحة"
+        assert "الحصة التالية: الأربعاء" in plain(rest[0].message)
+        assert plain(rest[0].reasons[0]) == "الثلاثاء ليس من أيام تمرينك"
+        short = recommend(ctx(catalogue, MONDAY, last_night=night(MONDAY, 6 * 60)))
+        lighter = next(r for r in short if r.id == "sleep_last_night")
+        assert lighter.title == "ليلة قصيرة: فكّر في تمرين أخف"
+        assert plain(lighter.reasons[0]) == "نمت 6 س الليلة الماضية، أقل من هدفك 8 س"
+        assert disclaimer().startswith("اقتراحات مبنية على ما سجّلته")
+    finally:
+        reset_language(token)
+    assert disclaimer() == DISCLAIMER

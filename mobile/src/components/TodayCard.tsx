@@ -43,7 +43,7 @@ export function TodayCard({ data }: { data: Recommendations }) {
             {tr(training ? "today.session" : "today.today").toLocaleUpperCase()}
           </Txt>
           <Txt style={{ ...typeScale.heading, fontSize: 19, lineHeight: 24, color: t.text }} numberOfLines={2}>
-            {lead.title.replace(/^Today:\s*/, "")}
+            {lead.title.replace(/^(Today|اليوم):\s*/, "")}
           </Txt>
         </View>
       </View>
