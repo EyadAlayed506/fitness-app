@@ -31,7 +31,8 @@ from app.services.activity import (
     sleep_nights,
     user_routine,
 )
-from app.services.plan import PlanOut, build_plan
+from app.i18n import tr
+from app.services.plan import TEXTS as PLAN_TEXTS, PlanOut, build_plan
 from app.services.recommendations import (
     PROGRESSION_LOOKBACK_DAYS,
     Context,
@@ -277,8 +278,7 @@ def read_projection(profile: CurrentProfile):
         "labels": list(range(length)),
         "series": series,
         "target_weight_kg": plan.optimal_weight_kg,
-        "note": "Eating the same calories every day: weight change slows as you get closer to your goal "
-                "because a lighter body burns less. Recalculate your plan every few weeks.",
+        "note": tr(PLAN_TEXTS, "projection_note"),
     }
 
 

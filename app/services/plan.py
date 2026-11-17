@@ -2,8 +2,29 @@
 
 from pydantic import BaseModel
 
+from app.i18n import Table, tr
 from app.models.user import Profile
 from app.services import calculations as calc
+
+# What the user reads about the plan, in the language of the request (app.i18n)
+TEXTS: Table = {
+    "en": {
+        "disclaimer": "Estimates based on standard formulas, not medical advice.",
+        "capped": "Capped at {kcal} kcal so intake never drops below a safe minimum",
+        "projection_note": "Eating the same calories every day: weight change slows as you get closer to your goal "
+        "because a lighter body burns less. Recalculate your plan every few weeks.",
+    },
+    "ar": {
+        "disclaimer": "تقديرات مبنية على معادلات معروفة، وليست نصيحة طبية.",
+        "capped": "حُدّدت عند {kcal} سعرة حتى لا ينخفض ما تتناوله عن الحد الأدنى الآمن",
+        "projection_note": "مع تناول السعرات نفسها كل يوم يتباطأ تغيّر الوزن كلما اقتربت من هدفك، "
+        "لأن الجسم الأخف يحرق أقل. أعد حساب خطتك كل بضعة أسابيع.",
+    },
+}
+
+
+def _plain(text: str) -> str:
+    return text.replace("⁨", "").replace("⁩", "")
 
 
 class DietOptionOut(BaseModel):
@@ -51,7 +72,11 @@ def build_plan(profile: Profile) -> PlanOut:
     raw = calc.diet_options(direction, tdee_value, bmr_value, profile.sex, optimal - w)
 
     selected_name = "maintain" if direction == "maintain" else profile.diet_option
-    options = [DietOptionOut(**o.__dict__, selected=o.option == selected_name) for o in raw]
+    options = [
+        DietOptionOut(**{**o.__dict__, "warning": _plain(tr(TEXTS, "capped", kcal=o.calories)) if o.capped else o.warning},
+                      selected=o.option == selected_name)
+        for o in raw
+    ]
     target = next(o.calories for o in options if o.selected)
 
     return PlanOut(
@@ -70,4 +95,5 @@ def build_plan(profile: Profile) -> PlanOut:
         tdee=round(tdee_value),
         options=options,
         target_calories=target,
+        disclaimer=tr(TEXTS, "disclaimer"),
     )

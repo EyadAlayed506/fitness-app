@@ -18,15 +18,19 @@ from app.services.activity import (
     sleep_goal,
     sleep_nights,
 )
+from app.i18n import Table, tr
 from app.services.calculations import estimated_1rm
 from app.services.plan import build_plan
 from app.services.schedule import effective_training_days
 
 HISTORY_WEEKS = 8
-NOTE = (
-    "Sleep and training are shown side by side to help you spot patterns. "
-    "This summary doesn't say that one caused a change in the other."
-)
+TEXTS: Table = {
+    "en": {"note": "Sleep and training are shown side by side to help you spot patterns. "
+                   "This summary doesn't say that one caused a change in the other."},
+    "ar": {"note": "يُعرض النوم والتمرين جنباً إلى جنب لمساعدتك على ملاحظة الأنماط. "
+                   "ولا يعني هذا الملخص أن أحدهما سبّب تغيّراً في الآخر."},
+}
+NOTE = TEXTS["en"]["note"]  # English, for code that reads it directly
 
 
 @dataclass
@@ -108,7 +112,7 @@ class WeeklySummary:
     points: int
     previous_points: int
     history: list[WeekCount]
-    notes: list[str] = field(default_factory=lambda: [NOTE])
+    notes: list[str] = field(default_factory=lambda: [tr(TEXTS, "note")])
 
 
 def _volume(workouts: list[DoneWorkout]) -> float:

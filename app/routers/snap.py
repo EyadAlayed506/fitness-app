@@ -192,6 +192,6 @@ def personal_insights(user: CurrentUser, profile: CurrentProfile, session: Sessi
             for f in result.findings
         ],
         not_enough=result.not_enough,
-        note=insights.CAUTION,
+        note=insights.caution(),
     )
 
