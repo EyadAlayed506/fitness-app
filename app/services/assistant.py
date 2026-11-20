@@ -59,6 +59,9 @@ TEXTS: Table = {
         "ollama_off": "Ollama isn't running on this PC (nothing answered at {url}). Start the Ollama app, "
         "or install it from ollama.com, then try again.",
         "ollama_no_model": "The model {model} isn't downloaded yet. Open a terminal and run: ollama pull {model}",
+        "ollama_slow": "The local AI took too long to answer. Try a shorter question or a smaller model.",
+        "ollama_failed": "The local AI couldn't answer: {detail}",
+        "partial_failure": "I added: {done}. Then something went wrong: {error}",
         "action_food": "{food}, {amount} ({kcal} kcal{estimate}) for {meal}{when}",
         "ai_estimate": ", AI estimate",
         "on_day": " on {day}",
@@ -91,6 +94,9 @@ TEXTS: Table = {
         "ollama_off": "Ollama لا يعمل على هذا الجهاز (لا استجابة على {url}). شغّل تطبيق Ollama، "
         "أو ثبّته من ollama.com، ثم حاول مجدداً.",
         "ollama_no_model": "النموذج {model} لم يُنزَّل بعد. افتح الطرفية ونفّذ: ollama pull {model}",
+        "ollama_slow": "تأخّر الذكاء الاصطناعي المحلي في الإجابة. جرّب سؤالاً أقصر أو نموذجاً أصغر.",
+        "ollama_failed": "تعذّر على الذكاء الاصطناعي المحلي الإجابة: {detail}",
+        "partial_failure": "أضفتُ: {done}. ثم حدث خطأ: {error}",
         "action_food": "{food}، {amount} ({kcal} سعرة{estimate}) في {meal}{when}",
         "ai_estimate": "، تقدير الذكاء الاصطناعي",
         "on_day": " يوم {day}",
@@ -118,6 +124,11 @@ def disclaimer() -> str:
     return tr(TEXTS, "disclaimer")
 
 
+def partial_failure(done: str, error: str) -> str:
+    """The reply when the AI failed after a tool had already saved something (kept, with its Undo)."""
+    return _plain(tr(TEXTS, "partial_failure", done=done, error=error))
+
+
 def _meal(meal: str) -> str:
     key = f"meal.{meal}"
     return tr(TEXTS, key) if key in TEXTS["en"] else meal
@@ -136,6 +147,7 @@ How to work:
 - Rest days are part of training. Don't push extra sessions to make up missed ones, very low calories, or training through pain.
 - You are not a doctor. Don't diagnose, and don't advise on medication, injuries, eating disorders or medical conditions; for pain, injury, chest pain, dizziness, or anything that worries them, tell them to see a professional. In an emergency, tell them to contact emergency services.
 - Don't say that sleep caused a change in performance (or the other way round) just because the numbers moved together.
+- Weights without a unit: use the user's units, unless the number doesn't fit them or their records (e.g. "I weigh 200" from someone around 95 kg, or "bench 135" when they lift about 60 kg). Then don't log yet: ask in one short question whether it's kg or lb. Don't ask when the unit was said or the number clearly fits.
 - Use the user's units (metric or imperial, from their profile). Be brief, warm and encouraging, in plain language.
 - Reply in the language the app note names (English or Arabic), unless the user writes in another language. Food and exercise names from the tools can stay as they are.
 
@@ -385,6 +397,7 @@ def _search_online(query: str) -> list:
     return asyncio.run(run())
 
 
+ARABIC_LETTERS = re.compile(r"[؀-ۿ]")
 ESTIMATE_FIELDS = ("calories_per_100", "protein_per_100", "carbs_per_100", "fat_per_100")
 
 
@@ -445,6 +458,9 @@ def _find_food(ctx: ToolContext, name: str, args: dict | None = None):
     local = search_local(foods, name, limit=1)
     if local:
         return local[0]
+    if ARABIC_LETTERS.search(name):  # the built-in list is in English: "موزة" would miss "Banana" and go online
+        raise ToolError(f"Nothing was logged: food names in the app are in English. Call log_food again with the "
+                        f"food's plain English name (e.g. 'banana' for 'موزة'), whatever language the user writes in.")
     online = _search_online(name)
     if not online:
         return _estimated_food(ctx, name, args or {})
@@ -624,7 +640,8 @@ TOOLS = [
          "online databases). Units: 'serving' (one normal portion, e.g. one banana or one egg), or g/kg/oz/lb for "
          "solids, ml/l/cup/fl_oz for drinks. If the food isn't found, the result says so and nothing is logged: call "
          "again with the *_per_100 estimates, serving_size and is_liquid filled in from your own knowledge.",
-         {"food": {"type": "string", "description": "A plain food name, e.g. 'banana', 'boiled egg', 'greek yogurt'"},
+         {"food": {"type": "string", "description": "A plain food name in English, even when the user writes in "
+                                                     "Arabic, e.g. 'banana', 'boiled egg', 'greek yogurt'"},
           "quantity": {"type": "number", "description": "How many units; default 1."},
           "unit": {"type": "string", "description": "serving, g, kg, oz, lb, ml, l, cup...; default serving."},
           "meal": {"type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"],
@@ -875,15 +892,15 @@ class OllamaBackend:
                 timeout=timeout,  # a local model can take a while, especially the first time it loads
             )
         except httpx.TimeoutException:
-            raise AssistantError(504, "The local AI took too long to answer. Try a shorter question or a smaller model.")
+            raise AssistantError(504, tr(TEXTS, "ollama_slow"))
         except httpx.HTTPError:
-            raise AssistantError(502, f"Couldn't reach Ollama at {self.url}. Is the Ollama app running?")
+            raise AssistantError(502, _plain(tr(TEXTS, "ollama_off", url=self.url)))
         if r.status_code == 404:
-            raise AssistantError(502, f"The model {self.model} isn't downloaded. Run: ollama pull {self.model}")
+            raise AssistantError(502, _plain(tr(TEXTS, "ollama_no_model", model=self.model)))
         if r.status_code >= 400:
             try:
                 detail = r.json().get("error", r.text)
             except ValueError:
                 detail = r.text
-            raise AssistantError(502, f"The local AI couldn't answer: {detail}")
+            raise AssistantError(502, _plain(tr(TEXTS, "ollama_failed", detail=detail)))
         return r.json()
