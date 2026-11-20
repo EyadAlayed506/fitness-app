@@ -13,3 +13,5 @@ __pycache__/
 # backups and data set aside by `python -m app.backup` (they contain testers' records)
 /backups/
 *.before-restore-*
+# coach evaluation runs (python -m app.coach_eval): send the files, they are not committed
+/coach-eval-results/

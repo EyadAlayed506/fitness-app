@@ -70,6 +70,9 @@ dependencies unchanged since it was synced).
 
 ## Handed over (proposed — please confirm)
 
+Messages and steps: [COACH-handoffs.md](COACH-handoffs.md). Eyad runs the cases with
+`uv run python -m app.coach_eval` instead of asking them by hand.
+
 | Task | To | What's needed back |
 |---|---|---|
 | APP-02 phone test ([APP-02-phone-test.md](APP-02-phone-test.md)), run from the PC that hosts the server | **Alzoman** | The filled-in table (phone, language, result, problems) and screenshots; Nawaf still reviews the Arabic wording of the coach from those screenshots |

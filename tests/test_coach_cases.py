@@ -19,24 +19,19 @@ import httpx
 import pytest
 from sqlmodel import select
 
+from app.coach_eval import ARABIC, CASES_FILE, LANGS, arabic_share, build_fixture, load_cases
 from app.i18n import reset_language, set_language
 from app.main import app
 from app.models.user import Profile, User
 from app.routers.assistant import get_assistant_backend
-from app.routers.exercises import search_exercises
 from app.services import assistant
-from tests.conftest import PROFILE, add_sleep, add_workout, signup_and_login
 from tests.test_assistant import FakeClaude, reply, tool_use
 
-CASES_FILE = Path(__file__).with_name("coach_cases.json")
-CASES = json.loads(CASES_FILE.read_text(encoding="utf-8"))
-LANGS = ("en", "ar")
+CASES = load_cases()
 CATEGORIES = {
     "personal_data", "missing_data", "logging_action", "incomplete_request", "ambiguous_units",
     "isolation", "provider_failure", "safety", "evidence_disabled", "language",
 }
-ARABIC = re.compile(r"[؀-ۿ]")
-TODAY = dt.datetime.now(dt.UTC).date()  # tool contexts use tz_offset=0
 
 
 # ---------- the case file ----------
@@ -72,29 +67,6 @@ def _ctx(session, user: User, question: str | None) -> assistant.ToolContext:
                                  question=question)
 
 
-def _build_fixture(name: str, client, session) -> dict:
-    """The case's data (on top of the signed-up test user from `auth`). Returns values for {placeholders}."""
-    values = {"today": TODAY.isoformat(), "yesterday": (TODAY - dt.timedelta(days=1)).isoformat()}
-    user = _user(session)
-    if name == "week":
-        add_sleep(session, user, TODAY, 6 * 60 + 30)
-        _, err = assistant.run_tool(_ctx(session, user, "breakfast"), "log_food", {"food": "banana"})
-        assert not err
-        bench = search_exercises(user, session, search="bench press", muscle_group=None, limit=1)[0]
-        add_workout(session, user, TODAY - dt.timedelta(days=1), [(bench.id, 8, 60)] * 3)
-    elif name == "other_user":
-        headers = signup_and_login(client, email="other@example.com")
-        client.put("/api/me/profile", json=PROFILE, headers=headers)
-        other = _user(session, "other@example.com")
-        add_sleep(session, other, TODAY, 9 * 60)
-        content, err = assistant.run_tool(_ctx(session, other, "lunch"), "log_food", {"food": "banana"})
-        assert not err
-        values["other_food_entry"] = json.loads(content)["logged"]["id"]
-    else:
-        assert name == "fresh"
-    return values
-
-
 def _fill(value, values: dict):
     if isinstance(value, str):
         m = re.fullmatch(r"\{(\w+)\}", value)
@@ -115,7 +87,7 @@ SCRIPTED = [
 def test_scripted_case(case, lang, client, auth, session, monkeypatch):
     # no internet in tests: the online food search finds nothing (the AI-estimate path then applies)
     monkeypatch.setattr(assistant, "_search_online", lambda query: [])
-    values = _build_fixture(case["fixture"], client, session)
+    values = build_fixture(case["fixture"], client, session, "sara@example.com")  # the `auth` user
     token = set_language(case.get("app_language_override", {}).get(lang, lang))
     try:
         ctx = _ctx(session, _user(session), case["message"][lang])
@@ -190,3 +162,63 @@ def test_ollama_errors_follow_the_app_language(client, auth, lang):
         assert bool(ARABIC.search(detail)) is (lang == "ar"), detail
         assert "⁨" not in detail
     assert "out of memory" in detail
+
+
+# ---------- the runner for real models (app/coach_eval.py), with a fake Ollama ----------
+
+
+def test_runner_asks_a_case_on_its_own_data_and_checks_the_reply(client, auth, session):
+    from app import coach_eval
+    from tests.test_assistant import FakeOllama, ollama_reply
+
+    case = next(c for c in CASES["cases"] if c["id"] == "data-sleep-last-night")
+    fake = FakeOllama(
+        ollama_reply(tool_calls=[("get_sleep", {"days": 2})]),
+        ollama_reply("نمت **6 س 30 د** البارحة، أقل من هدفك."),
+    )
+    http = httpx.Client(transport=httpx.MockTransport(fake.handler))
+    app.dependency_overrides[get_assistant_backend] = lambda: assistant.OllamaBackend(
+        http, "http://localhost:11434", "qwen3:8b", 16384)
+    result = coach_eval.ask_case(app, case, "ar")
+    assert result["status"] == 200 and result["tools_used"] == ["get_sleep"]
+    assert result["checks"] == {"tools": True, "actions": True, "language": True}
+    nights = json.loads(fake.requests[1]["messages"][-1]["content"])["nights"]
+    assert nights[-1]["main_minutes"] == 390, "the case's own data (week fixture), not the test user's"
+    assert len(session.exec(select(User)).all()) == 1, "the run used its own throwaway database"
+
+    md = coach_eval.markdown({"model": "qwen3:8b"}, [result])
+    assert "| data-sleep-last-night | ar |" in md and "نمت" in md
+    assert arabic_share("Banana، حصة واحدة") > 0.5 > arabic_share("1 serving of Banana")
+
+
+def test_runner_lists_the_cases(capsys):
+    from app import coach_eval
+
+    assert coach_eval.main(["--list"]) == 0
+    out = capsys.readouterr().out
+    assert "action-sets" in out and "failure-provider-down" not in out  # failures are covered offline
+
+
+def test_runner_end_to_end_writes_json_and_markdown(client, tmp_path, monkeypatch):
+    from app import coach_eval
+    from app.routers import assistant as assistant_router
+    from tests.test_assistant import FakeOllama, ollama_reply
+
+    fake = FakeOllama(*[ollama_reply("Which meal is it for?")] * 2)
+    http = httpx.Client(transport=httpx.MockTransport(fake.handler))
+
+    def backend():
+        yield assistant.OllamaBackend(http, "http://localhost:11434", "qwen3:8b", 16384)
+
+    app.dependency_overrides[get_assistant_backend] = backend
+    monkeypatch.setattr(assistant_router, "get_assistant_backend", backend)
+    monkeypatch.setattr(coach_eval, "OUT_DIR", tmp_path)
+    from app.config import get_settings
+    monkeypatch.setattr(get_settings(), "allow_signup", get_settings().allow_signup)  # main() turns it on; restore
+    assert coach_eval.main(["--only", "incomplete-food-no-meal"]) == 0
+    data = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
+    assert [(r["id"], r["lang"]) for r in data["results"]] == [("incomplete-food-no-meal", "en"),
+                                                                ("incomplete-food-no-meal", "ar")]
+    assert data["run"]["prompt_sha256_12"] and data["results"][0]["checks"]["actions"] is True
+    assert data["results"][1]["checks"]["language"] is False  # an English reply to an Arabic question
+    assert "Score (pass / partly / fail)" in next(tmp_path.glob("*.md")).read_text(encoding="utf-8")
