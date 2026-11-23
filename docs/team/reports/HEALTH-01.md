@@ -74,15 +74,15 @@ over phone sources, which win over manual; recovery is WHOOP-only. Availability 
 Found while checking: the sleep chart and the coach's `get_sleep` add naps into a day's hours, while the weekly
 summary and points use only the longest sleep. Logged as open decision 5 in HEALTH.md; not changed here.
 
-## 4. Device and access matrix — **Badr to fill in**
+## 4. Device and access matrix (Badr, 2026-11-23; blanks still open)
 
 | Item | Value | Checked how |
 |---|---|---|
-| Android phone (model, Android version) | | Settings → About phone |
-| Health Connect on it (built into Android 14+, or app version on 13 and older) | | Settings → Health Connect |
+| Android phone (model, Android version) | **None of Badr's own.** Live Android checks need a teammate's phone | Badr |
+| Health Connect on it (built into Android 14+, or app version on 13 and older) | Depends on the teammate's phone | Settings → Health Connect |
 | Which apps write sleep/steps into Health Connect (Samsung Health, Google Fit, …) | | Health Connect → App permissions |
-| iPhone (model, iOS version) | | Settings → General → About |
-| WHOOP band and account active | | WHOOP app |
+| iPhone (model, iOS version) | **iPhone 15 Pro, iOS 18** (version to confirm in Settings) | Badr |
+| WHOOP band and account active | **Yes** | Badr |
 | WHOOP developer app created (client id/secret on the server, not in git) | | developer.whoop.com dashboard |
 | A Mac available, even for one afternoon? | | Ask the group |
 | GitHub push access to the team repo | **Yes** (`can_push: true` for Badr's account) | Checked this session |
