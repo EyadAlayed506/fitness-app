@@ -62,8 +62,11 @@ export function addResults(a: HealthConnectImportResult, b: HealthConnectImportR
   };
 }
 
-export function syncSummary(r: HealthConnectImportResult): string {
+/** "Health Connect synced: 2 new, 1 updated, steps for 7 days" (or "Apple Health synced: …") */
+export function syncSummary(r: HealthConnectImportResult, title: "hc.synced" | "ah.synced" = "hc.synced"): string {
   const parts = [tr("sync.new", { n: r.imported }), tr("sync.updated", { n: r.updated })];
   if (r.replaced_manual) parts.push(trCount("sync.replaced", r.replaced_manual));
-  return tr("hc.synced", { parts: parts.join(tr("list.separator")) });
+  const stepDays = r.steps ? r.steps.inserted + r.steps.updated : 0;
+  if (stepDays) parts.push(trCount("sync.stepsDays", stepDays));
+  return tr(title, { parts: parts.join(tr("list.separator")) });
 }

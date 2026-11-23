@@ -13,10 +13,15 @@ class SleepSource(StrEnum):
     manual = "manual"
     whoop = "whoop"
     health_connect = "health_connect"  # Android Health Connect, sent by the phone app
-    # Planned (see ARCHITECTURE.md): apple_health
+    apple_health = "apple_health"  # Apple Health (HealthKit) on the iPhone, sent by the phone app
 
 
-SOURCE_NAMES = {SleepSource.manual: "you", SleepSource.whoop: "WHOOP", SleepSource.health_connect: "Health Connect"}
+SOURCE_NAMES = {
+    SleepSource.manual: "you",
+    SleepSource.whoop: "WHOOP",
+    SleepSource.health_connect: "Health Connect",
+    SleepSource.apple_health: "Apple Health",
+}
 
 
 class SleepEntry(SQLModel, table=True):
@@ -101,9 +106,13 @@ class HealthConnectStage(SQLModel):
 
 
 class HealthConnectSession(SQLModel):
-    """One SleepSessionRecord as the phone app reads it from Health Connect."""
+    """One SleepSessionRecord as the phone app reads it from Health Connect.
 
-    id: str = Field(min_length=1, max_length=100)  # Health Connect's record id
+    Apple Health sends the same shape: the iPhone groups its sleep samples into sessions and maps
+    Apple's sleep values onto these stage numbers (mobile/src/lib/appleHealthSleep.ts).
+    """
+
+    id: str = Field(min_length=1, max_length=100)  # Health Connect's record id, or Apple's sample UUID
     start_time: AwareDatetime
     end_time: AwareDatetime
     # Time zone the sleep was recorded in; the phone sends its own when Health Connect has none

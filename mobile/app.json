@@ -20,7 +20,8 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.eyadalayed.fitnessapp",
       "permissions": [
-        "android.permission.health.READ_SLEEP"
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_STEPS"
       ]
     },
     "web": {
@@ -55,6 +56,14 @@
         }
       ],
       "react-native-health-connect",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "The app reads your sleep and daily steps from Apple Health to show them next to your training. It never writes to Health.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ],
       [
         "expo-build-properties",
         {

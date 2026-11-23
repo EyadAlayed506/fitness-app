@@ -1,6 +1,7 @@
 from app.models.assistant import ChatMessage
 from app.models.exercise import Exercise, RestPreference
 from app.models.food import Food, FoodLog
+from app.models.health import DailySteps, HealthSync
 from app.models.gym import Gym, MachinePhoto, MachineSetting
 from app.models.measurement import BodyMeasurement
 from app.models.points import PointAward
@@ -12,6 +13,6 @@ from app.models.workout import WorkoutSession, WorkoutSet
 
 __all__ = [
     "ChatMessage", "CustomDay",
-    "BodyMeasurement", "Exercise", "Gym", "MachinePhoto", "MachineSetting", "PointAward", "RestPreference", "Food", "FoodLog", "Profile",
+    "BodyMeasurement", "DailySteps", "Exercise", "Gym", "HealthSync", "MachinePhoto", "MachineSetting", "PointAward", "RestPreference", "Food", "FoodLog", "Profile",
     "SleepEntry", "User", "WeightEntry", "WhoopConnection", "WorkoutSession", "WorkoutSet",
 ]

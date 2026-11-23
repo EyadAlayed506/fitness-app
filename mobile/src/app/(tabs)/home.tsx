@@ -43,6 +43,7 @@ import { clockOf, fmt, hoursMinutes, shortDate, todayISO, trackerName, units } f
 import { haptics } from "@/lib/haptics";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { currentLocale } from "@/lib/i18n/current";
+import { useAppleHealthAutoSync, useAppleHealthStatus } from "@/lib/appleHealth";
 import { useHealthConnectAutoSync, useHealthConnectStatus } from "@/lib/healthConnect";
 import { derivedKeys, errorMessage, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
 import { radius, space, type as typeScale, useTheme } from "@/lib/theme";
@@ -71,6 +72,8 @@ export default function Home() {
   useRefreshOnFocus([qk.foodDay(todayISO()), qk.sleep, qk.recommendations, qk.points, qk.whoop, qk.gettingStarted]);
   useWhoopAutoSync(!!whoop.data?.connected, 30);
   useHealthConnectAutoSync(!!healthConnect.data?.connected, 30);
+  const appleHealth = useAppleHealthStatus();
+  useAppleHealthAutoSync(!!appleHealth.data?.connected, 30);
   const [loggingSleep, setLoggingSleep] = useState(false);
   const [weight, setWeight] = useState("");
   const [refreshing, setRefreshing] = useState(false);

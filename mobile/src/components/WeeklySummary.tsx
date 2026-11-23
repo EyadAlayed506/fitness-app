@@ -135,6 +135,7 @@ export function WeeklySummaryCard() {
                 {[
                   s.sleep.from_whoop ? tr("weekly.fromWhoop", { n: s.sleep.from_whoop }) : "",
                   s.sleep.from_health_connect ? tr("weekly.fromHc", { n: s.sleep.from_health_connect }) : "",
+                  s.sleep.from_apple_health ? tr("weekly.fromApple", { n: s.sleep.from_apple_health }) : "",
                   s.sleep.logged_by_hand ? tr("weekly.byHand", { n: s.sleep.logged_by_hand }) : "",
                 ]
                   .filter(Boolean)

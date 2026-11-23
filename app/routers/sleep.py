@@ -62,7 +62,14 @@ def log_sleep(data: SleepEntryIn, user: CurrentUser, session: SessionDep):
 @router.post("/health-connect", response_model=HealthConnectImportResult)
 def import_health_connect(data: HealthConnectImport, user: CurrentUser, session: SessionDep):
     """Sleep sessions the phone app read from Android Health Connect. Sending the same session again updates it."""
-    return health_connect.import_sessions(session, user.id, data.sessions)
+    return health_connect.import_sessions(session, user.id, data.sessions, SleepSource.health_connect)
+
+
+@router.post("/apple-health", response_model=HealthConnectImportResult)
+def import_apple_health(data: HealthConnectImport, user: CurrentUser, session: SessionDep):
+    """Sleep the iPhone read from Apple Health, grouped into sessions in Health Connect's shape (same stage
+    numbers). Sending the same session again updates it."""
+    return health_connect.import_sessions(session, user.id, data.sessions, SleepSource.apple_health)
 
 
 @router.get("", response_model=list[SleepEntryPublic])
