@@ -1,6 +1,8 @@
 [
  {
   "name": "Chicken breast, roasted, skinless",
+  "name_ar": "صدر دجاج مشوي بدون جلد",
+  "aliases_ar": "صدر دجاج,صدور دجاج,دجاج",
   "is_liquid": false,
   "serving_size": 120,
   "serving_unit": "g",
@@ -17,6 +19,8 @@
  },
  {
   "name": "White rice, cooked",
+  "name_ar": "أرز أبيض مطبوخ",
+  "aliases_ar": "رز,رز أبيض,أرز",
   "is_liquid": false,
   "serving_size": 158,
   "serving_unit": "g",
@@ -33,6 +37,8 @@
  },
  {
   "name": "Brown rice, cooked",
+  "name_ar": "أرز بني مطبوخ",
+  "aliases_ar": "رز بني",
   "is_liquid": false,
   "serving_size": 195,
   "serving_unit": "g",
@@ -49,6 +55,8 @@
  },
  {
   "name": "Egg, whole, large",
+  "name_ar": "بيضة كاملة كبيرة",
+  "aliases_ar": "بيض,بيضة,بيض مسلوق",
   "is_liquid": false,
   "serving_size": 50,
   "serving_unit": "g",
@@ -65,6 +73,8 @@
  },
  {
   "name": "Egg white",
+  "name_ar": "بياض البيض",
+  "aliases_ar": "بياض بيض",
   "is_liquid": false,
   "serving_size": 33,
   "serving_unit": "g",
@@ -81,6 +91,8 @@
  },
  {
   "name": "Banana",
+  "name_ar": "موز",
+  "aliases_ar": "موزة,موزه",
   "is_liquid": false,
   "serving_size": 118,
   "serving_unit": "g",
@@ -97,6 +109,8 @@
  },
  {
   "name": "Apple",
+  "name_ar": "تفاح",
+  "aliases_ar": "تفاحة",
   "is_liquid": false,
   "serving_size": 182,
   "serving_unit": "g",
@@ -113,6 +127,8 @@
  },
  {
   "name": "Orange",
+  "name_ar": "برتقال",
+  "aliases_ar": "برتقالة",
   "is_liquid": false,
   "serving_size": 131,
   "serving_unit": "g",
@@ -129,6 +145,8 @@
  },
  {
   "name": "Oats, rolled, dry",
+  "name_ar": "شوفان (جاف)",
+  "aliases_ar": "شوفان",
   "is_liquid": false,
   "serving_size": 40,
   "serving_unit": "g",
@@ -145,6 +163,8 @@
  },
  {
   "name": "Whole wheat bread",
+  "name_ar": "خبز قمح كامل",
+  "aliases_ar": "خبز أسمر,خبز بر,توست أسمر",
   "is_liquid": false,
   "serving_size": 32,
   "serving_unit": "g",
@@ -161,6 +181,8 @@
  },
  {
   "name": "White bread",
+  "name_ar": "خبز أبيض",
+  "aliases_ar": "توست,توست أبيض",
   "is_liquid": false,
   "serving_size": 25,
   "serving_unit": "g",
@@ -177,6 +199,8 @@
  },
  {
   "name": "Pita bread, white",
+  "name_ar": "خبز عربي أبيض",
+  "aliases_ar": "خبز عربي,خبز شامي,خبز بيتا",
   "is_liquid": false,
   "serving_size": 60,
   "serving_unit": "g",
@@ -193,6 +217,8 @@
  },
  {
   "name": "Pasta, cooked",
+  "name_ar": "معكرونة مطبوخة",
+  "aliases_ar": "معكرونة,مكرونة,باستا",
   "is_liquid": false,
   "serving_size": 140,
   "serving_unit": "g",
@@ -209,6 +235,8 @@
  },
  {
   "name": "Potato, baked",
+  "name_ar": "بطاطس مشوية",
+  "aliases_ar": "بطاطس,بطاطا",
   "is_liquid": false,
   "serving_size": 173,
   "serving_unit": "g",
@@ -225,6 +253,8 @@
  },
  {
   "name": "Sweet potato, baked",
+  "name_ar": "بطاطا حلوة مشوية",
+  "aliases_ar": "بطاطا حلوة,بطاطس حلوة",
   "is_liquid": false,
   "serving_size": 114,
   "serving_unit": "g",
@@ -241,6 +271,8 @@
  },
  {
   "name": "Salmon, cooked",
+  "name_ar": "سلمون مطبوخ",
+  "aliases_ar": "سلمون,سمك سلمون",
   "is_liquid": false,
   "serving_size": 150,
   "serving_unit": "g",
@@ -257,6 +289,8 @@
  },
  {
   "name": "Tuna, canned in water",
+  "name_ar": "تونة معلبة بالماء",
+  "aliases_ar": "تونة,تونا",
   "is_liquid": false,
   "serving_size": 85,
   "serving_unit": "g",
@@ -273,6 +307,8 @@
  },
  {
   "name": "Ground beef 85% lean, cooked",
+  "name_ar": "لحم بقري مفروم مطبوخ (85% لحم)",
+  "aliases_ar": "لحم مفروم,مفروم,لحم بقري",
   "is_liquid": false,
   "serving_size": 100,
   "serving_unit": "g",
@@ -289,6 +325,8 @@
  },
  {
   "name": "Greek yogurt, plain, nonfat",
+  "name_ar": "زبادي يوناني سادة خالي الدسم",
+  "aliases_ar": "زبادي يوناني,زبادي",
   "is_liquid": false,
   "serving_size": 170,
   "serving_unit": "g",
@@ -305,6 +343,8 @@
  },
  {
   "name": "Cheddar cheese",
+  "name_ar": "جبن شيدر",
+  "aliases_ar": "جبنة شيدر,شيدر",
   "is_liquid": false,
   "serving_size": 28,
   "serving_unit": "g",
@@ -321,6 +361,8 @@
  },
  {
   "name": "Almonds",
+  "name_ar": "لوز",
+  "aliases_ar": "لوزة",
   "is_liquid": false,
   "serving_size": 28,
   "serving_unit": "g",
@@ -337,6 +379,8 @@
  },
  {
   "name": "Peanut butter",
+  "name_ar": "زبدة الفول السوداني",
+  "aliases_ar": "زبدة فول سوداني,زبدة فستق",
   "is_liquid": false,
   "serving_size": 32,
   "serving_unit": "g",
@@ -353,6 +397,8 @@
  },
  {
   "name": "Avocado",
+  "name_ar": "أفوكادو",
+  "aliases_ar": "افوكادو",
   "is_liquid": false,
   "serving_size": 68,
   "serving_unit": "g",
@@ -369,6 +415,8 @@
  },
  {
   "name": "Broccoli, cooked",
+  "name_ar": "بروكلي مطبوخ",
+  "aliases_ar": "بروكلي",
   "is_liquid": false,
   "serving_size": 156,
   "serving_unit": "g",
@@ -385,6 +433,8 @@
  },
  {
   "name": "Lentils, cooked",
+  "name_ar": "عدس مطبوخ",
+  "aliases_ar": "عدس",
   "is_liquid": false,
   "serving_size": 198,
   "serving_unit": "g",
@@ -401,6 +451,8 @@
  },
  {
   "name": "Chickpeas, cooked",
+  "name_ar": "حمص حب مطبوخ",
+  "aliases_ar": "حمص حب,حمص مسلوق",
   "is_liquid": false,
   "serving_size": 164,
   "serving_unit": "g",
@@ -417,6 +469,8 @@
  },
  {
   "name": "Hummus",
+  "name_ar": "حمص",
+  "aliases_ar": "حمص بالطحينة,حمّص",
   "is_liquid": false,
   "serving_size": 30,
   "serving_unit": "g",
@@ -433,6 +487,8 @@
  },
  {
   "name": "Falafel",
+  "name_ar": "فلافل",
+  "aliases_ar": "طعمية",
   "is_liquid": false,
   "serving_size": 17,
   "serving_unit": "g",
@@ -449,6 +505,8 @@
  },
  {
   "name": "Dates, Medjool",
+  "name_ar": "تمر مجدول",
+  "aliases_ar": "تمر,تمرة,تمور",
   "is_liquid": false,
   "serving_size": 24,
   "serving_unit": "g",
@@ -465,6 +523,8 @@
  },
  {
   "name": "Cucumber",
+  "name_ar": "خيار",
+  "aliases_ar": "خيارة",
   "is_liquid": false,
   "serving_size": 100,
   "serving_unit": "g",
@@ -481,6 +541,8 @@
  },
  {
   "name": "Tomato",
+  "name_ar": "طماطم",
+  "aliases_ar": "طماطة,بندورة",
   "is_liquid": false,
   "serving_size": 123,
   "serving_unit": "g",
@@ -497,6 +559,8 @@
  },
  {
   "name": "Milk, whole",
+  "name_ar": "حليب كامل الدسم",
+  "aliases_ar": "حليب",
   "is_liquid": true,
   "serving_size": 240,
   "serving_unit": "ml",
@@ -513,6 +577,8 @@
  },
  {
   "name": "Milk, skim",
+  "name_ar": "حليب منزوع الدسم",
+  "aliases_ar": "حليب خالي الدسم",
   "is_liquid": true,
   "serving_size": 240,
   "serving_unit": "ml",
@@ -529,6 +595,8 @@
  },
  {
   "name": "Orange juice",
+  "name_ar": "عصير برتقال",
+  "aliases_ar": "عصير",
   "is_liquid": true,
   "serving_size": 240,
   "serving_unit": "ml",
@@ -545,6 +613,8 @@
  },
  {
   "name": "Cola soft drink",
+  "name_ar": "مشروب غازي (كولا)",
+  "aliases_ar": "كولا,بيبسي,مشروب غازي",
   "is_liquid": true,
   "serving_size": 330,
   "serving_unit": "ml",
@@ -561,6 +631,8 @@
  },
  {
   "name": "Coffee, black",
+  "name_ar": "قهوة سوداء",
+  "aliases_ar": "قهوة,أمريكانو",
   "is_liquid": true,
   "serving_size": 240,
   "serving_unit": "ml",
@@ -577,6 +649,8 @@
  },
  {
   "name": "Water",
+  "name_ar": "ماء",
+  "aliases_ar": "موية,مويه",
   "is_liquid": true,
   "serving_size": 250,
   "serving_unit": "ml",
@@ -593,6 +667,8 @@
  },
  {
   "name": "Olive oil",
+  "name_ar": "زيت زيتون",
+  "aliases_ar": "زيت",
   "is_liquid": true,
   "serving_size": 15,
   "serving_unit": "ml",

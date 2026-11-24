@@ -3,8 +3,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
+from pydantic import model_validator
 from sqlmodel import Field, SQLModel
 
+from app.i18n import current_language
 from app.models.user import utcnow
 
 
@@ -59,12 +61,36 @@ class Food(FoodBase, table=True):
     owner_id: int | None = Field(default=None, foreign_key="user.id", index=True)  # None = global
     source: FoodSource
     external_id: str | None = Field(default=None, index=True)
+    # Built-in foods only (from app/seed/foods.json): Arabic name and comma-separated Arabic search words.
+    # The English `name` stays the identity (logs, the coach's tools, online search).
+    name_ar: str | None = None
+    aliases_ar: str | None = None
+
+
+def food_label(food) -> str:
+    """The food's name in the request's language (its own name when there is no Arabic one)."""
+    if current_language() == "ar" and getattr(food, "name_ar", None):
+        return food.name_ar
+    return food.name
 
 
 class FoodPublic(FoodBase):
     id: int
     source: FoodSource
     owner_id: int | None
+
+    @model_validator(mode="before")
+    @classmethod
+    def in_request_language(cls, data):
+        """For an Arabic request: the Arabic name of a built-in food."""
+        if current_language() != "ar":
+            return data
+        get = data.get if isinstance(data, dict) else (lambda key: getattr(data, key, None))
+        if not get("name_ar"):
+            return data
+        values = {name: get(name) for name in cls.model_fields}
+        values["name"] = get("name_ar")
+        return values
 
 
 class FoodCandidate(FoodBase):

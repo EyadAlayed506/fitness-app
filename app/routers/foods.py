@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import time
 from collections.abc import AsyncIterator
 from datetime import date, timedelta
 from typing import Annotated
@@ -28,18 +30,27 @@ from app.models.food import (
     RecentFood,
     RecentFoods,
     FoodSource,
+    food_label,
 )
 from app.models.user import Profile, User
 from app.services import food_search
 from app.services.plan import build_plan
 from app.services.units import UnitError, to_base_amount, units_for
 
+log = logging.getLogger("uvicorn.error")  # shows up in the server's console
+
 router = APIRouter(tags=["food"])
 
 # Shown in the app above the search results, in the language of the request (app.i18n)
 SEARCH_TEXTS: Table = {
-    "en": {"unreachable": "{source} is not reachable right now"},
-    "ar": {"unreachable": "تعذّر الوصول إلى {source} الآن"},
+    "en": {
+        "unreachable": "{source} is not reachable right now",
+        "busy": "{source} is busy right now. Try again in a minute",
+    },
+    "ar": {
+        "unreachable": "تعذّر الوصول إلى {source} الآن",
+        "busy": "{source} مشغول الآن. حاول مجدداً بعد دقيقة",
+    },
 }
 
 
@@ -73,20 +84,59 @@ async def search_foods(
     q: str = Query(min_length=1),
     online: bool = True,
 ):
-    """Local foods first (built-in, imported, your own), then USDA and Open Food Facts."""
-    local = food_search.search_local(list(session.exec(_visible_foods(user)).all()), q)
+    """Local foods first (built-in, imported, your own), then USDA and Open Food Facts.
+
+    Arabic searches also match the built-in foods' Arabic names. USDA's data is English, so for an Arabic
+    search it is asked for the English name of the best built-in match ("موز" -> "Banana"), and skipped
+    when there is none. Open Food Facts gets the words as typed (it has Arabic product labels).
+    """
+    local = food_search.search_local(list(session.exec(_visible_foods(user)).all()), q, arabic=True)
     result = FoodSearchResult(local=local, online=[])
     if not online:
         return result
 
     known = {(f.source, f.external_id) for f in local if f.external_id}
-    sources = [("USDA FoodData Central", food_search.search_usda), ("Open Food Facts", food_search.search_off)]
-    responses = await asyncio.gather(*(fn(client, q) for _, fn in sources), return_exceptions=True)
-    for (label, _), res in zip(sources, responses):
+    if len(q.strip()) < food_search.MIN_ONLINE_QUERY:
+        return result  # still typing: local results only, so a word doesn't cost a request per letter
+    usda_query = q
+    if food_search.ARABIC_LETTERS.search(q):
+        builtin = next((f for f in local if f.source == FoodSource.builtin), None)
+        usda_query = builtin.name if builtin else None
+    sources = [("Open Food Facts", food_search.search_off, q)]
+    if usda_query:
+        sources.insert(0, ("USDA FoodData Central", food_search.search_usda, usda_query))
+
+    now = time.monotonic()
+    answers: dict[str, list | str] = {}  # label -> candidates, or the warning key
+    to_ask = []
+    for label, fn, query in sources:
+        hit = food_search.cached(label, query, now)
+        if hit is not None:
+            answers[label] = hit
+        elif reason := food_search.backing_off(label, now):
+            answers[label] = reason
+        else:
+            to_ask.append((label, fn, query))
+    responses = await asyncio.gather(*(fn(client, query) for _, fn, query in to_ask), return_exceptions=True)
+    for (label, _, query), res in zip(to_ask, responses):
         if isinstance(res, Exception):
-            result.warnings.append(tr(SEARCH_TEXTS, "unreachable", source=label))
-            continue
-        result.online.extend(c for c in res if (c.source, c.external_id) not in known)
+            # the reason, so "unreachable" can be told apart from a rate limit or a bad key. Never the URL:
+            # USDA's contains the API key.
+            status = getattr(getattr(res, "response", None), "status_code", None)
+            log.warning("Food search: %s failed (%s%s)", label, type(res).__name__, f", HTTP {status}" if status else "")
+            answers[label] = "busy" if status == 429 else "unreachable"
+            if status in food_search.BACKOFF_STATUSES:
+                food_search.start_backoff(label, answers[label], now)
+        else:
+            food_search.remember(label, query, res, now)
+            answers[label] = res
+
+    for label, _, _ in sources:  # keep the sources' order (USDA first)
+        answer = answers[label]
+        if isinstance(answer, str):
+            result.warnings.append(tr(SEARCH_TEXTS, answer, source=label))
+        else:
+            result.online.extend(c for c in answer if (c.source, c.external_id) not in known)
     return result
 
 
@@ -207,19 +257,19 @@ def log_food(data: FoodLogIn, user: CurrentUser, session: SessionDep):
     session.add(entry)
     session.commit()
     session.refresh(entry)
-    return _log_public(entry, food.name)
+    return _log_public(entry, food_label(food))
 
 
 @router.get("/food-logs", response_model=FoodDay)
 def food_day(user: CurrentUser, session: SessionDep, day: date | None = Query(default=None, alias="date")):
     day = day or date.today()
     rows = session.exec(
-        select(FoodLog, Food.name)
+        select(FoodLog, Food)
         .join(Food, Food.id == FoodLog.food_id)
         .where(FoodLog.user_id == user.id, FoodLog.date == day)
         .order_by(FoodLog.created_at)
     ).all()
-    entries = [_log_public(e, name) for e, name in rows]
+    entries = [_log_public(e, food_label(food)) for e, food in rows]
     totals = DayTotals(
         calories=round(sum(e.calories for e in entries), 1),
         protein_g=round(sum(e.protein_g for e in entries), 1),
@@ -293,7 +343,7 @@ def copy_meal(data: CopyMealIn, user: CurrentUser, session: SessionDep):
             **_compute_entry(food, entry.quantity, entry.unit),
         )
         session.add(copy)
-        copies.append((copy, food.name))
+        copies.append((copy, food_label(food)))
     session.commit()
     for copy, _ in copies:
         session.refresh(copy)
@@ -313,7 +363,7 @@ def update_food_log(log_id: int, data: FoodLogUpdate, user: CurrentUser, session
     session.add(entry)
     session.commit()
     session.refresh(entry)
-    return _log_public(entry, food.name)
+    return _log_public(entry, food_label(food))
 
 
 @router.delete("/food-logs/{log_id}", status_code=204)

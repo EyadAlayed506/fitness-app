@@ -8,7 +8,7 @@ from sqlmodel import SQLModel, func, select
 from app.database import SessionDep
 from app.deps import CurrentProfile, CurrentUser
 from app.models.exercise import Exercise, ExercisePublic
-from app.models.food import Food, FoodAddedVia, FoodLog, FoodLogPublic, FoodSource
+from app.models.food import Food, FoodAddedVia, FoodLog, FoodLogPublic, FoodSource, food_label
 from app.models.snap import MenuDish, MenuLogIn, MenuOut, ScreenshotItem, ScreenshotRoutineOut, WeightReading
 from app.routers.exercises import MAX_PHOTO_BYTES
 from app.routers.foods import _compute_entry, _log_public
@@ -152,7 +152,7 @@ def log_menu_dish(data: MenuLogIn, user: CurrentUser, session: SessionDep, tz_of
     session.add(entry)
     session.commit()
     session.refresh(entry)
-    return _log_public(entry, food.name)
+    return _log_public(entry, food_label(food))
 
 
 # ---------- personal insights ----------

@@ -32,7 +32,17 @@ def seed_catalogue(session: Session) -> None:
         else:
             exercise.sqlmodel_update(row)
             session.add(exercise)
-    if session.exec(select(Food).where(Food.source == FoodSource.builtin).limit(1)).first() is None:
-        for row in json.loads((SEED_DIR / "foods.json").read_text(encoding="utf-8")):
+    food_rows = json.loads((SEED_DIR / "foods.json").read_text(encoding="utf-8"))
+    builtin = {f.name: f for f in session.exec(select(Food).where(Food.source == FoodSource.builtin)).all()}
+    if not builtin:
+        for row in food_rows:
             session.add(Food(source=FoodSource.builtin, **row))
+    else:
+        # An existing database only gains the Arabic names (matched by English name). Nutrition values,
+        # ids and anyone's food log are left exactly as they are.
+        for row in food_rows:
+            food = builtin.get(row["name"])
+            if food is not None and (food.name_ar, food.aliases_ar) != (row.get("name_ar"), row.get("aliases_ar")):
+                food.name_ar, food.aliases_ar = row.get("name_ar"), row.get("aliases_ar")
+                session.add(food)
     session.commit()

@@ -8,7 +8,7 @@ on:
     branches: [merged_branch]
   push:
     # merged_branch, plus Alzoman's work branch so checks run without opening a pull request
-    branches: [merged_branch, alzoman, "alzoman/**"]
+    branches: [merged_branch, alzoman, "alzoman/**", "alzoman-*"]
   workflow_dispatch:
 
 permissions:

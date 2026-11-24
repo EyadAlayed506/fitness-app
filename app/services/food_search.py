@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.models.food import Food, FoodCandidate, FoodSource
 
 USDA_SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
+USDA_DATA_TYPES = ("Foundation", "SR Legacy", "Survey (FNDDS)")
 OFF_SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 
 # USDA nutrient numbers -> our field names (USDA values are per 100 g)
@@ -45,16 +46,46 @@ OFF_NUTRIENTS = {
 LIQUID_QUANTITY = re.compile(r"\d\s*(ml|cl|dl|l|fl\.?\s*oz)\b", re.IGNORECASE)
 
 
-def search_local(foods: list[Food], query: str, limit: int = 15) -> list[Food]:
-    """Fuzzy match on name + brand, so typos and word order still match."""
+ARABIC_LETTERS = re.compile(r"[\u0600-\u06ff]")
+# Stricter than English (70): short Arabic words share letters easily ("برقر" vs "برتقال").
+ARABIC_CUTOFF = 80
+_ARABIC_FORMS = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ة": "ه", "ى": "ي"})
+
+
+def squash_arabic(text: str) -> str:
+    """One form for alef / taa marbuta / alef maqsura and no diacritics or tatweel, so spelling variants
+    ("موزة", "موزه", "تمرة") match. Same rule as the exercise search."""
+    text = text.lower().translate(_ARABIC_FORMS)
+    return "".join(ch for ch in text if (ch.isalnum() or ch == " ") and not "\u064b" <= ch <= "\u0652")
+
+
+def search_local(foods: list[Food], query: str, limit: int = 15, arabic: bool = False) -> list[Food]:
+    """Fuzzy match on name + brand, so typos and word order still match.
+
+    arabic=True also matches the Arabic names and search words of built-in foods ("موز" finds Banana).
+    It is off by default: the coach's food lookup deliberately stays English-only (COACH-02).
+    """
     if not query.strip():
         return foods[:limit]
     choices = {f.id: f"{f.name} {f.brand}".strip() for f in foods}
     matches = process.extract(
-        query, choices, scorer=fuzz.WRatio, processor=lambda s: s.lower(), limit=limit, score_cutoff=70
+        query, choices, scorer=fuzz.WRatio, processor=lambda s: s.lower(), limit=None, score_cutoff=70
     )
+    best = {key: score for _, score, key in matches}
+    if arabic and ARABIC_LETTERS.search(query):
+        q = squash_arabic(query)
+        for f in foods:
+            names = [f.name_ar or "", *(f.aliases_ar or "").split(",")]
+            names = [squash_arabic(n) for n in names if n.strip()]
+            if not names or not q:
+                continue
+            score = max(max(fuzz.WRatio(q, n), fuzz.ratio(q.replace(" ", ""), n.replace(" ", ""))) for n in names)
+            if score >= ARABIC_CUTOFF and score > best.get(f.id, 0):
+                best[f.id] = score
+    order = {f.id: i for i, f in enumerate(foods)}
     by_id = {f.id: f for f in foods}
-    return [by_id[key] for _, _, key in matches]
+    ranked = sorted(best, key=lambda key: (-best[key], order[key]))
+    return [by_id[key] for key in ranked[:limit]]
 
 
 def parse_usda_food(item: dict) -> FoodCandidate | None:
@@ -124,14 +155,12 @@ def parse_off_product(item: dict) -> FoodCandidate | None:
 
 async def search_usda(client: httpx.AsyncClient, query: str, limit: int = 8) -> list[FoodCandidate]:
     settings = get_settings()
-    resp = await client.get(
+    # USDA's JSON form (POST). Measured 2026-11-24 with a real key: the GET form of this search answered
+    # 400 Bad Request to 12 of 30 identical requests (however the spaces were encoded); POST answered 15 of 15.
+    resp = await client.post(
         USDA_SEARCH_URL,
-        params={
-            "api_key": settings.usda_api_key,
-            "query": query,
-            "pageSize": limit,
-            "dataType": "Foundation,SR Legacy,Survey (FNDDS)",
-        },
+        params={"api_key": settings.usda_api_key},
+        json={"query": query, "pageSize": limit, "dataType": list(USDA_DATA_TYPES)},
         timeout=settings.external_timeout_seconds,
     )
     resp.raise_for_status()
@@ -157,3 +186,45 @@ async def search_off(client: httpx.AsyncClient, query: str, limit: int = 8) -> l
     resp.raise_for_status()
     results = [parse_off_product(item) for item in resp.json().get("products", [])]
     return [r for r in results if r is not None]
+
+
+# ---- Protecting the online databases (and their rate limits) -----------------------------------------
+# All testers share the server's address, so the limits are shared too: USDA's DEMO_KEY allows 30 requests
+# an hour, Open Food Facts 10 searches a minute. The app searches as you type, so without this one word
+# could cost a dozen requests.
+
+MIN_ONLINE_QUERY = 3  # "l", "lk", "مو": local results only
+ONLINE_CACHE_SECONDS = 6 * 3600  # the same words again (from anyone) reuse the earlier answer
+BACKOFF_SECONDS = 60  # after a 429/503, give that source a minute before asking again
+BACKOFF_STATUSES = (429, 503)
+_MAX_CACHED = 500
+
+_cache: dict[tuple[str, str], tuple[float, list[FoodCandidate]]] = {}
+_backoff: dict[str, tuple[float, str]] = {}  # source label -> (until, warning key)
+
+
+def reset_online_state() -> None:
+    """Forget cached answers and back-offs (tests; or after changing USDA_API_KEY without a restart)."""
+    _cache.clear()
+    _backoff.clear()
+
+
+def cached(label: str, query: str, now: float) -> list[FoodCandidate] | None:
+    hit = _cache.get((label, query.strip().lower()))
+    return hit[1] if hit and hit[0] > now else None
+
+
+def remember(label: str, query: str, results: list[FoodCandidate], now: float) -> None:
+    if len(_cache) >= _MAX_CACHED:
+        _cache.clear()  # crude, but bounded; a pilot never gets near this
+    _cache[(label, query.strip().lower())] = (now + ONLINE_CACHE_SECONDS, results)
+
+
+def backing_off(label: str, now: float) -> str | None:
+    """The warning key to show while this source is resting after a 429/503, else None."""
+    entry = _backoff.get(label)
+    return entry[1] if entry and entry[0] > now else None
+
+
+def start_backoff(label: str, warning: str, now: float) -> None:
+    _backoff[label] = (now + BACKOFF_SECONDS, warning)
