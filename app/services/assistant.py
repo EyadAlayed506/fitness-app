@@ -86,7 +86,9 @@ TEXTS: Table = {
         "meal.lunch": "lunch",
         "meal.dinner": "dinner",
         "meal.snack": "snack",
-        "reply_in": "The app is set to English: reply in English unless the user writes in another language.",
+        "reply_in": "Reply in the language of this latest message of the user's (just above this note), even if earlier messages were in another language: Arabic (simple Modern Standard Arabic) if they wrote in "
+        "Arabic, English if they wrote in English. The app is set to English; use English only when the message's "
+        "language isn't clear.",
     },
     "ar": {
         "disclaimer": "المدرب ذكاء اصطناعي. يقرأ بياناتك ويستطيع تسجيل الأشياء لك، لكنه قد يخطئ (تحقّق مما أضافه "
@@ -128,8 +130,9 @@ TEXTS: Table = {
         "meal.lunch": "الغداء",
         "meal.dinner": "العشاء",
         "meal.snack": "الوجبة الخفيفة",
-        "reply_in": "The app is set to Arabic: reply in Arabic (simple Modern Standard Arabic) unless the user writes in "
-        "another language. Keep numbers in Western digits (0-9) and units as the app shows them.",
+        "reply_in": "Reply in the language of this latest message of the user's (just above this note), even if earlier messages were in another language: Arabic (simple Modern Standard Arabic) if they wrote in "
+        "Arabic, English if they wrote in English. The app is set to Arabic; use Arabic when the message's language "
+        "isn't clear. Keep numbers in Western digits (0-9) and units as the app shows them.",
     },
 }
 
@@ -157,6 +160,8 @@ SYSTEM_PROMPT = """You are the coach inside a fitness app. You help one person w
 
 How to work:
 - Before answering anything about the user's own data, look it up with the tools. Quote the numbers and dates you used. If something isn't logged, say so plainly and suggest how to log it in the app; never invent values or fill gaps with guesses.
+- Quote the targets, averages, totals and differences the tools give (macro targets, full-day averages, fiber, sugar and sodium, sleep stage averages); don't work out your own. Today isn't over yet: for averages and habits use the full days the tools give, and talk about today separately.
+- For a check-up, a review of the week or "how am I doing" in any language, look at all three: food (get_food_summary), sleep (get_sleep) and training (get_recent_workouts or get_weekly_summary), then answer. For questions about the user's eating habits, healthy eating or the foods they eat most, use get_food_summary. For whether one thing goes with another (sleep after training days, sleep and lifts), use get_patterns. For steps, walking or daily activity, use get_steps; in a check-up, add steps when the user has them. Say today's steps are "so far" and as of the last sync.
 - The app's own plan and rules come first: their training days and session types, the recommended calories, the sleep goal. Explain them and help the user follow them; if they want to change the plan, tell them where (Workouts > Edit plan, Profile, Sleep > Change goal). You can't change the plan or settings yourself.
 - You can log things for the user: food (log_food), workout sets (log_workout_sets), a weigh-in (log_weight) and a night of sleep (log_sleep), and remove a food entry (remove_food_entry). When the user asks you to add or log something, do it straight away with the right tool, without asking first. If they don't say how much, use one normal serving and say so. Log only what they asked for, one log_food call per food.
 - Food goes to a meal: breakfast, lunch, dinner or snack. If the user didn't say which meal in their message, don't log it yet: ask which one in one short question, then log it when they answer. Never guess the meal from the time of day or from earlier messages. Afterwards say exactly what was added (name, amount, meal or day); the app shows it with an Undo button.
@@ -269,6 +274,7 @@ def _profile(ctx: ToolContext, _: dict) -> Any:
         "weekday": ctx.today.strftime("%A"),
         "profile": profile_public(ctx.profile),
         "plan": build_plan(ctx.profile),
+        "macro_targets": macro_targets(build_plan(ctx.profile).target_calories),
         "sleep_goal_minutes": goal.minutes,
         "sleep_goal_is_custom": goal.custom,
         "recommended_sleep_hours": goal.recommended_hours,
@@ -326,20 +332,236 @@ def _exercise_info(ctx: ToolContext, args: dict) -> Any:
 def _sleep(ctx: ToolContext, args: dict) -> Any:
     from app.routers.analytics import sleep_series
 
-    return sleep_series(ctx.user, ctx.session, _int(args.get("days"), 14, 1, 90), ctx.tz_offset)
+    result = jsonable_encoder(sleep_series(ctx.user, ctx.session, _int(args.get("days"), 14, 1, 90), ctx.tz_offset))
+    result["stage_averages"] = stage_averages(result.get("nights") or [])
+    return result
+
+
+# ---------- numbers worked out here, so the coach quotes them instead of doing sums itself ----------
+
+# The same split as the app's macro bars (mobile/src/components/MacroBars.tsx): share of calories, kcal per gram
+MACRO_SPLIT = {"protein_g": (0.30, 4), "carbs_g": (0.40, 4), "fat_g": (0.30, 9)}
+MACROS = ("calories", "protein_g", "carbs_g", "fat_g")
+OTHER_NUTRIENTS = ("fiber_g", "sugar_g", "added_sugar_g", "saturated_fat_g", "sodium_mg", "potassium_mg", "cholesterol_mg")
+
+
+def macro_targets(target_kcal: float | None) -> dict | None:
+    """The daily targets the app shows: calories from the plan, protein/carbs/fat as 30/40/30% of them."""
+    if not target_kcal:
+        return None
+    out: dict[str, float] = {"calories": round(target_kcal)}
+    for key, (share, kcal_per_g) in MACRO_SPLIT.items():
+        out[key] = round(target_kcal * share / kcal_per_g)
+    return out
+
+
+def guidelines(target_kcal: float | None) -> dict:
+    """General adult guidance for nutrients the app sets no target for (not personal medical advice)."""
+    kcal = target_kcal or 2000
+    return {
+        "fiber_g_at_least": round(14 * kcal / 1000),
+        "added_sugar_g_at_most": round(kcal * 0.10 / 4),
+        "saturated_fat_g_at_most": round(kcal * 0.10 / 9),
+        "sodium_mg_at_most": 2300,
+        "note": "General guidance for healthy adults (about 14 g fiber per 1,000 kcal; added sugar and saturated fat "
+        "under 10% of calories each; sodium under 2,300 mg), not a personal medical target.",
+    }
+
+
+def _food_rows(ctx: ToolContext, start: dt.date, end: dt.date) -> list:
+    from sqlmodel import select
+
+    from app.models.food import Food, FoodLog
+
+    return list(ctx.session.exec(
+        select(FoodLog, Food).join(Food, Food.id == FoodLog.food_id)
+        .where(FoodLog.user_id == ctx.user.id, FoodLog.date >= start, FoodLog.date <= end)
+    ).all())
+
+
+def other_nutrients(rows: list) -> dict:
+    """Fiber, sugar, sodium... eaten, from each food's values per 100 g/ml; counts entries whose food lacks a value."""
+    totals = {k: 0.0 for k in OTHER_NUTRIENTS}
+    unknown = {k: 0 for k in OTHER_NUTRIENTS}
+    for log, food in rows:
+        for k in OTHER_NUTRIENTS:
+            value = getattr(food, k)
+            if value is None:
+                unknown[k] += 1
+            else:
+                totals[k] += value * log.amount_base / 100
+    out: dict[str, Any] = {k: round(v) if k.endswith("_mg") else round(v, 1) for k, v in totals.items()}
+    missing = {k: n for k, n in unknown.items() if n}
+    if missing:
+        out["entries_without_a_value"] = missing
+    return out
+
+
+def stage_averages(nights: list) -> dict | None:
+    """Average minutes per stage over the nights a tracker measured stages (manual logs have none)."""
+    measured = [n["stages"] for n in nights if n and n.get("stages")]
+    if not measured:
+        return None
+    out: dict[str, Any] = {"nights_with_stages": len(measured)}
+    for k in ("light", "deep", "rem", "awake"):
+        values = [m[k] for m in measured if m.get(k) is not None]
+        if values:
+            out[f"{k}_minutes"] = round(sum(values) / len(values))
+    return out
 
 
 def _food_day(ctx: ToolContext, args: dict) -> Any:
     from app.routers.foods import food_day
 
-    return food_day(ctx.user, ctx.session, _date(args.get("date"), ctx))
+    day = _date(args.get("date"), ctx)
+    result = jsonable_encoder(food_day(ctx.user, ctx.session, day))
+    targets = macro_targets(result.get("target_calories"))
+    result["targets"] = targets
+    if targets:
+        result["eaten_minus_target"] = {k: round(result["totals"][k] - targets[k], 1) for k in MACROS}
+    result["other_nutrients"] = other_nutrients(_food_rows(ctx, day, day))
+    result["guidelines"] = guidelines(result.get("target_calories"))
+    result["day_is_over"] = day < ctx.today
+    return result
+
+
+def _averages(per_day: list[dict], keys) -> dict:
+    return {k: round(sum(d[k] for d in per_day) / len(per_day), 1) for k in keys} if per_day else {}
 
 
 def _calories(ctx: ToolContext, args: dict) -> Any:
     from app.routers.analytics import calorie_series
 
     days = _int(args.get("days"), 14, 1, 90)
-    return calorie_series(ctx.user, ctx.session, ctx.today - dt.timedelta(days=days - 1), ctx.today)
+    result = jsonable_encoder(calorie_series(ctx.user, ctx.session, ctx.today - dt.timedelta(days=days - 1), ctx.today))
+    labels, kcal = result["labels"], result["series"][0]["data"]
+    macros = {m["name"]: m["data"] for m in result["macros"]}
+    today = ctx.today.isoformat()
+    per_day = [
+        {"calories": kcal[i], "protein_g": macros["Protein"][i], "carbs_g": macros["Carbs"][i], "fat_g": macros["Fat"][i]}
+        for i, label in enumerate(labels) if label < today and kcal[i] > 0
+    ]
+    targets = macro_targets(result.get("target_calories"))
+    full = _averages(per_day, MACROS)
+    result["full_days"] = {
+        "days_with_food": len(per_day),
+        "days_without_food": sum(1 for i, label in enumerate(labels) if label < today and kcal[i] == 0),
+        "average_per_day": full,
+        "average_minus_target": {k: round(full[k] - targets[k], 1) for k in MACROS} if full and targets else None,
+        "note": "Averages over finished days with food logged; today is left out because it isn't over.",
+    }
+    result["targets"] = targets
+    result["maintenance_calories"] = round(build_plan(ctx.profile).tdee)
+    return result
+
+
+def _food_summary(ctx: ToolContext, args: dict) -> Any:
+    """Several finished days of eating: averages against the targets, other nutrients, the foods eaten most, meals."""
+    days = _int(args.get("days"), 14, 1, 90)
+    end = ctx.today - dt.timedelta(days=1)
+    start = end - dt.timedelta(days=days - 1)
+    rows = _food_rows(ctx, start, end)
+    by_day: dict[dt.date, list] = {}
+    for log, food in rows:
+        by_day.setdefault(log.date, []).append((log, food))
+    target_kcal = build_plan(ctx.profile).target_calories
+    targets = macro_targets(target_kcal)
+    per_day = [{k: sum(getattr(log, k) for log, _ in day_rows) for k in MACROS} for day_rows in by_day.values()]
+    nutrients_per_day = [other_nutrients(day_rows) for day_rows in by_day.values()]
+    average = _averages(per_day, MACROS)
+    other_average = {}
+    for k in OTHER_NUTRIENTS:
+        if nutrients_per_day:
+            mean = sum(n[k] for n in nutrients_per_day) / len(nutrients_per_day)
+            other_average[k] = round(mean) if k.endswith("_mg") else round(mean, 1)
+    foods: dict[int, dict] = {}
+    for log, food in rows:
+        f = foods.setdefault(food.id, {
+            "food": food.name, "times_logged": 0, "days": set(), "calories": 0.0,
+            "per_100": {k: getattr(food, k) for k in ("calories", "protein_g", "fiber_g", "sugar_g", "added_sugar_g",
+                                                       "saturated_fat_g", "sodium_mg") if getattr(food, k) is not None},
+        })
+        f["times_logged"] += 1
+        f["days"].add(log.date)
+        f["calories"] += log.calories
+    total_kcal = sum(d["calories"] for d in per_day) or 1
+    most = sorted(foods.values(), key=lambda f: (-f["times_logged"], -f["calories"]))[:12]
+    meal_days: dict[str, set] = {}
+    for log, _ in rows:
+        meal_days.setdefault(str(log.meal.value if hasattr(log.meal, "value") else log.meal), set()).add(log.date)
+    return {
+        "from": start, "to": end, "days": days,
+        "days_with_food": len(per_day), "days_without_food": days - len(per_day),
+        "targets": targets,
+        "average_per_day": average,
+        "average_minus_target": {k: round(average[k] - targets[k], 1) for k in MACROS} if average and targets else None,
+        "days_within_10_percent_of_calorie_target": sum(
+            1 for d in per_day if targets and abs(d["calories"] - targets["calories"]) <= 0.1 * targets["calories"]),
+        "days_protein_target_reached": sum(1 for d in per_day if targets and d["protein_g"] >= targets["protein_g"]),
+        "other_nutrients_average_per_day": other_average,
+        "guidelines": guidelines(target_kcal),
+        "maintenance_calories": round(build_plan(ctx.profile).tdee),
+        "foods_eaten_most": [
+            {"food": f["food"], "times_logged": f["times_logged"], "days": len(f["days"]),
+             "share_of_calories_percent": round(100 * f["calories"] / total_kcal, 1), "per_100": f["per_100"]}
+            for f in most
+        ],
+        "days_each_meal_was_logged": {meal: len(d) for meal, d in meal_days.items()},
+        "note": "Finished days only (today is left out). Nutrient values per 100 g/ml come from the food database.",
+    }
+
+
+def _steps(ctx: ToolContext, args: dict) -> Any:
+    """Daily steps from the phone (Apple Health / Health Connect): today so far, full-day averages, last sync."""
+    from sqlmodel import select
+
+    from app.models.health import HealthSync
+    from app.services.health_sync import steps_history
+
+    days = _int(args.get("days"), 14, 1, 90)
+    history = steps_history(ctx.session, ctx.user.id, ctx.today, days)
+    synced = ctx.session.exec(select(HealthSync).where(HealthSync.user_id == ctx.user.id)).all()
+    last = max(synced, key=lambda r: r.last_sync_at, default=None)
+    if not any(d.steps is not None for d in history):
+        return {
+            "steps_synced": False,
+            "last_sync": jsonable_encoder({"source": last.source, "at": last.last_sync_at}) if last else None,
+            "note": "No steps from the phone for these days. Steps come from Apple Health (iPhone) or Health Connect "
+            "(Android): connect it on the Sleep screen, then open the app so it syncs. WHOOP doesn't send steps.",
+        }
+    full = [d for d in history if d.date < ctx.today and d.steps is not None]
+    today = history[-1] if history and history[-1].date == ctx.today else None
+    best = max(full, key=lambda d: d.steps, default=None)
+    return {
+        "steps_synced": True,
+        "days": [{"date": d.date, "steps": d.steps} for d in history],  # null = no data that day (not 0)
+        "today_so_far": today.steps if today else None,
+        "full_days": {
+            "days_with_steps": len(full),
+            "days_without_data": sum(1 for d in history if d.date < ctx.today and d.steps is None),
+            "average_per_day": round(sum(d.steps for d in full) / len(full)) if full else None,
+            "best_day": {"date": best.date, "steps": best.steps} if best else None,
+            "days_at_or_above_8000": sum(1 for d in full if d.steps >= 8000),
+        },
+        "source": next((d.source for d in reversed(history) if d.source), None),
+        "last_sync": {"source": last.source, "at": last.last_sync_at} if last else None,
+        "note": "Today's steps are as of the last sync; the phone syncs when the app is open. Averages are over "
+        "finished days with data. 8,000+ steps a day is a common everyday activity goal, not a personal target.",
+    }
+
+
+def _patterns(ctx: ToolContext, _: dict) -> Any:
+    """The same patterns as Progress > Patterns: e.g. sleep after training days vs rest days, with how sure."""
+    from dataclasses import asdict
+
+    from app.services import insights
+
+    result = insights.compute(ctx.session, ctx.user, ctx.profile, ctx.today, ctx.tz_offset)
+    return {
+        "findings": [asdict(f) for f in result.findings],
+        "not_enough_data_yet": result.not_enough,
+        "note": "Side by side from the user's own data; a pattern doesn't show that one thing causes the other.",
+    }
 
 
 def _weekly_summary(ctx: ToolContext, args: dict) -> Any:
@@ -638,19 +860,35 @@ TOOLS = [
          {"exercise": _EXERCISE, "all_equipment": {"type": "boolean"}}, _exercise_info, required=["exercise"]),
     Tool("get_sleep",
          "Sleep per night (hours, bed and wake times, WHOOP or manual, stages and recovery when a tracker measured "
-         "them; null = not logged), the sleep goal, 7-day average vs the 7 days before, and bedtime consistency.",
+         "them; null = not logged), the sleep goal, 7-day average vs the 7 days before, bedtime consistency, and "
+         "stage_averages (deep, light, REM, awake) over the nights a tracker measured.",
          {"days": _DAYS}, _sleep),
     Tool("get_food_day",
-         "Everything the user logged to eat on one day, with calories and macros per item and the day's totals "
-         "against their target.",
+         "Everything the user logged to eat on one day: calories and macros per item, the day's totals against the "
+         "calorie, protein, carbs and fat targets, and fiber, sugar, saturated fat and sodium eaten.",
          {"date": {"type": "string", "description": "YYYY-MM-DD; default today."}}, _food_day),
     Tool("get_calorie_trend",
-         "Daily calories and macros for recent days against the calorie target (0 = nothing logged that day).",
+         "Daily calories and macros for recent days (0 = nothing logged that day), the targets, and full_days: "
+         "averages over finished days with food (today left out) and how far they are from the targets.",
          {"days": _DAYS}, _calories),
+    Tool("get_food_summary",
+         "Eating over several finished days (default 14, today left out): average calories, protein, carbs and fat "
+         "against the targets, fiber, sugar, saturated fat and sodium against general guidelines, the foods eaten "
+         "most (with their nutrition per 100 g), and which meals get logged. Use it for eating habits and diet quality.",
+         {"days": _DAYS}, _food_summary),
+    Tool("get_steps",
+         "Daily steps from the phone (Apple Health or Health Connect): each day (null = no data, not 0), today so far, "
+         "the average and best day over finished days, the source, and when the phone last synced.",
+         {"days": _DAYS}, _steps),
+    Tool("get_patterns",
+         "Patterns in the user's own data, the same as Progress > Patterns: sleep after training days vs rest days, "
+         "lifts after good vs short sleep, which planned days get done, food logging and weight. Says how sure each is.",
+         {}, _patterns),
     Tool("get_weekly_summary",
          "A Monday-Sunday week: sessions done vs planned, lifts vs last time, records, sleep, weight goal, points, "
-         "compared with the week before.",
-         {"weeks_ago": {"type": "integer", "description": "0 = this week, 1 = last week, ..."}}, _weekly_summary),
+         "and the same numbers for the week before it (previous_...), so one call compares two weeks. "
+         "\"Last week vs the week before\" is weeks_ago=1; this week isn't over yet.",
+         {"weeks_ago": {"type": "integer", "description": "0 = this week (not over yet), 1 = last week, 2 = the week before last."}}, _weekly_summary),
     Tool("get_points",
          "Wellness points: total, level, today's points with reasons, achievements, and how points are earned.",
          {}, _points),

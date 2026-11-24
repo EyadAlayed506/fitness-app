@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import type * as HealthConnect from "react-native-health-connect";
 
 import { api } from "./api";
@@ -171,8 +171,9 @@ export const useHealthConnectStatus = () =>
   useQuery({ queryKey: qk.healthConnect, queryFn: getHealthConnectStatus, enabled: Platform.OS === "android" });
 
 /**
- * With Health Connect connected: each time the screen comes into view, bring in new sleep (skipped if
- * it synced less than `staleMinutes` ago). New nights refresh sleep, points and suggestions.
+ * With Health Connect connected: each time the screen comes into view, and each time the app comes back to the
+ * front while it's in view, bring in new sleep and steps (skipped if it synced less than `staleMinutes` ago).
+ * New nights refresh sleep, points and suggestions.
  */
 export function useHealthConnectAutoSync(
   connected: boolean,
@@ -186,15 +187,21 @@ export function useHealthConnectAutoSync(
   useFocusEffect(
     useCallback(() => {
       if (!connected) return;
-      syncHealthConnect(staleMinutes)
-        .then((r) => {
-          if (!r) return;
-          invalidate(qk.healthConnect);
-          if (r.imported || r.replaced_manual) invalidate(qk.sleep, ...derivedKeys);
-          if (r.steps) invalidate(qk.health);
-          callback.current?.(r);
-        })
-        .catch(() => {}); // older data stays on screen
+      const run = () =>
+        syncHealthConnect(staleMinutes)
+          .then((r) => {
+            if (!r) return;
+            invalidate(qk.healthConnect);
+            if (r.imported || r.replaced_manual) invalidate(qk.sleep, ...derivedKeys);
+            if (r.steps) invalidate(qk.health);
+            callback.current?.(r);
+          })
+          .catch(() => {}); // older data stays on screen
+      run();
+      const sub = AppState.addEventListener("change", (state) => {
+        if (state === "active") run();
+      });
+      return () => sub.remove();
     }, [connected, staleMinutes]),
   );
 }

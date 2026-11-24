@@ -16,11 +16,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button, Card, ErrorText, FadeIn, Icon, IconButton, Row, Skeleton, Txt, type IconName } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useAppleHealthAutoSync, useAppleHealthStatus } from "@/lib/appleHealth";
 import { useAuth } from "@/lib/auth";
 import { confirm } from "@/lib/confirm";
 import { afterCoachActions, useAssistant } from "@/lib/data";
 import { parseCoachText, type Span } from "@/lib/coachText";
 import { tzOffset } from "@/lib/format";
+import { useHealthConnectAutoSync, useHealthConnectStatus } from "@/lib/healthConnect";
 import { useI18n, useLanguage, type MessageKey } from "@/lib/i18n";
 import { trOr } from "@/lib/i18n/current";
 import { errorMessage, qk, queryClient, useRefreshOnFocus } from "@/lib/query";
@@ -43,6 +45,9 @@ export default function Coach() {
   const { refresh } = useAuth();
   const assistant = useAssistant();
   useRefreshOnFocus([qk.assistant]);
+  // the coach answers from the server's copy of steps and sleep: bring in what the phone has before asking
+  useHealthConnectAutoSync(!!useHealthConnectStatus().data?.connected, 10);
+  useAppleHealthAutoSync(!!useAppleHealthStatus().data?.connected, 10);
   const status = assistant.data ?? null;
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null); // the question being answered

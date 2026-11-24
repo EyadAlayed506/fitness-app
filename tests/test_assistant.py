@@ -548,7 +548,7 @@ def test_in_arabic_the_coach_is_told_to_reply_in_arabic_and_its_action_cards_are
     try:
         ctx = tool_ctx(session)
         note = assistant._context_note(ctx)
-        assert "app language: Arabic" in note and "reply in Arabic" in note
+        assert "app language: Arabic" in note and "use Arabic when" in note
         content, err = assistant.run_tool(ctx, "log_workout_sets", {"exercise": "bench press", "sets": 3, "reps": 8, "weight": 60})
         assert not err, content
         assert ctx.actions[0].summary == "بنش برس بالبار: 3 مجموعات من 8 تكرار x 60 kg (بدأ تمريناً)"
