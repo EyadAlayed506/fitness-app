@@ -43,7 +43,7 @@ class ChatMessagePublic(SQLModel):
 class AssistantStatus(SQLModel):
     configured: bool  # the AI is ready to answer
     problem: str | None  # why not, and how to fix it
-    provider: Literal["claude", "ollama"]
+    provider: Literal["claude", "gemini", "ollama"]
     model: str
     messages_left_today: int | None  # None: no limit (a free local model)
     messages: list[ChatMessagePublic]

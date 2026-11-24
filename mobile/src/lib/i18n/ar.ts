@@ -703,6 +703,7 @@ export const ar: Dictionary = {
   // ---------- coach ----------
   "coach.onPc": "على جهازك · {model}",
   "coach.onClaude": "يعمل على Claude",
+  "coach.onGemini": "يعمل على Google Gemini",
   "coach.clear": "مسح المحادثة",
   "coach.clearTitle": "مسح المحادثة؟",
   "coach.clearText": "سيؤدي هذا إلى حذف الرسائل نهائياً.",
@@ -726,6 +727,9 @@ export const ar: Dictionary = {
   "coach.send": "إرسال",
   "coach.recording": "جارٍ التسجيل {time} · اضغط إيقاف عند الانتهاء",
   "coach.transcribing": "جارٍ تحويل صوتك إلى نص…",
+  "coach.noteShort": "المدرب ذكاء اصطناعي وقد يخطئ.",
+  "coach.noteMore": "المزيد",
+  "coach.noteLess": "أقل",
   "coach.questionsLeft":
     "لم يبقَ أي سؤال خلال آخر 24 ساعة.|بقي سؤال واحد خلال آخر 24 ساعة.|بقي سؤالان خلال آخر 24 ساعة.|بقيت {n} أسئلة خلال آخر 24 ساعة.|بقي {n} سؤالاً خلال آخر 24 ساعة.|بقي {n} سؤال خلال آخر 24 ساعة.",
   "coach.lookedAt": "اطّلع على: {sources}",
@@ -746,6 +750,9 @@ export const ar: Dictionary = {
   "tool.get_food_day": "سجل الطعام",
   "tool.get_calorie_trend": "السعرات",
   "tool.get_weekly_summary": "الملخص الأسبوعي",
+  "tool.get_food_summary": "الأكل في الأيام الأخيرة",
+  "tool.get_patterns": "الأنماط",
+  "tool.get_steps": "الخطوات",
   "tool.get_points": "النقاط",
   "tool.log_food": "سجل الطعام",
   "tool.remove_food_entry": "سجل الطعام",

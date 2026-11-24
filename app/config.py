@@ -37,12 +37,19 @@ class Settings(BaseSettings):
     whoop_client_secret: str = ""
     whoop_redirect_uri: str = "http://localhost:8000/api/whoop/callback"
     whoop_base_url: str = "https://api.prod.whoop.com"  # only changed for testing against a fake WHOOP
-    # Coach assistant. "auto": Claude when anthropic_api_key is set, otherwise Ollama on this PC.
-    assistant_provider: Literal["auto", "claude", "ollama"] = "auto"
+    # Coach assistant. "auto": Claude when anthropic_api_key is set, else Gemini when gemini_api_key is set,
+    # otherwise Ollama on this PC.
+    assistant_provider: Literal["auto", "claude", "gemini", "ollama"] = "auto"
     # Claude (paid): an API key from https://console.anthropic.com
     anthropic_api_key: str = ""
     assistant_model: str = "claude-opus-5-5"
     assistant_daily_limit: int = 50  # Claude questions per user per 24 hours, to keep the bill predictable
+    # Gemini (free tier, small quota shared by every user): an API key from https://aistudio.google.com
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.5-flash-lite"  # the free tier's roomiest model (about 500 requests a day)
+    gemini_fallback_model: str = "gemini-3.1-flash-lite"  # used for the rest of a question when the first is out of quota
+    gemini_daily_limit: int = 10  # questions per user per 24 hours: one question is 2-4 requests from the shared quota
+    gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"  # only changed for testing
     # Ollama (free, runs on this PC): https://ollama.com, then `ollama pull <model>`
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:8b"
@@ -69,7 +76,7 @@ class Settings(BaseSettings):
     web_app_dir: str = "mobile/dist"
     photos_dir: str = "data/photos"  # confirmed machine photos; they never leave this server
 
-    @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri", "anthropic_api_key")
+    @field_validator("whoop_client_id", "whoop_client_secret", "whoop_redirect_uri", "anthropic_api_key", "gemini_api_key")
     @classmethod
     def _strip(cls, v: str) -> str:
         # keys pasted with a stray space or quotes still work

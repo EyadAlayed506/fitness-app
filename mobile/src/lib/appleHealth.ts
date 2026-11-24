@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import type * as HealthKit from "@kingstinct/react-native-healthkit";
 
 import { api } from "./api";
@@ -129,8 +129,8 @@ export const useAppleHealthStatus = () =>
   useQuery({ queryKey: qk.appleHealth, queryFn: getAppleHealthStatus, enabled: Platform.OS === "ios" });
 
 /**
- * With Apple Health connected: each time the screen comes into view, bring in new sleep and steps (skipped
- * if it synced less than `staleMinutes` ago).
+ * With Apple Health connected: each time the screen comes into view, and each time the app comes back to the
+ * front while it's in view, bring in new sleep and steps (skipped if it synced less than `staleMinutes` ago).
  */
 export function useAppleHealthAutoSync(
   connected: boolean,
@@ -144,14 +144,20 @@ export function useAppleHealthAutoSync(
   useFocusEffect(
     useCallback(() => {
       if (!connected) return;
-      syncAppleHealth(staleMinutes)
-        .then((r) => {
-          if (!r) return;
-          invalidate(qk.appleHealth, qk.health);
-          if (r.imported || r.replaced_manual) invalidate(qk.sleep, ...derivedKeys);
-          callback.current?.(r);
-        })
-        .catch(() => {}); // older data stays on screen
+      const run = () =>
+        syncAppleHealth(staleMinutes)
+          .then((r) => {
+            if (!r) return;
+            invalidate(qk.appleHealth, qk.health);
+            if (r.imported || r.replaced_manual) invalidate(qk.sleep, ...derivedKeys);
+            callback.current?.(r);
+          })
+          .catch(() => {}); // older data stays on screen
+      run();
+      const sub = AppState.addEventListener("change", (state) => {
+        if (state === "active") run();
+      });
+      return () => sub.remove();
     }, [connected, staleMinutes]),
   );
 }

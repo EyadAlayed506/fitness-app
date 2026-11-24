@@ -62,6 +62,8 @@ async def lifespan(app: FastAPI):
         log.warning("WHOOP: off. To turn it on, put WHOOP_CLIENT_ID and WHOOP_CLIENT_SECRET in %s and restart", PROJECT_ENV)
     if chosen_provider() == "claude":
         log.info("Coach: Claude (%s)%s", s.assistant_model, "" if s.anthropic_api_key else ", but ANTHROPIC_API_KEY is missing")
+    elif chosen_provider() == "gemini":
+        log.info("Coach: Gemini (%s, then %s)%s", s.gemini_model, s.gemini_fallback_model, "" if s.gemini_api_key else ", but GEMINI_API_KEY is missing")
     else:
         log.info("Coach: Ollama on this PC (%s at %s)", s.ollama_model, s.ollama_url)
     yield

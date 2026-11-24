@@ -24,26 +24,37 @@ from app.services.activity import TzOffset
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
-Backend = assistant.ClaudeBackend | assistant.OllamaBackend
+Backend = assistant.ClaudeBackend | assistant.GeminiBackend | assistant.OllamaBackend
 
 
 def chosen_provider() -> str:
-    """ASSISTANT_PROVIDER, where "auto" means Claude when an API key is set and Ollama otherwise."""
+    """ASSISTANT_PROVIDER, where "auto" means Claude when its key is set, else Gemini when its key is set, else Ollama."""
     s = get_settings()
     if s.assistant_provider != "auto":
         return s.assistant_provider
-    return "claude" if s.anthropic_api_key else "ollama"
+    if s.anthropic_api_key:
+        return "claude"
+    return "gemini" if s.gemini_api_key else "ollama"
 
 
 def get_assistant_backend() -> Iterator[Backend]:
-    """The AI that answers: Claude (online) or Ollama (on this PC). Tests replace this with a fake."""
+    """The AI that answers: Claude or Gemini (online) or Ollama (on this PC). Tests replace this with a fake."""
     s = get_settings()
-    if chosen_provider() == "claude":
+    provider = chosen_provider()
+    if provider == "claude":
         client = anthropic.Anthropic(api_key=s.anthropic_api_key, timeout=90.0, max_retries=2) if s.anthropic_api_key else None
         yield assistant.ClaudeBackend(client, s.assistant_model)
         return
     with httpx.Client() as http:
-        yield assistant.OllamaBackend(http, s.ollama_url, s.ollama_model, s.ollama_num_ctx)
+        if provider == "gemini":
+            yield assistant.GeminiBackend(http, s.gemini_url, s.gemini_api_key, s.gemini_model, s.gemini_fallback_model)
+        else:
+            yield assistant.OllamaBackend(http, s.ollama_url, s.ollama_model, s.ollama_num_ctx)
+
+
+def _daily_limit(backend: Backend) -> int:
+    s = get_settings()
+    return s.gemini_daily_limit if backend.provider == "gemini" else s.assistant_daily_limit
 
 
 AssistantBackend = Annotated[Backend, Depends(get_assistant_backend)]
@@ -68,7 +79,7 @@ def _left_today(session: Session, user_id: int, backend: Backend) -> int | None:
             ChatMessage.user_id == user_id, ChatMessage.role == "user", ChatMessage.created_at >= since
         )
     ).one()
-    return max(0, get_settings().assistant_daily_limit - asked)
+    return max(0, _daily_limit(backend) - asked)
 
 
 @router.get("", response_model=AssistantStatus)
@@ -84,7 +95,7 @@ def read_conversation(user: CurrentUser, session: SessionDep, backend: Assistant
         model=backend.model,
         messages_left_today=_left_today(session, user.id, backend),
         messages=[_public(m) for m in messages],
-        disclaimer=assistant.disclaimer(),
+        disclaimer=assistant.disclaimer(backend.provider),
     )
 
 
@@ -105,7 +116,7 @@ def send_message(
     if left is not None and left <= 0:
         raise HTTPException(
             status_code=429,
-            detail=f"You've asked {get_settings().assistant_daily_limit} questions in the last 24 hours. Try again later.",
+            detail=f"You've asked {_daily_limit(backend)} questions in the last 24 hours. Try again later.",
         )
     history = [
         (m.role, m.text)
