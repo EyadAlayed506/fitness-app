@@ -45,16 +45,46 @@ OFF_NUTRIENTS = {
 LIQUID_QUANTITY = re.compile(r"\d\s*(ml|cl|dl|l|fl\.?\s*oz)\b", re.IGNORECASE)
 
 
-def search_local(foods: list[Food], query: str, limit: int = 15) -> list[Food]:
-    """Fuzzy match on name + brand, so typos and word order still match."""
+ARABIC_LETTERS = re.compile(r"[\u0600-\u06ff]")
+# Stricter than English (70): short Arabic words share letters easily ("برقر" vs "برتقال").
+ARABIC_CUTOFF = 80
+_ARABIC_FORMS = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ة": "ه", "ى": "ي"})
+
+
+def squash_arabic(text: str) -> str:
+    """One form for alef / taa marbuta / alef maqsura and no diacritics or tatweel, so spelling variants
+    ("موزة", "موزه", "تمرة") match. Same rule as the exercise search."""
+    text = text.lower().translate(_ARABIC_FORMS)
+    return "".join(ch for ch in text if (ch.isalnum() or ch == " ") and not "\u064b" <= ch <= "\u0652")
+
+
+def search_local(foods: list[Food], query: str, limit: int = 15, arabic: bool = False) -> list[Food]:
+    """Fuzzy match on name + brand, so typos and word order still match.
+
+    arabic=True also matches the Arabic names and search words of built-in foods ("موز" finds Banana).
+    It is off by default: the coach's food lookup deliberately stays English-only (COACH-02).
+    """
     if not query.strip():
         return foods[:limit]
     choices = {f.id: f"{f.name} {f.brand}".strip() for f in foods}
     matches = process.extract(
-        query, choices, scorer=fuzz.WRatio, processor=lambda s: s.lower(), limit=limit, score_cutoff=70
+        query, choices, scorer=fuzz.WRatio, processor=lambda s: s.lower(), limit=None, score_cutoff=70
     )
+    best = {key: score for _, score, key in matches}
+    if arabic and ARABIC_LETTERS.search(query):
+        q = squash_arabic(query)
+        for f in foods:
+            names = [f.name_ar or "", *(f.aliases_ar or "").split(",")]
+            names = [squash_arabic(n) for n in names if n.strip()]
+            if not names or not q:
+                continue
+            score = max(max(fuzz.WRatio(q, n), fuzz.ratio(q.replace(" ", ""), n.replace(" ", ""))) for n in names)
+            if score >= ARABIC_CUTOFF and score > best.get(f.id, 0):
+                best[f.id] = score
+    order = {f.id: i for i, f in enumerate(foods)}
     by_id = {f.id: f for f in foods}
-    return [by_id[key] for _, _, key in matches]
+    ranked = sorted(best, key=lambda key: (-best[key], order[key]))
+    return [by_id[key] for key in ranked[:limit]]
 
 
 def parse_usda_food(item: dict) -> FoodCandidate | None:
