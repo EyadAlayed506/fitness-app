@@ -177,7 +177,9 @@ def test_rate_limited_source_shows_busy_and_rests_for_a_minute(client, auth):
     calls.clear()
     r = search(client, auth, "lentils", lang="ar", online=True)  # different words, within the minute
     assert "usda" not in calls  # not asked again while resting
-    assert r["warnings"] == ["USDA FoodData Central مشغول الآن. حاول مجدداً بعد دقيقة"]
+    # Arabic text wraps the source name in invisible direction marks (FSI/PDI) so it displays correctly
+    plain = [w.replace("\u2068", "").replace("\u2069", "") for w in r["warnings"]]
+    assert plain == ["USDA FoodData Central مشغول الآن. حاول مجدداً بعد دقيقة"]
 
 
 def test_network_failures_are_not_remembered(client, auth):
