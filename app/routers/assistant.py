@@ -119,7 +119,7 @@ def send_message(
             raise HTTPException(status_code=e.status, detail=e.detail)
         # it already changed something: keep the record (and the Undo) even though the answer failed
         done = "; ".join(a.summary for a in ctx.actions)
-        answer = assistant.Answer(f"I added: {done}. Then something went wrong: {e.detail}", [])
+        answer = assistant.Answer(assistant.partial_failure(done, e.detail), [])
 
     # saved only once there's an answer, so a failed request leaves no half conversation
     question = ChatMessage(user_id=user.id, role="user", text=data.text.strip())
