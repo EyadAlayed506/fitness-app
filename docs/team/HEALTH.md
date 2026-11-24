@@ -6,7 +6,7 @@ Nawaf (what the coach reads). Status: **HEALTH-01 draft + HEALTH-02/03 code**, 2
 
 Each section marks what is **Current** (in `merged_branch` at `3ce0645`), **Built** (on branch
 `badr/health-native-sync`, tested with synthetic data, not merged or reviewed yet) and **Proposed** (not
-built). Nothing here has been run on a real phone or a real WHOOP account yet.
+built). WHOOP was checked on a real account on 2026-11-24 (HEALTH-04); nothing has run on a real phone yet.
 
 ## 1. Scope
 
@@ -24,7 +24,7 @@ Phone code stays in the repo. Until Nawaf confirms or reverses it, HEALTH-02+ pl
 |---|---|---|---|
 | Manual | Sleep: bedtime, wake-up, quality 1–5, notes | `app/routers/sleep.py` | `tests/test_sleep.py` |
 | Android Health Connect | **Sleep only** (`SleepSession`, with stages). No steps | `mobile/src/lib/healthConnect.ts` reads on the phone → `POST /api/sleep/health-connect` → `app/services/health_connect.py` | `tests/test_health_connect.py`, `mobile/src/lib/healthConnectSessions.test.ts` (mapping only). **Never run on a phone** |
-| WHOOP (API v2) | Sleep with stages and sleep performance; recovery % attached to the matching sleep | Server-side OAuth: `app/routers/whoop.py`, `app/services/whoop.py` | `tests/test_whoop.py` against a fake WHOOP server. **Never run against a real account** |
+| WHOOP (API v2) | Sleep with stages and sleep performance; recovery % attached to the matching sleep | Server-side OAuth: `app/routers/whoop.py`, `app/services/whoop.py` | `tests/test_whoop.py` against a fake WHOOP server. **Live check passed on a real account, 2026-11-24** (`reports/HEALTH-04.md`) |
 | Apple Health | **Built:** sleep and daily steps, read only | `mobile/src/lib/appleHealth.ts` → `POST /api/sleep/apple-health`, `POST /api/health/steps` | `tests/test_health_sync.py`, `mobile/src/lib/phoneHealth.test.ts`. **Never run on an iPhone** (needs a signed build) |
 | Steps | **Built:** Health Connect and Apple Health daily totals; `DailySteps` table | `app/models/health.py`, `app/services/health_sync.py`, `app/routers/health.py` | Same tests. **Never read from a real phone** |
 | Source + last sync | **Built:** `GET /api/health/connectors` | `HealthSync` table + `WhoopConnection` | `tests/test_health_sync.py` |
