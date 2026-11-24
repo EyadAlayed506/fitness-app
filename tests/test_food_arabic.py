@@ -135,3 +135,59 @@ def test_existing_database_gains_arabic_names_without_other_changes(session):
     assert banana.name_ar == "موز" and "موزة" in banana.aliases_ar
     assert banana.id == banana_id and banana.calories == calories
     assert len(session.exec(select(Food).where(Food.source == FoodSource.builtin)).all()) == 38
+
+
+# ---- rate limits: the server protects the shared online databases ------------------------------------
+
+def counting_handler(calls, usda_status=200, off_status=200):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "nal.usda.gov" in request.url.host:
+            calls.append("usda")
+            return httpx.Response(usda_status, json=USDA_RESPONSE if usda_status == 200 else {})
+        calls.append("off")
+        return httpx.Response(off_status, json=OFF_RESPONSE if off_status == 200 else {})
+    return handler
+
+
+def test_one_or_two_letters_search_locally_only(client, auth):
+    calls = []
+    use_handler(counting_handler(calls))
+    for q in ("l", "lk", "مو"):
+        r = search(client, auth, q, online=True)
+        assert r["online"] == [] and r["warnings"] == []
+    assert calls == []
+
+
+def test_the_same_words_reuse_the_earlier_online_answer(client, auth):
+    calls = []
+    use_handler(counting_handler(calls))
+    first = search(client, auth, "quinoa", online=True)
+    again = search(client, auth, "Quinoa ", online=True)  # case and spaces don't matter
+    assert sorted(calls) == ["off", "usda"]  # asked once, not twice
+    assert again["online"] == first["online"] and first["online"]
+
+
+def test_rate_limited_source_shows_busy_and_rests_for_a_minute(client, auth):
+    calls = []
+    use_handler(counting_handler(calls, usda_status=429))
+    r = search(client, auth, "quinoa", online=True)
+    assert r["warnings"] == ["USDA FoodData Central is busy right now. Try again in a minute"]
+    assert any(c["source"] == "off" for c in r["online"])  # the other source still answers
+
+    calls.clear()
+    r = search(client, auth, "lentils", lang="ar", online=True)  # different words, within the minute
+    assert "usda" not in calls  # not asked again while resting
+    assert r["warnings"] == ["USDA FoodData Central مشغول الآن. حاول مجدداً بعد دقيقة"]
+
+
+def test_network_failures_are_not_remembered(client, auth):
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.host)
+        raise httpx.ConnectError("no network")
+
+    use_handler(handler)
+    search(client, auth, "quinoa", online=True)
+    search(client, auth, "quinoa", online=True)
+    assert len(calls) == 4  # both sources asked both times: a connection error is neither cached nor rested

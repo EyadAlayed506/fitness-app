@@ -63,6 +63,16 @@ def mock_handler(request: httpx.Request) -> httpx.Response:
 
 
 @pytest.fixture(autouse=True)
+def fresh_online_food_search():
+    """Online food answers and back-offs are remembered by the server; each test starts without them."""
+    from app.services import food_search
+
+    food_search.reset_online_state()
+    yield
+    food_search.reset_online_state()
+
+
+@pytest.fixture(autouse=True)
 def whoop_off(monkeypatch):
     """Tests never use the WHOOP keys from a developer's own .env (test_whoop turns on a fake WHOOP)."""
     settings = get_settings()

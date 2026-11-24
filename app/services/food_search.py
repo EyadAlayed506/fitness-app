@@ -187,3 +187,45 @@ async def search_off(client: httpx.AsyncClient, query: str, limit: int = 8) -> l
     resp.raise_for_status()
     results = [parse_off_product(item) for item in resp.json().get("products", [])]
     return [r for r in results if r is not None]
+
+
+# ---- Protecting the online databases (and their rate limits) -----------------------------------------
+# All testers share the server's address, so the limits are shared too: USDA's DEMO_KEY allows 30 requests
+# an hour, Open Food Facts 10 searches a minute. The app searches as you type, so without this one word
+# could cost a dozen requests.
+
+MIN_ONLINE_QUERY = 3  # "l", "lk", "مو": local results only
+ONLINE_CACHE_SECONDS = 6 * 3600  # the same words again (from anyone) reuse the earlier answer
+BACKOFF_SECONDS = 60  # after a 429/503, give that source a minute before asking again
+BACKOFF_STATUSES = (429, 503)
+_MAX_CACHED = 500
+
+_cache: dict[tuple[str, str], tuple[float, list[FoodCandidate]]] = {}
+_backoff: dict[str, tuple[float, str]] = {}  # source label -> (until, warning key)
+
+
+def reset_online_state() -> None:
+    """Forget cached answers and back-offs (tests; or after changing USDA_API_KEY without a restart)."""
+    _cache.clear()
+    _backoff.clear()
+
+
+def cached(label: str, query: str, now: float) -> list[FoodCandidate] | None:
+    hit = _cache.get((label, query.strip().lower()))
+    return hit[1] if hit and hit[0] > now else None
+
+
+def remember(label: str, query: str, results: list[FoodCandidate], now: float) -> None:
+    if len(_cache) >= _MAX_CACHED:
+        _cache.clear()  # crude, but bounded; a pilot never gets near this
+    _cache[(label, query.strip().lower())] = (now + ONLINE_CACHE_SECONDS, results)
+
+
+def backing_off(label: str, now: float) -> str | None:
+    """The warning key to show while this source is resting after a 429/503, else None."""
+    entry = _backoff.get(label)
+    return entry[1] if entry and entry[0] > now else None
+
+
+def start_backoff(label: str, warning: str, now: float) -> None:
+    _backoff[label] = (now + BACKOFF_SECONDS, warning)

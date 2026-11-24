@@ -29,6 +29,23 @@
 - **Not changed:** the coach's food lookup stays English-only, because COACH-02's tests rely on it
   (`search_local(..., arabic=True)` is opt-in). Nawaf can turn it on for the coach later and update his cases.
 
+## Part 2 — rate limits (found from the server log, 2026-11-24 21:3x)
+
+Log evidence on Alzoman's PC: USDA answered **HTTP 429** every time (the shared `DEMO_KEY`: 30 requests/hour,
+50/day per address), Open Food Facts **HTTP 503** most of the time (its search limit is 10/minute per address).
+The app searches as you type, so one word ("l", "lk", "lم", "مو", "موظ", "موز") cost 6 online searches. On the
+hosted server every tester shares one address, so these limits are shared by the whole pilot.
+
+Changes (server only, no app change):
+- No online search for 1–2 characters (local results only).
+- Online answers are remembered for 6 hours per source and words (any user): the same food costs one request.
+- After a 429/503 a source rests for 60 s instead of being asked on every keystroke.
+- A 429 is shown as "{source} is busy right now. Try again in a minute" (Arabic too); "unreachable" stays for real
+  connection failures. Connection failures are neither remembered nor rested.
+
+Still needed: a personal USDA key on the server (`USDA_API_KEY`, free at https://api.data.gov/signup).
+Tests: 4 more in `tests/test_food_arabic.py`; `tests/conftest.py` resets the remembered answers between tests.
+
 ## Recommended config (no code)
 
 Get a free personal USDA key (api.data.gov) for the pilot server's `.env` (`USDA_API_KEY=`); `DEMO_KEY` is shared
