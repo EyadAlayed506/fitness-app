@@ -46,6 +46,15 @@ Changes (server only, no app change):
 Still needed: a personal USDA key on the server (`USDA_API_KEY`, free at https://api.data.gov/signup).
 Tests: 4 more in `tests/test_food_arabic.py`; `tests/conftest.py` resets the remembered answers between tests.
 
+## Part 3 — USDA's GET search is unreliable; use its JSON form (2026-11-24 22:2x)
+
+With a personal key the server still often showed USDA "unreachable". The server's own code, run on Alzoman's PC,
+got `400 Bad Request` for some searches ("Banana" worked, then failed a minute later). Measured with the same key,
+5 × Banana/Apple/Orange per method: GET with `+` spaces 5/15 failed, GET with `%20` spaces 7/15 failed,
+**JSON POST 0/15 failed**. A first guess (space encoding) was ruled out by that measurement.
+Change: `search_usda` sends USDA's documented JSON POST (`api_key` stays in the address, everything else in the
+body). The coach's online search uses the same function. Test: `test_usda_is_asked_with_its_json_form`.
+
 ## Recommended config (no code)
 
 Get a free personal USDA key (api.data.gov) for the pilot server's `.env` (`USDA_API_KEY=`); `DEMO_KEY` is shared

@@ -1,5 +1,6 @@
 """Searching and showing the built-in foods in Arabic ("موز" finds Banana), and honest online-search warnings."""
 
+import json
 import logging
 
 import httpx
@@ -75,7 +76,7 @@ def test_arabic_search_asks_usda_for_the_english_name(client, auth):
 
     def handler(request: httpx.Request) -> httpx.Response:
         if "nal.usda.gov" in request.url.host:
-            seen.append(("usda", request.url.params["query"]))
+            seen.append(("usda", json.loads(request.content)["query"]))
             return httpx.Response(200, json=USDA_RESPONSE)
         seen.append(("off", request.url.params["search_terms"]))
         return httpx.Response(200, json=OFF_RESPONSE)
@@ -193,3 +194,23 @@ def test_network_failures_are_not_remembered(client, auth):
     search(client, auth, "quinoa", online=True)
     search(client, auth, "quinoa", online=True)
     assert len(calls) == 4  # both sources asked both times: a connection error is neither cached nor rested
+
+
+def test_usda_is_asked_with_its_json_form(client, auth):
+    """USDA's GET search failed about 40% of the time in a live test; the JSON POST form never did."""
+    sent = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "nal.usda.gov" in request.url.host:
+            sent.append(request)
+            return httpx.Response(200, json=USDA_RESPONSE)
+        return httpx.Response(200, json=OFF_RESPONSE)
+
+    use_handler(handler)
+    r = search(client, auth, "quinoa", online=True)
+    assert any(c["source"] == "usda" for c in r["online"])
+    (req,) = sent
+    assert req.method == "POST"
+    assert json.loads(req.content) == {"query": "quinoa", "pageSize": 8,
+                                       "dataType": ["Foundation", "SR Legacy", "Survey (FNDDS)"]}
+    assert set(req.url.params) == {"api_key"}  # nothing else in the address

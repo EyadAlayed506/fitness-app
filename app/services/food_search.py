@@ -9,6 +9,7 @@ from app.config import get_settings
 from app.models.food import Food, FoodCandidate, FoodSource
 
 USDA_SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
+USDA_DATA_TYPES = ("Foundation", "SR Legacy", "Survey (FNDDS)")
 OFF_SEARCH_URL = "https://world.openfoodfacts.org/cgi/search.pl"
 
 # USDA nutrient numbers -> our field names (USDA values are per 100 g)
@@ -154,14 +155,12 @@ def parse_off_product(item: dict) -> FoodCandidate | None:
 
 async def search_usda(client: httpx.AsyncClient, query: str, limit: int = 8) -> list[FoodCandidate]:
     settings = get_settings()
-    resp = await client.get(
+    # USDA's JSON form (POST). Measured 2026-11-24 with a real key: the GET form of this search answered
+    # 400 Bad Request to 12 of 30 identical requests (however the spaces were encoded); POST answered 15 of 15.
+    resp = await client.post(
         USDA_SEARCH_URL,
-        params={
-            "api_key": settings.usda_api_key,
-            "query": query,
-            "pageSize": limit,
-            "dataType": "Foundation,SR Legacy,Survey (FNDDS)",
-        },
+        params={"api_key": settings.usda_api_key},
+        json={"query": query, "pageSize": limit, "dataType": list(USDA_DATA_TYPES)},
         timeout=settings.external_timeout_seconds,
     )
     resp.raise_for_status()
