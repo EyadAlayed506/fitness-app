@@ -274,8 +274,8 @@ export interface MeasurementCompare {
   rows: { field: string; label: string; first: number | null; second: number | null; difference: number | null }[];
 }
 
-/** where a sleep came from: typed in, WHOOP, or Android Health Connect */
-export type SleepSource = "manual" | "whoop" | "health_connect";
+/** where a sleep came from: typed in, WHOOP, Android Health Connect or Apple Health */
+export type SleepSource = "manual" | "whoop" | "health_connect" | "apple_health";
 
 export interface SleepEntry {
   id: number;
@@ -301,6 +301,30 @@ export interface HealthConnectImportResult {
   replaced_manual: number;
   /** unusable, or the night is already in the log from WHOOP or another app */
   skipped: number;
+  /** days of steps sent in the same sync (phone only; null when steps weren't read) */
+  steps?: StepsUploadResult | null;
+}
+
+/** POST /api/health/steps */
+export interface StepsUploadResult {
+  inserted: number;
+  updated: number;
+}
+
+/** GET /api/health/steps: one entry per local day, oldest first; steps is null on days without data */
+export interface StepsDay {
+  date: string;
+  steps: number | null;
+  source: "health_connect" | "apple_health" | null;
+}
+
+/** GET /api/health/connectors */
+export interface HealthConnector {
+  source: "health_connect" | "apple_health" | "whoop";
+  metrics: string[];
+  last_sync_at: string | null;
+  configured?: boolean | null;
+  connected?: boolean | null;
 }
 
 export interface WhoopStatus {
@@ -440,6 +464,7 @@ export interface WeeklySummary {
     nights_meeting_goal: number;
     from_whoop: number;
     from_health_connect: number;
+    from_apple_health: number;
     logged_by_hand: number;
     previous_average_minutes: number | null;
     previous_nights_logged: number;

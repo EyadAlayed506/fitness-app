@@ -20,8 +20,8 @@ import { Badge, Button, Card, ErrorText, LinkButton, Row, Txt } from "./ui";
 const PLAY_STORE = "https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata";
 
 /**
- * Android only: bring in sleep from Health Connect, where watches, rings and sleep apps on the phone
- * (Samsung Health, Fitbit, Garmin, Oura, Sleep as Android, bedtime mode…) save it.
+ * Android only: bring in sleep and daily steps from Health Connect, where watches, rings and sleep apps on
+ * the phone (Samsung Health, Fitbit, Garmin, Oura, Sleep as Android, bedtime mode…) save them.
  */
 export function HealthConnectCard({
   status,
@@ -90,6 +90,14 @@ export function HealthConnectCard({
         <Txt variant="small" style={{ marginTop: 4 }}>
           {tr("hc.lastSynced", { ago: timeAgo(status.lastSyncAt) })}
         </Txt>
+        {status.steps ? null : (
+          <View style={{ marginTop: 10, gap: 6 }}>
+            <Txt variant="tiny" style={{ color: t.warnInk }}>
+              {tr("hc.stepsOff")}
+            </Txt>
+            <Button title={tr("hc.allowSteps")} kind="soft" icon="walk" small onPress={connect} loading={busy} />
+          </View>
+        )}
         <ErrorText message={error} />
         <Row style={{ marginTop: 12 }}>
           <Button title={tr("sync.now")} icon="sync" onPress={sync} loading={busy} style={{ flex: 1 }} />

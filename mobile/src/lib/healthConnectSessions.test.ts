@@ -44,3 +44,10 @@ test("sessions are sent in batches and the results added up", () => {
   assert.deepEqual(r, { imported: 4, updated: 2, replaced_manual: 1, skipped: 1 });
   assert.equal(syncSummary(r), "Health Connect synced: 4 new, 2 updated, 1 typed-in night replaced");
 });
+
+test("the sync summary mentions steps only when days of steps came in", () => {
+  const r = { imported: 0, updated: 1, replaced_manual: 0, skipped: 0 };
+  assert.equal(syncSummary({ ...r, steps: { inserted: 1, updated: 6 } }, "ah.synced"), "Apple Health synced: 0 new, 1 updated, steps for 7 days");
+  assert.equal(syncSummary({ ...r, steps: { inserted: 0, updated: 0 } }), "Health Connect synced: 0 new, 1 updated");
+  assert.equal(syncSummary({ ...r, steps: null }), "Health Connect synced: 0 new, 1 updated");
+});

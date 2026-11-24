@@ -40,6 +40,11 @@ export const qk = {
   sleepAnalytics: (days: number) => ["sleep", "analytics", days] as const,
   whoop: ["whoop"] as const,
   healthConnect: ["health-connect"] as const,
+  appleHealth: ["apple-health"] as const,
+  /** steps and the connectors' last sync (GET /api/health/...) */
+  health: ["health"] as const,
+  steps: (days: number) => ["health", "steps", days] as const,
+  connectors: ["health", "connectors"] as const,
   recommendations: ["recommendations"] as const,
   points: ["points"] as const,
   gettingStarted: ["getting-started"] as const,

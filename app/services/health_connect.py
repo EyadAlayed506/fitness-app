@@ -1,12 +1,15 @@
-"""Android Health Connect: turning the sleep sessions the phone app reads into sleep entries.
+"""Phone sleep (Android Health Connect, Apple Health): turning the sessions the phone app reads into sleep entries.
 
-Health Connect lives on the phone, so there is no login or token here: the phone asks the user for
-permission, reads the sessions and sends them to POST /api/sleep/health-connect.
+Both stores live on the phone, so there is no login or token here: the phone asks the user for permission,
+reads the sessions and sends them to POST /api/sleep/health-connect or /api/sleep/apple-health. Apple Health
+sessions arrive already in Health Connect's shape (stage numbers included), so one mapping serves both.
 """
 
 import datetime as dt
 
 from sqlmodel import Session, select
+
+from app.models.health import PhoneSource
 
 from app.models.sleep import (
     MAX_SLEEP_HOURS,
@@ -15,6 +18,7 @@ from app.models.sleep import (
     SleepEntry,
     SleepSource,
 )
+from app.services import health_sync
 
 # Health Connect's SleepStageType
 AWAKE = {1, 3}  # awake, out of bed
@@ -57,11 +61,16 @@ def entry_fields(s: HealthConnectSession) -> dict | None:
     return fields
 
 
-def import_sessions(session: Session, user_id: int, sessions: list[HealthConnectSession]) -> HealthConnectImportResult:
+def import_sessions(
+    session: Session,
+    user_id: int,
+    sessions: list[HealthConnectSession],
+    source: SleepSource = SleepSource.health_connect,
+) -> HealthConnectImportResult:
     """Add or update the sessions. Like WHOOP, they replace nights typed in by hand.
 
-    A session that overlaps a night already imported (from WHOOP, or another app writing to Health
-    Connect for the same night) is skipped, so a night is never counted twice.
+    A session that overlaps a night already imported (from WHOOP, the other phone store, or another app
+    writing to the same store for the same night) is skipped, so a night is never counted twice.
     """
     result = HealthConnectImportResult()
     # Sessions with stages first: when two apps wrote the same night, the more detailed one is kept
@@ -73,7 +82,7 @@ def import_sessions(session: Session, user_id: int, sessions: list[HealthConnect
         entry = session.exec(
             select(SleepEntry).where(
                 SleepEntry.user_id == user_id,
-                SleepEntry.source == SleepSource.health_connect,
+                SleepEntry.source == source,
                 SleepEntry.external_id == s.id,
             )
         ).first()
@@ -89,7 +98,7 @@ def import_sessions(session: Session, user_id: int, sessions: list[HealthConnect
             result.skipped += 1
             continue
         if entry is None:
-            entry = SleepEntry(user_id=user_id, source=SleepSource.health_connect, external_id=s.id, **fields)
+            entry = SleepEntry(user_id=user_id, source=source, external_id=s.id, **fields)
             result.imported += 1
         else:
             entry.sqlmodel_update(fields)  # the user's quality and notes stay
@@ -106,5 +115,6 @@ def import_sessions(session: Session, user_id: int, sessions: list[HealthConnect
             result.replaced_manual += 1
         session.add(entry)
         session.flush()  # later sessions in this batch see this one
+    health_sync.record_sync(session, user_id, PhoneSource(source.value))
     session.commit()
     return result

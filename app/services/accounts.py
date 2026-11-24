@@ -6,6 +6,7 @@ from app.models.food import Food, FoodLog
 from app.models.gym import Gym, MachinePhoto, MachineSetting
 from app.models.measurement import BodyMeasurement
 from app.models.points import PointAward
+from app.models.health import DailySteps, HealthSync
 from app.models.sleep import SleepEntry
 from app.models.snap import CustomDay
 from app.models.user import Profile, User, WeightEntry
@@ -18,7 +19,7 @@ def delete_user(session: Session, user: User) -> None:
     """Delete a user and every piece of data that belongs to them."""
     session_ids = select(WorkoutSession.id).where(WorkoutSession.user_id == user.id)
     session.exec(delete(WorkoutSet).where(WorkoutSet.session_id.in_(session_ids)))
-    for model in (WorkoutSession, FoodLog, WeightEntry, BodyMeasurement, SleepEntry):
+    for model in (WorkoutSession, FoodLog, WeightEntry, BodyMeasurement, SleepEntry, DailySteps, HealthSync):
         session.exec(delete(model).where(model.user_id == user.id))
     session.exec(delete(Food).where(Food.owner_id == user.id))
     session.exec(delete(Profile).where(Profile.user_id == user.id))

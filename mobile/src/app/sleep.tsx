@@ -5,7 +5,9 @@ import { ScrollView } from "react-native";
 
 import { LastNightCard, SleepConsistencyCard, SleepGoalForm, SleepWeekCard } from "@/components/SleepDashboard";
 import { SleepChart, SleepForm, qualityChoices, qualityLabel, trackerSummary } from "@/components/SleepParts";
+import { AppleHealthCard } from "@/components/AppleHealthCard";
 import { HealthConnectCard } from "@/components/HealthConnectCard";
+import { StepsCard } from "@/components/StepsCard";
 import { Badge, Card, EmptyState, ListRow, Loading, Section, Sheet, SkeletonCards, Txt, useToast } from "@/components/ui";
 import { WhoopCard, syncSummary } from "@/components/WhoopCard";
 import { api } from "@/lib/api";
@@ -13,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { clockOf, hoursMinutes, longDate, trackerName, tzOffset } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { useWhoopAutoSync, useWhoopStatus } from "@/lib/data";
+import { useAppleHealthAutoSync, useAppleHealthStatus } from "@/lib/appleHealth";
 import { useHealthConnectAutoSync, useHealthConnectStatus } from "@/lib/healthConnect";
 import { syncSummary as healthConnectSummary } from "@/lib/healthConnectSessions";
 import { derivedKeys, invalidate, qk, useRefreshOnFocus } from "@/lib/query";
@@ -57,11 +60,16 @@ function SleepScreen() {
   useHealthConnectAutoSync(!!healthConnectQuery.data?.connected, 15, (r) => {
     if (r.imported || r.replaced_manual) toast(healthConnectSummary(r));
   });
+  const appleHealthQuery = useAppleHealthStatus();
+  // and from Apple Health (iPhone)
+  useAppleHealthAutoSync(!!appleHealthQuery.data?.connected, 15, (r) => {
+    if (r.imported || r.replaced_manual) toast(healthConnectSummary(r, "ah.synced"));
+  });
   const entries = screen.data?.list ?? [];
   const stats = screen.data?.analytics ?? null;
   const whoop = whoopQuery.data ?? null;
   const load = async () => {
-    invalidate(qk.sleep, qk.whoop, qk.healthConnect, ...derivedKeys);
+    invalidate(qk.sleep, qk.whoop, qk.healthConnect, qk.appleHealth, qk.health, ...derivedKeys);
   };
 
   const saved = async (message: string) => {
@@ -78,6 +86,8 @@ function SleepScreen() {
       {stats ? <SleepConsistencyCard data={stats} /> : null}
 
       <HealthConnectCard status={healthConnectQuery.data ?? null} onChanged={load} toast={toast} />
+      <AppleHealthCard status={appleHealthQuery.data ?? null} onChanged={load} toast={toast} />
+      <StepsCard />
 
       <WhoopCard
         status={whoop}
