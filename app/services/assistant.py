@@ -6,8 +6,10 @@ a weigh-in or a night of sleep when the user asks, and report each change as an 
 with a link to the right screen and an Undo. The model is told to say when data is missing instead of
 guessing, and not to give medical advice.
 
-Two backends answer the same way, with the same tools and rules:
+Three backends answer the same way, with the same tools and rules:
 - ClaudeBackend: Claude through Anthropic's API (needs ANTHROPIC_API_KEY; every question costs money).
+- GeminiBackend: Google Gemini's free tier through its OpenAI-compatible API (needs GEMINI_API_KEY; a small
+  daily quota shared by every user, and Google may use free-tier data).
 - OllamaBackend: a free model running on the user's own PC through Ollama (weaker answers, data stays local).
 """
 
@@ -15,6 +17,7 @@ import asyncio
 import datetime as dt
 import json
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -61,6 +64,13 @@ TEXTS: Table = {
         "ollama_no_model": "The model {model} isn't downloaded yet. Open a terminal and run: ollama pull {model}",
         "ollama_slow": "The local AI took too long to answer. Try a shorter question or a smaller model.",
         "ollama_failed": "The local AI couldn't answer: {detail}",
+        "gemini_no_key": "The coach isn't set up on this server yet. For Gemini: create a free API key at "
+        "aistudio.google.com, put it in the backend's .env file as GEMINI_API_KEY and restart the backend.",
+        "gemini_key_refused": "The Gemini API key was refused. Check GEMINI_API_KEY in .env.",
+        "gemini_quota": "The coach has used up its free questions for now. Try again in a little while, or tomorrow.",
+        "gemini_slow": "The coach took too long to answer. Try again, or ask a shorter question.",
+        "gemini_note": "Replies come from Google Gemini (free tier): Google may use the questions and the data sent "
+        "with them to improve its products.",
         "partial_failure": "I added: {done}. Then something went wrong: {error}",
         "action_food": "{food}, {amount} ({kcal} kcal{estimate}) for {meal}{when}",
         "ai_estimate": ", AI estimate",
@@ -96,6 +106,13 @@ TEXTS: Table = {
         "ollama_no_model": "النموذج {model} لم يُنزَّل بعد. افتح الطرفية ونفّذ: ollama pull {model}",
         "ollama_slow": "تأخّر الذكاء الاصطناعي المحلي في الإجابة. جرّب سؤالاً أقصر أو نموذجاً أصغر.",
         "ollama_failed": "تعذّر على الذكاء الاصطناعي المحلي الإجابة: {detail}",
+        "gemini_no_key": "المدرب غير مُعدّ على هذا الخادم بعد. لاستخدام Gemini: أنشئ مفتاح API مجانياً من "
+        "aistudio.google.com، وضعه في ملف ‎.env في الخادم باسم GEMINI_API_KEY ثم أعد تشغيل الخادم.",
+        "gemini_key_refused": "رُفض مفتاح Gemini API. تحقّق من GEMINI_API_KEY في ملف ‎.env.",
+        "gemini_quota": "استهلك المدرب أسئلته المجانية حالياً. حاول مرة أخرى بعد قليل، أو غداً.",
+        "gemini_slow": "تأخّر المدرب في الإجابة. حاول مرة أخرى، أو اسأل سؤالاً أقصر.",
+        "gemini_note": "الإجابات من Google Gemini (الفئة المجانية): قد تستخدم Google الأسئلة والبيانات المرسلة معها "
+        "لتحسين منتجاتها.",
         "partial_failure": "أضفتُ: {done}. ثم حدث خطأ: {error}",
         "action_food": "{food}، {amount} ({kcal} سعرة{estimate}) في {meal}{when}",
         "ai_estimate": "، تقدير الذكاء الاصطناعي",
@@ -120,8 +137,10 @@ TEXTS: Table = {
 DISCLAIMER = TEXTS["en"]["disclaimer"]
 
 
-def disclaimer() -> str:
-    return tr(TEXTS, "disclaimer")
+def disclaimer(provider: str | None = None) -> str:
+    """Shown under the message box; with Gemini's free tier it also says where the questions go."""
+    text = tr(TEXTS, "disclaimer")
+    return f"{text} {tr(TEXTS, 'gemini_note')}" if provider == "gemini" else text
 
 
 def partial_failure(done: str, error: str) -> str:
@@ -904,3 +923,115 @@ class OllamaBackend:
                 detail = r.text
             raise AssistantError(502, _plain(tr(TEXTS, "ollama_failed", detail=detail)))
         return r.json()
+
+
+# Gemini and others that speak OpenAI's chat format take the same tool list Ollama does
+OPENAI_TOOLS = OLLAMA_TOOLS
+GEMINI_MAX_TOKENS = 8_000
+
+
+class GeminiBackend:
+    """Google Gemini through its OpenAI-compatible API: free tier, decent answers, a small shared daily quota.
+
+    When the main model is out of quota (429), the rest of the question goes to the fallback model, which has
+    its own quota on Google's side.
+    """
+
+    provider = "gemini"
+    metered = True  # questions count toward GEMINI_DAILY_LIMIT
+    retry_pause = 1.5  # seconds before trying a busy (503) model again
+
+    def __init__(self, http: httpx.Client, url: str, api_key: str, model: str, fallback_model: str | None = None):
+        self.http = http
+        self.url = url.rstrip("/")
+        self.api_key = api_key
+        self.model = model
+        self.fallback_model = fallback_model if fallback_model and fallback_model != model else None
+
+    def problem(self) -> str | None:
+        return None if self.api_key else tr(TEXTS, "gemini_no_key")
+
+    def ask(self, ctx: ToolContext, history: list[tuple[str, str]], question: str) -> Answer:
+        messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages += [{"role": role, "content": text} for role, text in history[-HISTORY_MESSAGES:]]
+        messages.append({"role": "user", "content": f"{question}\n\n{_context_note(ctx)}"})
+        used: list[str] = []
+        model = self.model
+        for _ in range(MAX_TOOL_ROUNDS):
+            reply, model = self._chat(messages, model)
+            choice = (reply.get("choices") or [{}])[0]
+            message = choice.get("message") or {}
+            calls = message.get("tool_calls") or []
+            if calls:
+                # sent back unchanged: Gemini needs the "thought signature" it put in each tool call
+                messages.append({k: v for k, v in message.items() if k in ("role", "content", "tool_calls")})
+                for call in calls:
+                    fn = call.get("function") or {}
+                    name, args = fn.get("name", ""), fn.get("arguments") or {}
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args) if args.strip() else {}
+                        except ValueError:
+                            args = {}
+                    used.append(name)
+                    text, is_error = run_tool(ctx, name, args if isinstance(args, dict) else {})
+                    messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": f"Error: {text}" if is_error else text})
+                continue
+            text = _THINK.sub("", message.get("content") or "").strip()
+            if choice.get("finish_reason") == "length":
+                text += tr(TEXTS, "cut_off")
+            return Answer(text or tr(TEXTS, "no_answer"), used)
+        return Answer(tr(TEXTS, "too_many_steps"), used)
+
+    def _chat(self, messages: list[dict], model: str) -> tuple[dict, str]:
+        """One model call; returns the reply and the model that gave it.
+
+        Google often answers 503 ("high demand") for a moment: that's tried once more after a short pause. A model
+        still busy or out of quota (429) hands the rest of the question to the fallback model.
+        """
+        r = self._post(messages, model)
+        if r.status_code in (500, 503):
+            time.sleep(self.retry_pause)
+            r = self._post(messages, model)
+        if r.status_code in (429, 500, 503) and self.fallback_model and model != self.fallback_model:
+            model = self.fallback_model
+            r = self._post(messages, model)
+        if r.status_code in (401, 403):
+            raise AssistantError(502, tr(TEXTS, "gemini_key_refused"))
+        if r.status_code == 429:
+            raise AssistantError(429, tr(TEXTS, "gemini_quota"))
+        if r.status_code >= 500:
+            raise AssistantError(503, tr(TEXTS, "busy"))
+        if r.status_code >= 400:
+            raise AssistantError(502, _plain(tr(TEXTS, "couldnt_answer", status=r.status_code, message=_error_text(r))))
+        try:
+            return r.json(), model
+        except ValueError:
+            raise AssistantError(502, _plain(tr(TEXTS, "couldnt_answer", status=r.status_code, message=r.text[:200])))
+
+    def _post(self, messages: list[dict], model: str) -> httpx.Response:
+        try:
+            return self.http.post(
+                f"{self.url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={"model": model, "messages": messages, "tools": OPENAI_TOOLS, "max_tokens": GEMINI_MAX_TOKENS},
+                timeout=90,
+            )
+        except httpx.TimeoutException:
+            raise AssistantError(504, tr(TEXTS, "gemini_slow"))
+        except httpx.HTTPError:
+            raise AssistantError(502, tr(TEXTS, "unreachable"))
+
+
+def _error_text(r: httpx.Response) -> str:
+    """The message in an OpenAI-style error body ({"error": {"message": ...}}, sometimes inside a list)."""
+    try:
+        body = r.json()
+    except ValueError:
+        return r.text[:200]
+    if isinstance(body, list) and body:
+        body = body[0]
+    error = body.get("error") if isinstance(body, dict) else None
+    if isinstance(error, dict):
+        return str(error.get("message") or error)[:200]
+    return str(error or body)[:200]

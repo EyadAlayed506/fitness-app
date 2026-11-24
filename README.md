@@ -178,7 +178,7 @@ The **Coach** tab is a chat assistant for training, sleep and food. It answers f
 
 In **Workouts**, the **Photo** button recognises a machine from a picture (choose one from your files or gallery, or use the camera) and suggests up to 3 exercises from the library; you tap the right one.
 
-It can run on two kinds of AI. `ASSISTANT_PROVIDER=auto` (the default) uses Claude when `ANTHROPIC_API_KEY` is set, otherwise Ollama. Voice and photos always run on your PC.
+It can run on three kinds of AI. `ASSISTANT_PROVIDER=auto` (the default) uses Claude when `ANTHROPIC_API_KEY` is set, else Gemini when `GEMINI_API_KEY` is set, otherwise Ollama. Voice and photos always run on your PC.
 
 **Free, on your PC (Ollama)**, the default:
 1. Install Ollama from https://ollama.com and leave it running.
@@ -197,7 +197,9 @@ Good to know: free, no daily limit, and your data, voice and photos stay on your
 
 **Paid, online (Claude):** create an API key at https://console.anthropic.com, put `ANTHROPIC_API_KEY=...` in `.env` and restart. Better answers; a question usually costs a few US cents and `ASSISTANT_DAILY_LIMIT` (default 50 per user per 24 hours) keeps the bill predictable. The data the assistant reads is sent to Anthropic. `ASSISTANT_MODEL` defaults to `claude-opus-5-5`.
 
-Either way it's an AI: it's told to quote your numbers, say when data is missing and not give medical advice, but it can still be wrong.
+**Free, online (Google Gemini):** create a free API key at https://aistudio.google.com (API Keys > Create API key), put `GEMINI_API_KEY=...` in `.env` and restart; the console says `Coach: Gemini (gemini-3.5-flash-lite, then gemini-3.1-flash-lite)`. The free tier's quota is small and shared by every user (about 500 requests a day for Flash Lite; one question is 2-4 requests), so `GEMINI_DAILY_LIMIT` (default 10 per user per 24 hours) keeps it from running out. When the main model is out of quota or busy, the rest of the question goes to `GEMINI_FALLBACK_MODEL`. On the free tier Google may use the questions and the data sent with them to improve its products, and the app says so under the message box. Turning on billing in AI Studio raises the limits and stops that.
+
+Whichever it is, it's an AI: it's told to quote your numbers, say when data is missing and not give medical advice, but it can still be wrong.
 
 ## Project layout
 

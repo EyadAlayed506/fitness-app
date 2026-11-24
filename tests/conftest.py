@@ -72,6 +72,16 @@ def whoop_off(monkeypatch):
     monkeypatch.setattr(settings, "whoop_base_url", "https://api.prod.whoop.com")
 
 
+@pytest.fixture(autouse=True)
+def no_real_coach_keys(monkeypatch):
+    """Tests never reach a real AI with the keys from a developer's own .env (each test fakes the coach)."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "assistant_provider", "auto")
+    monkeypatch.setattr(settings, "anthropic_api_key", "")
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    monkeypatch.setattr(settings, "gemini_url", "https://gemini.test/v1beta/openai")
+
+
 @pytest.fixture
 def session():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)

@@ -508,7 +508,7 @@ export interface AssistantStatus {
   /** why the assistant can't answer yet, and how to fix it */
   problem: string | null;
   /** "ollama": a free model on the user's PC; "claude": Anthropic's API (paid) */
-  provider: "claude" | "ollama";
+  provider: "claude" | "gemini" | "ollama";
   model: string;
   /** null: no limit (local model) */
   messages_left_today: number | null;

@@ -46,6 +46,7 @@ export default function Coach() {
   const status = assistant.data ?? null;
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null); // the question being answered
+  const [showNote, setShowNote] = useState(false); // the full disclaimer under the message box
   // a send error is kept as-is so it re-translates; voice errors arrive as text
   const [sendError, setError] = useState<unknown>(null);
   const error = sendError != null ? (typeof sendError === "string" ? sendError : errorText(sendError)) : status ? null : errorMessage(assistant.error);
@@ -97,7 +98,7 @@ export default function Coach() {
           <Row style={{ paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.sm, justifyContent: "space-between" }} gap={space.md}>
             <View style={{ flex: 1 }}>
               <Text style={[typeScale.overline, { color: t.muted, marginBottom: 2 }, rtlText]} numberOfLines={1}>
-                {status ? (status.provider === "ollama" ? tr("coach.onPc", { model: status.model }) : tr("coach.onClaude")).toLocaleUpperCase() : " "}
+                {status ? providerLabel(status, tr).toLocaleUpperCase() : " "}
               </Text>
               <Text style={[typeScale.title, { color: t.text }, rtlText]} accessibilityRole="header">
                 {tr("nav.coach")}
@@ -301,16 +302,35 @@ export default function Coach() {
                   </Txt>
                 </Row>
               ) : null}
-              <Txt variant="tiny" style={{ marginTop: space.sm, paddingHorizontal: space.xs, fontSize: 11, lineHeight: 15 }}>
-                {status.disclaimer}
-                {status.messages_left_today != null ? ` ${tn("coach.questionsLeft", status.messages_left_today)}` : ""}
-              </Txt>
+              <Pressable
+                onPress={() => setShowNote((v) => !v)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showNote }}
+                accessibilityLabel={tr(showNote ? "coach.noteLess" : "coach.noteMore")}
+                style={{ marginTop: space.sm, paddingHorizontal: space.xs }}
+              >
+                <Row gap={space.xs} style={{ alignItems: "flex-start" }}>
+                  <Txt variant="tiny" style={{ flex: 1, fontSize: 11, lineHeight: 15 }} numberOfLines={showNote ? undefined : 1}>
+                    {status.messages_left_today != null ? `${tn("coach.questionsLeft", status.messages_left_today)} ` : ""}
+                    {showNote ? status.disclaimer : tr("coach.noteShort")}
+                  </Txt>
+                  <Txt variant="tiny" style={{ fontSize: 11, lineHeight: 15, color: t.accent }}>
+                    {tr(showNote ? "coach.noteLess" : "coach.noteMore")}
+                  </Txt>
+                </Row>
+              </Pressable>
             </View>
           ) : null}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+/** The line above the title: which AI answers. */
+function providerLabel(status: AssistantStatus, tr: (key: MessageKey, values?: Record<string, string | number>) => string) {
+  if (status.provider === "ollama") return tr("coach.onPc", { model: status.model });
+  return tr(status.provider === "gemini" ? "coach.onGemini" : "coach.onClaude");
 }
 
 function Bubble({ message: m }: { message: ChatMessage }) {

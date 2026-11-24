@@ -197,7 +197,7 @@ def run_info() -> dict:
         "started": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
         "commit": current_commit(),
         "provider": provider,
-        "model": s.ollama_model if provider == "ollama" else s.assistant_model,
+        "model": {"ollama": s.ollama_model, "gemini": s.gemini_model}.get(provider, s.assistant_model),
         "ollama_num_ctx": s.ollama_num_ctx if provider == "ollama" else None,
         "prompt_sha256_12": hashlib.sha256(assistant.SYSTEM_PROMPT.encode()).hexdigest()[:12],
         "cases_version": load_cases()["version"],

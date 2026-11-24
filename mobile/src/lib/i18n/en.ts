@@ -704,6 +704,7 @@ export const en = {
   // ---------- coach ----------
   "coach.onPc": "On your PC · {model}",
   "coach.onClaude": "Runs on Claude",
+  "coach.onGemini": "Runs on Google Gemini",
   "coach.clear": "Clear conversation",
   "coach.clearTitle": "Clear the conversation?",
   "coach.clearText": "This deletes the messages for good.",
@@ -727,6 +728,9 @@ export const en = {
   "coach.send": "Send",
   "coach.recording": "Recording {time} · tap stop when you're done",
   "coach.transcribing": "Turning your voice into text…",
+  "coach.noteShort": "The coach is an AI and can make mistakes.",
+  "coach.noteMore": "More",
+  "coach.noteLess": "Less",
   "coach.questionsLeft": "{n} question left in the last 24 hours.|{n} questions left in the last 24 hours.",
   "coach.lookedAt": "Looked at: {sources}",
   "voice.noMic": "The microphone isn't available.",
